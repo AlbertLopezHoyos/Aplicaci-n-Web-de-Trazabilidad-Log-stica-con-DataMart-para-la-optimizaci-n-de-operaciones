@@ -1,0 +1,25 @@
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/database');
+
+const Envio = sequelize.define('envios', {
+  id_envio: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  codigo_envio: { type: DataTypes.STRING(30), allowNull: false, unique: true },
+  id_cliente: { type: DataTypes.INTEGER, allowNull: false },
+  id_estado_actual: { type: DataTypes.INTEGER, allowNull: false },
+  id_responsable: DataTypes.INTEGER,
+  origen: { type: DataTypes.STRING(255), allowNull: false },
+  destino: { type: DataTypes.STRING(255), allowNull: false },
+  fecha_registro: { type: DataTypes.DATEONLY, allowNull: false },
+  fecha_estimada_entrega: DataTypes.DATEONLY,
+  fecha_entrega_real: DataTypes.DATEONLY,
+  tipo_carga: { type: DataTypes.STRING(100), allowNull: false },
+  peso_kg: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
+  observaciones: DataTypes.TEXT,
+  prioridad: {
+    type: DataTypes.ENUM('baja', 'normal', 'alta', 'urgente'),
+    defaultValue: 'normal',
+  },
+  activo: { type: DataTypes.BOOLEAN, defaultValue: true },
+}, { tableName: 'envios', createdAt: 'created_at', updatedAt: 'updated_at' });
+
+module.exports = Envio;

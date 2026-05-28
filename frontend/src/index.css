@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-800 antialiased;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-salazar-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-salazar-900 focus:outline-none focus:ring-2 focus:ring-salazar-500 focus:ring-offset-2 disabled:opacity-50;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-salazar-800 transition hover:bg-slate-50;
+  }
+  .input-field {
+    @apply w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-salazar-500 focus:ring-2 focus:ring-salazar-500/20;
+  }
+  .card {
+    @apply rounded-xl border border-slate-100 bg-white p-6 shadow-card;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+}
+
+/* SweetAlert2 theme */
+.swal2-popup {
+  font-family: Inter, system-ui, sans-serif !important;
+}
