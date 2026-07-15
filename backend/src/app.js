@@ -20,6 +20,11 @@ app.use(
         callback(null, true);
         return;
       }
+      // Permite previews y producción en Vercel sin actualizar CORS cada vez
+      if (/\.vercel\.app$/i.test(origin)) {
+        callback(null, true);
+        return;
+      }
       callback(null, false);
     },
     credentials: true,

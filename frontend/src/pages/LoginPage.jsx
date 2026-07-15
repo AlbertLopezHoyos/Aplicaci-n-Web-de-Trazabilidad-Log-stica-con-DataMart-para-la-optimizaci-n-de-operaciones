@@ -20,7 +20,11 @@ const LoginPage = () => {
       await login(email, password);
       navigate('/dashboard');
     } catch (err) {
-      toastError('Acceso denegado', err.response?.data?.message || 'Credenciales inválidas');
+      const msg = err.response?.data?.message
+        || (err.request && !err.response
+          ? 'No se pudo conectar con la API. Revise VITE_API_URL en Vercel y redeploy.'
+          : 'Credenciales inválidas');
+      toastError('Acceso denegado', msg);
     } finally {
       setLoading(false);
     }
