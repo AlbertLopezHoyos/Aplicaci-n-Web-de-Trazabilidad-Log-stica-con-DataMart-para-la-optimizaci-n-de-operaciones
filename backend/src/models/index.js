@@ -9,6 +9,7 @@ const Incidencia = require('./Incidencia');
 const Evidencia = require('./Evidencia');
 const Reporte = require('./Reporte');
 const Auditoria = require('./Auditoria');
+const ErrorRegistro = require('./ErrorRegistro');
 
 // Asociaciones
 Rol.hasMany(Usuario, { foreignKey: 'id_rol', as: 'usuarios' });
@@ -43,6 +44,10 @@ Reporte.belongsTo(Usuario, { foreignKey: 'id_usuario', as: 'usuario' });
 Usuario.hasMany(Auditoria, { foreignKey: 'id_usuario', as: 'auditorias' });
 Auditoria.belongsTo(Usuario, { foreignKey: 'id_usuario', as: 'usuario' });
 
+Envio.hasMany(ErrorRegistro, { foreignKey: 'id_envio', as: 'erroresRegistro' });
+ErrorRegistro.belongsTo(Envio, { foreignKey: 'id_envio', as: 'envio' });
+ErrorRegistro.belongsTo(Usuario, { foreignKey: 'id_usuario', as: 'usuario' });
+
 module.exports = {
   sequelize,
   Rol,
@@ -55,4 +60,5 @@ module.exports = {
   Evidencia,
   Reporte,
   Auditoria,
+  ErrorRegistro,
 };

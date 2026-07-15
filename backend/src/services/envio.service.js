@@ -3,11 +3,19 @@ const envioRepo = require('../repositories/envio.repository');
 const { generarCodigoEnvio } = require('../utils/codigoEnvio');
 const { sanitizeObject } = require('../utils/sanitize');
 
+const calcularTiemposRegistro = (horaInicio) => {
+  const inicio = horaInicio ? new Date(horaInicio) : new Date();
+  const fin = new Date();
+  const diffMs = fin - inicio;
+  const minutos = Math.round((diffMs / 60000) * 100) / 100;
+  return { hora_inicio_registro: inicio, hora_fin_registro: fin, tiempo_registro_min: minutos };
+};
+
 const list = (filters) => envioRepo.findAllPaginated(filters);
 
 const getById = async (id) => {
   const envio = await envioRepo.findById(id);
-  if (!envio) throw Object.assign(new Error('Envío no encontrado'), { statusCode: 404 });
+  if (!envio || !envio.activo) throw Object.assign(new Error('Envío no encontrado'), { statusCode: 404 });
   return envio;
 };
 
@@ -17,12 +25,22 @@ const create = async (data, userId) => {
   const estadoInicial = await EstadoEnvio.findOne({ where: { codigo: 'recibido' } });
   if (!estadoInicial) throw new Error('Estado inicial no configurado');
 
+  const tiempos = calcularTiemposRegistro(clean.hora_inicio_registro);
+  const peso = parseFloat(clean.peso_kg);
+  if (clean.peso_kg !== undefined && clean.peso_kg !== '' && (Number.isNaN(peso) || peso < 0)) {
+    throw Object.assign(new Error('Peso inválido'), { statusCode: 400 });
+  }
+
   const envio = await Envio.create({
     ...clean,
     codigo_envio: codigo,
     id_estado_actual: clean.id_estado_actual || estadoInicial.id_estado,
     id_responsable: clean.id_responsable || userId,
     fecha_registro: clean.fecha_registro || new Date().toISOString().split('T')[0],
+    numero_paquetes: parseInt(clean.numero_paquetes, 10) || 1,
+    peso_kg: Number.isNaN(peso) ? 0 : peso,
+    ...tiempos,
+    registro_correcto: true,
   });
 
   await Auditoria.create({
@@ -30,7 +48,10 @@ const create = async (data, userId) => {
     tabla_afectada: 'envios',
     accion: 'INSERT',
     registro_id: String(envio.id_envio),
-    datos_nuevos: { codigo_envio: codigo },
+    datos_nuevos: {
+      codigo_envio: codigo,
+      tiempo_registro_min: tiempos.tiempo_registro_min,
+    },
   });
 
   return getById(envio.id_envio);
@@ -40,6 +61,7 @@ const update = async (id, data, userId) => {
   const envio = await Envio.findByPk(id);
   if (!envio || !envio.activo) throw Object.assign(new Error('Envío no encontrado'), { statusCode: 404 });
   const clean = sanitizeObject(data, ['origen', 'destino', 'tipo_carga', 'observaciones']);
+  if (clean.numero_paquetes !== undefined) clean.numero_paquetes = parseInt(clean.numero_paquetes, 10) || 1;
   const anterior = envio.toJSON();
   await envio.update(clean);
   await Auditoria.create({
@@ -66,8 +88,8 @@ const remove = async (id, userId) => {
 };
 
 const actualizarEstado = async (id, { id_estado, ubicacion, comentario }, userId) => {
-  const envio = await Envio.findByPk(id, { include: [{ model: EstadoEnvio, as: 'estadoActual' }] });
-  if (!envio) throw Object.assign(new Error('Envío no encontrado'), { statusCode: 404 });
+  const envio = await Envio.findByPk(id);
+  if (!envio || !envio.activo) throw Object.assign(new Error('Envío no encontrado'), { statusCode: 404 });
 
   const estado = await EstadoEnvio.findByPk(id_estado);
   if (!estado) throw Object.assign(new Error('Estado no válido'), { statusCode: 400 });
@@ -75,7 +97,6 @@ const actualizarEstado = async (id, { id_estado, ubicacion, comentario }, userId
   await envio.update({
     id_estado_actual: id_estado,
     ...(estado.codigo === 'entregado' ? { fecha_entrega_real: new Date().toISOString().split('T')[0] } : {}),
-    ...(estado.codigo === 'retrasado' ? {} : {}),
   });
 
   await HistorialEstado.create({

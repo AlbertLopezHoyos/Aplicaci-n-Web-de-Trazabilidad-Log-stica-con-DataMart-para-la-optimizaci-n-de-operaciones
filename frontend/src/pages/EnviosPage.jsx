@@ -97,6 +97,7 @@ const EnviosPage = () => {
                 <th className="px-4 py-3">Cliente</th>
                 <th className="px-4 py-3">Ruta</th>
                 <th className="px-4 py-3">Carga</th>
+                <th className="px-4 py-3">Tiempo reg.</th>
                 <th className="px-4 py-3">Estado</th>
                 <th className="px-4 py-3">Fecha</th>
                 <th className="px-4 py-3 text-right">Acciones</th>
@@ -112,7 +113,10 @@ const EnviosPage = () => {
                   </td>
                   <td className="px-4 py-3">
                     {e.tipo_carga}
-                    <span className="block text-xs text-slate-400">{e.peso_kg} kg</span>
+                    <span className="block text-xs text-slate-400">{e.peso_kg} kg · {e.numero_paquetes ?? 1} paq.</span>
+                  </td>
+                  <td className="px-4 py-3 text-xs">
+                    {e.tiempo_registro_min != null ? `${e.tiempo_registro_min} min` : '—'}
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge estado={e.estadoActual} />

@@ -13,6 +13,8 @@ router.post(
   [
     body('tipo').isIn(['envios_estado', 'tiempos', 'incidencias', 'productividad']),
     body('formato').isIn(['pdf', 'excel']),
+    body('area_solicitante').optional().notEmpty(),
+    body('observaciones').optional(),
   ],
   validate,
   reporteController.generar

@@ -9,6 +9,7 @@ import EnvioFormPage from '../pages/EnvioFormPage';
 import SeguimientoPage from '../pages/SeguimientoPage';
 import IncidenciasPage from '../pages/IncidenciasPage';
 import ReportesPage from '../pages/ReportesPage';
+import ObservacionPage from '../pages/ObservacionPage';
 import DataMartPage from '../pages/DataMartPage';
 
 const PrivateRoute = ({ children }) => {
@@ -47,6 +48,7 @@ const AppRoutes = () => (
       <Route path="seguimiento/:id" element={<SeguimientoPage />} />
       <Route path="incidencias" element={<IncidenciasPage />} />
       <Route path="reportes" element={<ReportesPage />} />
+      <Route path="observacion" element={<ObservacionPage />} />
       <Route path="datamart" element={<DataMartPage />} />
     </Route>
     <Route path="*" element={<Navigate to="/dashboard" replace />} />

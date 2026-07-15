@@ -2,58 +2,57 @@ const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
-const { sequelize, Reporte, Envio, Incidencia, Cliente, EstadoEnvio } = require('../models');
+const { sequelize, Reporte, Envio, Incidencia, Cliente } = require('../models');
 const { QueryTypes } = require('sequelize');
 
 const reportsDir = path.join(__dirname, '../../uploads/reportes');
 if (!fs.existsSync(reportsDir)) fs.mkdirSync(reportsDir, { recursive: true });
 
 const getDatosEnviosPorEstado = async () => {
-  return sequelize.query('SELECT * FROM vw_envios_por_estado', { type: QueryTypes.SELECT });
+  try {
+    return await sequelize.query('SELECT * FROM vw_envios_por_estado', { type: QueryTypes.SELECT });
+  } catch {
+    return [];
+  }
 };
 
 const getDatosProductividad = async () => {
-  return sequelize.query('SELECT * FROM vw_productividad_operadores', { type: QueryTypes.SELECT });
+  try {
+    return await sequelize.query('SELECT * FROM vw_productividad_operadores', { type: QueryTypes.SELECT });
+  } catch {
+    return [];
+  }
 };
 
-const getDatosIncidencias = async () => {
-  return Incidencia.findAll({
+const getDatosIncidencias = async () =>
+  Incidencia.findAll({
     include: [{ model: Envio, as: 'envio', attributes: ['codigo_envio'] }],
     order: [['fecha_reporte', 'DESC']],
     limit: 500,
   });
-};
 
-const getDatosTiempos = async () => {
-  return Envio.findAll({
+const getDatosTiempos = async () =>
+  Envio.findAll({
     where: { fecha_entrega_real: { [require('sequelize').Op.ne]: null } },
     attributes: ['codigo_envio', 'fecha_registro', 'fecha_entrega_real', 'fecha_estimada_entrega'],
     include: [{ model: Cliente, as: 'cliente', attributes: ['razon_social'] }],
     limit: 500,
   });
-};
 
 const generarPDF = async (titulo, filas, columnas, filename) => {
   const filepath = path.join(reportsDir, filename);
   const doc = new PDFDocument({ margin: 50 });
   const stream = fs.createWriteStream(filepath);
   doc.pipe(stream);
-
   doc.fontSize(18).fillColor('#0B3D6E').text('Grupo Logístico Salazar S.A.C.', { align: 'center' });
   doc.fontSize(12).fillColor('#333').text('Sistema de Trazabilidad Logística - Lima 2026', { align: 'center' });
   doc.moveDown();
   doc.fontSize(14).text(titulo, { underline: true });
   doc.moveDown();
   doc.fontSize(9);
-
-  const header = columnas.join(' | ');
-  doc.text(header);
+  doc.text(columnas.join(' | '));
   doc.moveDown(0.5);
-  filas.forEach((row) => {
-    const line = columnas.map((c) => String(row[c] ?? '')).join(' | ');
-    doc.text(line);
-  });
-
+  filas.forEach((row) => doc.text(columnas.map((c) => String(row[c] ?? '')).join(' | ')));
   doc.end();
   await new Promise((resolve) => stream.on('finish', resolve));
   return `/uploads/reportes/${filename}`;
@@ -64,13 +63,14 @@ const generarExcel = async (titulo, filas, columnas, filename) => {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet(titulo.slice(0, 31));
   ws.addRow(columnas);
-  filas.forEach((row) => ws.addRow(columnas.map((c) => row[c])));
+  filas.forEach((row) => ws.addRow(columnas.map((c) => row[c] ?? '')));
   ws.getRow(1).font = { bold: true };
   await wb.xlsx.writeFile(filepath);
   return `/uploads/reportes/${filename}`;
 };
 
-const generar = async ({ tipo, formato, titulo, userId }) => {
+const generar = async ({ tipo, formato, titulo, userId, area_solicitante, observaciones }) => {
+  const horaInicio = new Date();
   let filas = [];
   let columnas = [];
   let tipoReporte = tipo;
@@ -121,6 +121,9 @@ const generar = async ({ tipo, formato, titulo, userId }) => {
       ? await generarExcel(titulo, filas, columnas, filename)
       : await generarPDF(titulo, filas, columnas, filename);
 
+  const horaFin = new Date();
+  const tiempoMin = Math.round(((horaFin - horaInicio) / 60000) * 100) / 100;
+
   const reporte = await Reporte.create({
     id_usuario: userId,
     tipo_reporte: tipoReporte,
@@ -129,6 +132,12 @@ const generar = async ({ tipo, formato, titulo, userId }) => {
     ruta_archivo: ruta,
     formato: formato === 'excel' ? 'excel' : 'pdf',
     estado: 'generado',
+    hora_inicio: horaInicio,
+    hora_fin: horaFin,
+    tiempo_generacion_min: tiempoMin,
+    area_solicitante: area_solicitante || 'Operaciones',
+    cantidad_registros: filas.length,
+    observaciones: observaciones || null,
   });
 
   return { reporte, downloadUrl: ruta };

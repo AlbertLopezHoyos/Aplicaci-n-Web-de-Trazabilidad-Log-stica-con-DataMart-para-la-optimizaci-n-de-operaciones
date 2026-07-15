@@ -12,6 +12,8 @@ const clientes = [
   { id_cliente: 3, razon_social: 'Importaciones del Pacífico S.A.', ruc: '20456789123' },
 ];
 
+const responsable = { nombres: 'María', apellidos: 'Torres Vega' };
+
 let envios = [
   {
     id_envio: 1,
@@ -21,37 +23,21 @@ let envios = [
     origen: 'Lima - Surquillo',
     destino: 'Arequipa Centro',
     fecha_registro: '2026-05-20',
-    fecha_estimada_entrega: '2026-05-22',
     tipo_carga: 'Carga general',
     peso_kg: 450,
-    prioridad: 'normal',
-    observaciones: 'Demo sin base de datos',
+    numero_paquetes: 12,
+    hora_inicio_registro: '2026-05-20T09:00:00',
+    hora_fin_registro: '2026-05-20T09:04:30',
+    tiempo_registro_min: 4.5,
+    registro_correcto: true,
+    observaciones: 'Registro demo',
     cliente: clientes[0],
     estadoActual: estados[2],
+    responsable,
     historial: [
-      {
-        id_historial: 3,
-        fecha_hora: '2026-05-22T14:00:00',
-        comentario: 'Entrega confirmada',
-        ubicacion: 'Arequipa',
-        estado: estados[2],
-        usuario: { nombres: 'María', apellidos: 'Torres' },
-      },
-      {
-        id_historial: 2,
-        fecha_hora: '2026-05-21T08:00:00',
-        comentario: 'Salida de planta Lima',
-        ubicacion: 'Panamericana Sur',
-        estado: estados[1],
-        usuario: { nombres: 'María', apellidos: 'Torres' },
-      },
-      {
-        id_historial: 1,
-        fecha_hora: '2026-05-20T09:00:00',
-        comentario: 'Registro inicial',
-        estado: estados[0],
-        usuario: { nombres: 'María', apellidos: 'Torres' },
-      },
+      { id_historial: 3, fecha_hora: '2026-05-22T14:00:00', comentario: 'Entrega confirmada', estado: estados[2], usuario: responsable },
+      { id_historial: 2, fecha_hora: '2026-05-21T08:00:00', comentario: 'En ruta', estado: estados[1], usuario: responsable },
+      { id_historial: 1, fecha_hora: '2026-05-20T09:05:00', comentario: 'Registro inicial', estado: estados[0], usuario: responsable },
     ],
   },
   {
@@ -64,16 +50,16 @@ let envios = [
     fecha_registro: '2026-05-25',
     tipo_carga: 'Encomienda',
     peso_kg: 25,
+    numero_paquetes: 1,
+    hora_inicio_registro: '2026-05-25T10:15:00',
+    hora_fin_registro: '2026-05-25T10:17:20',
+    tiempo_registro_min: 2.33,
+    registro_correcto: true,
     cliente: clientes[1],
     estadoActual: estados[1],
+    responsable,
     historial: [
-      {
-        id_historial: 10,
-        fecha_hora: '2026-05-26T10:00:00',
-        comentario: 'En ruta',
-        estado: estados[1],
-        usuario: { nombres: 'María', apellidos: 'Torres' },
-      },
+      { id_historial: 10, fecha_hora: '2026-05-26T10:00:00', comentario: 'En ruta', estado: estados[1], usuario: responsable },
     ],
   },
   {
@@ -86,9 +72,35 @@ let envios = [
     fecha_registro: '2026-05-24',
     tipo_carga: 'Carga refrigerada',
     peso_kg: 800,
+    numero_paquetes: 8,
+    hora_inicio_registro: '2026-05-24T08:30:00',
+    hora_fin_registro: '2026-05-24T08:38:00',
+    tiempo_registro_min: 8,
+    registro_correcto: false,
     cliente: clientes[2],
     estadoActual: estados[3],
+    responsable,
     historial: [],
+  },
+];
+
+let erroresRegistro = [
+  { id_error: 1, id_envio: 3, tipo_error: 'validacion', campo_afectado: 'destino', descripcion: 'Destino incompleto corregido' },
+];
+
+let reportesHistorial = [
+  {
+    id_reporte: 1,
+    titulo: 'Reporte de envíos por estado',
+    tipo_reporte: 'envios_estado',
+    formato: 'pdf',
+    area_solicitante: 'Operaciones',
+    tiempo_generacion_min: 1.2,
+    cantidad_registros: 4,
+    hora_inicio: '2026-05-26T09:00:00',
+    hora_fin: '2026-05-26T09:01:12',
+    observaciones: 'Demo',
+    ruta_archivo: null,
   },
 ];
 
@@ -99,7 +111,7 @@ let incidencias = [
     tipo: 'retraso',
     severidad: 'alta',
     titulo: 'Retraso por obras viales',
-    descripcion: 'Demora estimada 24h en Panamericana Norte.',
+    descripcion: 'Demora estimada 24h.',
     estado_incidencia: 'abierta',
     fecha_reporte: '2026-05-26T11:00:00',
     envio: { codigo_envio: 'GLS-2026-00003' },
@@ -109,39 +121,132 @@ let incidencias = [
 let evidencias = [];
 let nextEnvioId = 4;
 let nextIncidenciaId = 2;
+let nextErrorId = 2;
+let nextReporteId = 2;
 
 const ok = (data, message = 'OK') => Promise.resolve({ data: { success: true, message, data } });
 
+const fmtTime = (iso) => (iso ? new Date(iso).toTimeString().slice(0, 8) : null);
+
+const buildFichaEficiencia = () =>
+  envios.map((e) => ({
+    codigo_envio: e.codigo_envio,
+    fecha: e.fecha_registro,
+    tipo_mercaderia: e.tipo_carga,
+    peso_kg: e.peso_kg,
+    numero_paquetes: e.numero_paquetes,
+    origen: e.origen,
+    destino: e.destino,
+    hora_inicio: fmtTime(e.hora_inicio_registro),
+    hora_fin: fmtTime(e.hora_fin_registro),
+    tiempo_registro_min: e.tiempo_registro_min,
+    usuario_responsable: e.responsable ? `${e.responsable.nombres} ${e.responsable.apellidos}` : 'María Torres Vega',
+    observaciones: e.observaciones,
+  }));
+
+const buildFichaCalidad = () =>
+  envios.map((e) => {
+    const err = erroresRegistro.find((x) => x.id_envio === e.id_envio);
+    const tieneError = !e.registro_correcto || err;
+    return {
+      codigo_envio: e.codigo_envio,
+      fecha: e.fecha_registro,
+      tipo_mercaderia: e.tipo_carga,
+      destino: e.destino,
+      numero_paquetes: e.numero_paquetes,
+      error_en_registro: tieneError ? 'Sí' : 'No',
+      tipo_error: err?.tipo_error || null,
+      campo_afectado: err?.campo_afectado || null,
+      observaciones: e.observaciones,
+    };
+  });
+
+const buildFichaControl = () =>
+  envios.map((e) => ({
+    codigo_envio: e.codigo_envio,
+    fecha: e.fecha_registro,
+    tipo_mercaderia: e.tipo_carga,
+    origen: e.origen,
+    destino: e.destino,
+    estado_actual: e.estadoActual?.nombre,
+    estado_actualizado: (e.historial?.length > 1 || e.estadoActual?.codigo !== 'recibido') ? 'Sí' : 'No',
+    fecha_actualizacion: e.historial?.[0]?.fecha_hora?.split('T')[0] || null,
+    hora_actualizacion: fmtTime(e.historial?.[0]?.fecha_hora),
+    responsable_actualizacion: e.historial?.[0]?.usuario
+      ? `${e.historial[0].usuario.nombres} ${e.historial[0].usuario.apellidos}`
+      : null,
+    observaciones: e.observaciones,
+  }));
+
+const buildFichaReportes = () =>
+  reportesHistorial.map((r) => ({
+    fecha: r.hora_inicio?.split('T')[0],
+    tipo_reporte: r.tipo_reporte,
+    area_solicitante: r.area_solicitante,
+    hora_inicio: fmtTime(r.hora_inicio),
+    hora_fin: fmtTime(r.hora_fin),
+    tiempo_generacion_min: r.tiempo_generacion_min,
+    cantidad_registros_analizados: r.cantidad_registros,
+    productividad_registros_hora: r.cantidad_registros && r.tiempo_generacion_min
+      ? Math.round((r.cantidad_registros / (r.tiempo_generacion_min / 60)) * 100) / 100
+      : null,
+    productividad_tiempos_registro: r.tiempo_generacion_min
+      ? Math.round((60 / r.tiempo_generacion_min) * 100) / 100
+      : null,
+    usuario_genera: 'Carlos Salazar Mendoza',
+    observaciones: r.observaciones,
+  }));
+
+const calcIndicadores = () => {
+  const tiempos = envios.filter((e) => e.tiempo_registro_min != null).map((e) => e.tiempo_registro_min);
+  const tpre = tiempos.length ? tiempos.reduce((a, b) => a + b, 0) / tiempos.length : 0;
+  const conError = envios.filter((e) => !e.registro_correcto || erroresRegistro.some((x) => x.id_envio === e.id_envio)).length;
+  const per = envios.length ? (conError / envios.length) * 100 : 0;
+  const actualizados = envios.filter((e) => e.historial?.length > 1 || e.estadoActual?.codigo !== 'recibido').length;
+  const peea = envios.length ? (actualizados / envios.length) * 100 : 0;
+  const tpgroRows = reportesHistorial.filter((r) => r.tiempo_generacion_min != null).map((r) => r.tiempo_generacion_min);
+  const tpgro = tpgroRows.length ? tpgroRows.reduce((a, b) => a + b, 0) / tpgroRows.length : 0;
+  return {
+    tpre: Math.round(tpre * 100) / 100,
+    per: Math.round(per * 100) / 100,
+    peea: Math.round(peea * 100) / 100,
+    tpgro: Math.round(tpgro * 100) / 100,
+    totalEnvios: envios.length,
+    totalReportes: reportesHistorial.length,
+  };
+};
+
 export const mockHandlers = {
-  'GET /auth/me': () => ok({ id_usuario: 1, nombres: 'Carlos', apellidos: 'Salazar Mendoza', email: 'admin@salazarlogistica.pe', rol: { nombre: 'Administrador' } }),
+  'GET /auth/me': () =>
+    ok({
+      id_usuario: 1,
+      nombres: 'Carlos',
+      apellidos: 'Salazar Mendoza',
+      email: 'admin@salazarlogistica.pe',
+      rol: { nombre: 'Administrador' },
+    }),
 
   'GET /dashboard': () =>
     ok({
       kpis: {
-        totalEnvios: 8,
-        enviosEntregados: 3,
-        enviosPendientes: 4,
-        incidenciasAbiertas: 1,
+        totalEnvios: envios.length,
+        enviosEntregados: envios.filter((e) => e.estadoActual?.codigo === 'entregado').length,
+        enviosPendientes: envios.filter((e) => ['recibido', 'en_transito', 'retrasado'].includes(e.estadoActual?.codigo)).length,
+        incidenciasAbiertas: incidencias.filter((i) => i.estado_incidencia === 'abierta').length,
         diasPromedioEntrega: 2.4,
       },
-      porEstado: [
-        { codigo: 'recibido', estado: 'Recibido', cantidad: 2, color_hex: '#3b82f6' },
-        { codigo: 'en_transito', estado: 'En tránsito', cantidad: 2, color_hex: '#f59e0b' },
-        { codigo: 'entregado', estado: 'Entregado', cantidad: 3, color_hex: '#22c55e' },
-        { codigo: 'retrasado', estado: 'Retrasado', cantidad: 1, color_hex: '#ef4444' },
-      ],
+      porEstado: estados.map((s) => ({
+        codigo: s.codigo,
+        estado: s.nombre,
+        cantidad: envios.filter((e) => e.id_estado_actual === s.id_estado).length,
+        color_hex: s.color_hex,
+      })),
       tendencia: [
-        { mes: '2026-01', total: 12, entregados: 10 },
-        { mes: '2026-02', total: 15, entregados: 13 },
-        { mes: '2026-03', total: 18, entregados: 16 },
-        { mes: '2026-04', total: 22, entregados: 19 },
-        { mes: '2026-05', total: 8, entregados: 3 },
+        { mes: '2026-03', total: 5, entregados: 4 },
+        { mes: '2026-04', total: 8, entregados: 6 },
+        { mes: '2026-05', total: envios.length, entregados: 1 },
       ],
-      incidencias: [
-        { tipo: 'retraso', cantidad: 5 },
-        { tipo: 'error', cantidad: 2 },
-        { tipo: 'observacion', cantidad: 8 },
-      ],
+      incidencias: [{ tipo: 'retraso', cantidad: 1 }],
     }),
 
   'GET /envios': (config) => {
@@ -164,52 +269,30 @@ export const mockHandlers = {
 
   'GET /catalogos/estados': () => ok(estados),
   'GET /catalogos/clientes': () => ok(clientes),
-
-  'GET /incidencias': (config) => {
-    const page = Number(config.params?.page) || 1;
-    return ok({ data: incidencias, total: incidencias.length, page });
-  },
-
-  'GET /reportes/historial': () => ok([]),
-
+  'GET /incidencias': (config) => ok({ data: incidencias, total: incidencias.length, page: Number(config.params?.page) || 1 }),
+  'GET /reportes/historial': () => ok(reportesHistorial),
+  'GET /observacion/indicadores': () => ok(calcIndicadores()),
   'GET /datamart/design': () =>
     ok({
       nombre: 'DataMart Operaciones Logísticas',
       version: '1.0.0',
       esquema: 'estrella',
-      etl: { extraccion: 'Modo demo — conectar MySQL para ETL real' },
-      dashboardsBI: ['Panel OTIF', 'Productividad operadores', 'Incidencias por tipo'],
-      tablas: { hechos: { fact_operaciones_logisticas: { metricas: ['peso_kg', 'dias_transito', 'cantidad_incidencias'] } } },
+      etl: { extraccion: 'Modo demo' },
+      dashboardsBI: ['Panel OTIF'],
+      tablas: { hechos: { fact_operaciones_logisticas: { metricas: ['peso_kg'] } } },
     }),
-
   'GET /datamart/preview': () =>
-    ok({
-      totalHechos: 0,
-      dimensiones: [
-        { tabla: 'dim_fecha', registros: 1461 },
-        { tabla: 'dim_cliente', registros: 3 },
-        { tabla: 'dim_estado', registros: 5 },
-        { tabla: 'dim_operador', registros: 2 },
-      ],
-    }),
-
-  'POST /datamart/etl/run': () => ok({ ok: true, filasCargadas: 0, mensaje: 'ETL disponible cuando conecte MySQL' }),
-
-  'POST /reportes/generar': () =>
-    ok({
-      reporte: { id_reporte: 1, titulo: 'Reporte demo' },
-      downloadUrl: null,
-    }, 'Reporte demo (conecte API para descargar PDF/Excel)'),
+    ok({ totalHechos: 0, dimensiones: [{ tabla: 'dim_fecha', registros: 1461 }] }),
+  'POST /datamart/etl/run': () => ok({ ok: true, filasCargadas: 0 }),
 };
 
 const matchRoute = (method, url) => {
   const path = url.replace(/^\//, '').split('?')[0];
-  const key = `${method.toUpperCase()} /${path}`;
-  if (mockHandlers[key]) return key;
-
   if (method === 'get' && path.match(/^envios\/\d+$/)) return 'GET_ENVIO_ID';
   if (method === 'get' && path.match(/^envios\/\d+\/timeline$/)) return 'GET_ENVIO_TIMELINE';
   if (method === 'get' && path.match(/^evidencias\/envio\/\d+$/)) return 'GET_EVIDENCIAS';
+  if (method === 'get' && path.match(/^observacion\/ficha\/[1-4]$/)) return 'GET_FICHA';
+  if (method === 'get' && path.match(/^observacion\/ficha\/[1-4]\/export$/)) return 'GET_FICHA_EXPORT';
   return null;
 };
 
@@ -217,56 +300,76 @@ export const handleMockRequest = async (config) => {
   const method = (config.method || 'get').toLowerCase();
   const url = (config.url || '').replace(/^\/api/, '').replace(/^\//, '');
   const path = url.split('?')[0];
+  const body = typeof config.data === 'string' ? JSON.parse(config.data || '{}') : config.data || {};
 
   const key = matchRoute(method, path);
   if (key === 'GET_ENVIO_ID') {
-    const id = Number(path.split('/')[1]);
-    const envio = envios.find((e) => e.id_envio === id);
+    const envio = envios.find((e) => e.id_envio === Number(path.split('/')[1]));
     if (!envio) return Promise.reject({ response: { data: { message: 'No encontrado' }, status: 404 } });
     return ok(envio);
   }
   if (key === 'GET_ENVIO_TIMELINE') {
-    const id = Number(path.split('/')[1]);
-    const envio = envios.find((e) => e.id_envio === id);
+    const envio = envios.find((e) => e.id_envio === Number(path.split('/')[1]));
     return ok(envio?.historial || []);
   }
   if (key === 'GET_EVIDENCIAS') {
-    const id = Number(path.split('/').pop());
-    return ok(evidencias.filter((e) => e.id_envio === id));
+    return ok(evidencias.filter((e) => e.id_envio === Number(path.split('/').pop())));
+  }
+  if (key === 'GET_FICHA') {
+    const dim = Number(path.split('/')[2]);
+    const builders = { 1: buildFichaEficiencia, 2: buildFichaCalidad, 3: buildFichaControl, 4: buildFichaReportes };
+    const data = builders[dim]?.() || [];
+    return ok({ dimension: dim, data });
+  }
+  if (key === 'GET_FICHA_EXPORT') {
+    return ok({ downloadUrl: null, filas: buildFichaEficiencia(), mensaje: 'Export Excel disponible con MySQL' });
   }
 
   const handlerKey = `${method.toUpperCase()} /${path}`;
   if (mockHandlers[handlerKey]) return mockHandlers[handlerKey](config);
 
   if (method === 'post' && path === 'envios') {
-    const body = config.data || {};
     const estado = estados.find((s) => s.codigo === 'recibido');
+    const inicio = body.hora_inicio_registro ? new Date(body.hora_inicio_registro) : new Date(Date.now() - 180000);
+    const fin = new Date();
+    const tiempoMin = Math.round(((fin - inicio) / 60000) * 100) / 100;
+    const id = nextEnvioId++;
     const nuevo = {
-      id_envio: nextEnvioId++,
-      codigo_envio: `GLS-2026-${String(nextEnvioId).padStart(5, '0')}`,
+      id_envio: id,
+      codigo_envio: `GLS-2026-${String(id).padStart(5, '0')}`,
       ...body,
       id_estado_actual: estado.id_estado,
       estadoActual: estado,
       cliente: clientes.find((c) => c.id_cliente === Number(body.id_cliente)) || clientes[0],
-      historial: [],
+      responsable,
+      numero_paquetes: parseInt(body.numero_paquetes, 10) || 1,
+      hora_inicio_registro: inicio.toISOString(),
+      hora_fin_registro: fin.toISOString(),
+      tiempo_registro_min: tiempoMin,
+      registro_correcto: true,
+      historial: [{
+        id_historial: Date.now(),
+        fecha_hora: fin.toISOString(),
+        comentario: 'Registro inicial',
+        estado,
+        usuario: responsable,
+      }],
     };
     envios.unshift(nuevo);
-    return ok(nuevo, 'Envío registrado (demo)', 201);
+    return ok(nuevo, 'Envío registrado (demo)');
   }
 
   if (method === 'put' && path.match(/^envios\/\d+$/)) {
     const id = Number(path.split('/')[1]);
     const idx = envios.findIndex((e) => e.id_envio === id);
     if (idx >= 0) {
-      envios[idx] = { ...envios[idx], ...config.data };
-      return ok(envios[idx], 'Actualizado (demo)');
+      envios[idx] = { ...envios[idx], ...body };
+      return ok(envios[idx]);
     }
   }
 
   if (method === 'patch' && path.match(/^envios\/\d+\/estado$/)) {
-    const id = Number(path.split('/')[1]);
-    const body = config.data || {};
-    const envio = envios.find((e) => e.id_envio === id);
+    const envio = envios.find((e) => e.id_envio === Number(path.split('/')[1]));
     const estado = estados.find((s) => s.id_estado === Number(body.id_estado));
     if (envio && estado) {
       envio.id_estado_actual = estado.id_estado;
@@ -278,38 +381,57 @@ export const handleMockRequest = async (config) => {
         comentario: body.comentario || `Cambio a ${estado.nombre}`,
         ubicacion: body.ubicacion,
         estado,
-        usuario: { nombres: 'María', apellidos: 'Torres' },
+        usuario: responsable,
       });
-      return ok(envio, 'Estado actualizado (demo)');
+      return ok(envio);
     }
   }
 
   if (method === 'post' && path === 'incidencias') {
-    const body = config.data || {};
     const envio = envios.find((e) => e.id_envio === Number(body.id_envio));
-    const inc = {
-      id_incidencia: nextIncidenciaId++,
-      ...body,
-      fecha_reporte: new Date().toISOString(),
-      estado_incidencia: 'abierta',
-      envio: envio ? { codigo_envio: envio.codigo_envio } : {},
-    };
+    const inc = { id_incidencia: nextIncidenciaId++, ...body, fecha_reporte: new Date().toISOString(), envio: envio ? { codigo_envio: envio.codigo_envio } : {} };
     incidencias.unshift(inc);
-    return ok(inc, 'Incidencia registrada (demo)', 201);
+    return ok(inc);
+  }
+
+  if (method === 'post' && path === 'observacion/errores-registro') {
+    erroresRegistro.unshift({ id_error: nextErrorId++, ...body, id_usuario: 1 });
+    return ok(body);
+  }
+
+  if (method === 'post' && path === 'reportes/generar') {
+    const inicio = new Date();
+    const tiempoMin = Math.round((Math.random() * 2 + 0.5) * 100) / 100;
+    const fin = new Date(inicio.getTime() + tiempoMin * 60000);
+    const rep = {
+      id_reporte: nextReporteId++,
+      titulo: `Reporte ${body.tipo}`,
+      tipo_reporte: body.tipo,
+      formato: body.formato,
+      area_solicitante: body.area_solicitante || 'Operaciones',
+      observaciones: body.observaciones,
+      tiempo_generacion_min: tiempoMin,
+      cantidad_registros: envios.length,
+      hora_inicio: inicio.toISOString(),
+      hora_fin: fin.toISOString(),
+      ruta_archivo: null,
+      estado: 'generado',
+    };
+    reportesHistorial.unshift(rep);
+    return ok({ reporte: rep, downloadUrl: null });
   }
 
   if (method === 'delete' && path.match(/^envios\/\d+$/)) {
-    const id = Number(path.split('/')[1]);
-    envios = envios.filter((e) => e.id_envio !== id);
-    return ok(null, 'Eliminado (demo)');
+    envios = envios.filter((e) => e.id_envio !== Number(path.split('/')[1]));
+    return ok(null);
   }
 
   if (method === 'post' && path === 'auth/logout') return ok(null);
   if (method === 'post' && path === 'evidencias/upload') {
-    return ok({ nombre_archivo: 'demo.jpg', ruta_archivo: '#' }, 'Evidencia demo', 201);
+    const ev = { id_evidencia: Date.now(), id_envio: Number(body.id_envio), nombre_archivo: 'demo.jpg', ruta_archivo: '#' };
+    evidencias.push(ev);
+    return ok(ev);
   }
 
-  return Promise.reject({
-    response: { status: 404, data: { message: `Mock no definido: ${method} ${path}` } },
-  });
+  return Promise.reject({ response: { status: 404, data: { message: `Mock: ${method} ${path}` } } });
 };

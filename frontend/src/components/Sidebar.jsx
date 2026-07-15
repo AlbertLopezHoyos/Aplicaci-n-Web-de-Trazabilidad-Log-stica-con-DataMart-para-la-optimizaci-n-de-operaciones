@@ -8,6 +8,7 @@ import {
   Database,
   Truck,
   X,
+  ClipboardList,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -17,6 +18,7 @@ const navItems = [
   { to: '/seguimiento', icon: MapPin, label: 'Seguimiento' },
   { to: '/incidencias', icon: AlertTriangle, label: 'Incidencias' },
   { to: '/reportes', icon: FileBarChart, label: 'Reportes' },
+  { to: '/observacion', icon: ClipboardList, label: 'Fichas observación' },
   { to: '/datamart', icon: Database, label: 'DataMart', adminOnly: true },
 ];
 

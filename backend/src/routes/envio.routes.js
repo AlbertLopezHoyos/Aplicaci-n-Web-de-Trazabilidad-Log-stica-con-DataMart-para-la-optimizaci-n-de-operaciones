@@ -2,6 +2,7 @@ const express = require('express');
 const { body } = require('express-validator');
 const envioController = require('../controllers/envio.controller');
 const validate = require('../middlewares/validate.middleware');
+const validateConRegistroErrores = require('../middlewares/validate.middleware').validateConRegistroErrores;
 const { authenticate } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
@@ -14,15 +15,26 @@ router.get('/:id', envioController.getById);
 router.post(
   '/',
   [
-    body('id_cliente').isInt(),
-    body('origen').notEmpty(),
-    body('destino').notEmpty(),
-    body('tipo_carga').notEmpty(),
+    body('id_cliente').isInt().withMessage('Cliente requerido'),
+    body('origen').notEmpty().withMessage('Origen requerido'),
+    body('destino').notEmpty().withMessage('Destino requerido'),
+    body('tipo_carga').notEmpty().withMessage('Tipo de carga requerido'),
+    body('numero_paquetes').optional().isInt({ min: 1 }).withMessage('Número de paquetes inválido'),
+    body('peso_kg').optional().isFloat({ min: 0 }).withMessage('Peso inválido'),
+    body('hora_inicio_registro').optional().isISO8601().withMessage('Hora inicio inválida'),
   ],
-  validate,
+  validateConRegistroErrores,
   envioController.create
 );
-router.put('/:id', envioController.update);
+router.put(
+  '/:id',
+  [
+    body('numero_paquetes').optional().isInt({ min: 1 }),
+    body('peso_kg').optional().isFloat({ min: 0 }),
+  ],
+  validate,
+  envioController.update
+);
 router.delete('/:id', envioController.remove);
 router.patch(
   '/:id/estado',
