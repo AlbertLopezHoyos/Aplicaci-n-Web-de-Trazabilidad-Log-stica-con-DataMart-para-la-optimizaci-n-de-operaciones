@@ -12,7 +12,14 @@ const start = async () => {
       console.log(`  Entorno: ${process.env.NODE_ENV || 'development'}`);
     });
   } catch (err) {
-    console.error('✗ Error al iniciar servidor:', err.message);
+    console.error('✗ Error al iniciar servidor:', err.message || err);
+    if (err.original) {
+      console.error('  MySQL:', err.original.code, err.original.sqlMessage || err.original.message);
+    }
+    if (process.env.NODE_ENV === 'production') {
+      console.error('  Revise DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD y DB_SSL en Render.');
+      console.error('  Use el host PUBLICO de Railway (tokaido.proxy.rlwy.net), NO mysql.railway.internal');
+    }
     process.exit(1);
   }
 };
