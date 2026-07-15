@@ -2,8 +2,21 @@
   "build": {
     "env": {
       "VITE_DEMO_MODE": "false",
-      "VITE_API_URL": "https://aplicaci-n-web-de-trazabilidad-log-stica.onrender.com/api"
+      "VITE_API_URL": "/api"
     }
   },
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://aplicaci-n-web-de-trazabilidad-log-stica.onrender.com/api/:path*"
+    },
+    {
+      "source": "/uploads/:path*",
+      "destination": "https://aplicaci-n-web-de-trazabilidad-log-stica.onrender.com/uploads/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }

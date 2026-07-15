@@ -22,7 +22,7 @@ const LoginPage = () => {
     } catch (err) {
       const msg = err.response?.data?.message
         || (err.request && !err.response
-          ? 'No se pudo conectar con la API. Revise VITE_API_URL en Vercel y redeploy.'
+          ? 'No se pudo conectar con la API. Espere 1 min (Render despierta) e intente de nuevo.'
           : 'Credenciales inválidas');
       toastError('Acceso denegado', msg);
     } finally {
