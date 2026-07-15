@@ -1,3 +1,9 @@
 {
+  "build": {
+    "env": {
+      "VITE_DEMO_MODE": "false",
+      "VITE_API_URL": "https://aplicaci-n-web-de-trazabilidad-log-stica.onrender.com/api"
+    }
+  },
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }

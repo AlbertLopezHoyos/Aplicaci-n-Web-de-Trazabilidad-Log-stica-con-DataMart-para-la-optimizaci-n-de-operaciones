@@ -1,9 +1,10 @@
 import axios from 'axios';
 import { isDemoMode } from './demoMode';
 import { handleMockRequest } from './mockData';
+import { resolveApiUrl } from '../config/apiUrl';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: resolveApiUrl(),
   headers: { 'Content-Type': 'application/json' },
 });
 
