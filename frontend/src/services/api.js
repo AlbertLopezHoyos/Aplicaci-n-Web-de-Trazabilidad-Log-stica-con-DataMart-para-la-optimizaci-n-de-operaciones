@@ -6,6 +6,7 @@ import { resolveApiUrl } from '../config/apiUrl';
 const api = axios.create({
   baseURL: resolveApiUrl(),
   headers: { 'Content-Type': 'application/json' },
+  timeout: 120000,
 });
 
 api.interceptors.request.use(async (config) => {

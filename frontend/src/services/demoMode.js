@@ -1,7 +1,5 @@
-/** Activo sin BD: VITE_DEMO_MODE=true en .env local */
-export const isDemoMode =
-  import.meta.env.VITE_DEMO_MODE === 'true' &&
-  !(import.meta.env.PROD && typeof window !== 'undefined' && window.location.hostname.includes('vercel.app'));
+/** Activo sin BD solo en desarrollo local */
+export const isDemoMode = import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE === 'true';
 
 export const DEMO_USER = {
   id_usuario: 1,
