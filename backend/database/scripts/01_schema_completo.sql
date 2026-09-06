@@ -11,6 +11,11 @@ CREATE DATABASE trazabilidad_logistica
 
 USE trazabilidad_logistica;
 
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
+SET character_set_client = utf8mb4;
+SET character_set_connection = utf8mb4;
+SET character_set_results = utf8mb4;
+
 -- -----------------------------------------------------------------------------
 -- TABLAS OPERACIONALES
 -- -----------------------------------------------------------------------------
@@ -42,14 +47,9 @@ CREATE TABLE usuarios (
 
 CREATE TABLE clientes (
   id_cliente INT AUTO_INCREMENT PRIMARY KEY,
-  razon_social VARCHAR(200) NOT NULL,
-  ruc VARCHAR(11) UNIQUE,
-  contacto VARCHAR(150),
-  email VARCHAR(150),
-  telefono VARCHAR(20),
-  direccion VARCHAR(255),
-  distrito VARCHAR(100),
-  ciudad VARCHAR(100) DEFAULT 'Lima',
+  razon_social VARCHAR(200) NOT NULL COMMENT 'Nombre completo',
+  dni VARCHAR(8) NULL UNIQUE,
+  telefono VARCHAR(20) NULL,
   activo TINYINT(1) DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -80,6 +80,7 @@ CREATE TABLE envios (
   fecha_entrega_real DATE NULL,
   tipo_carga VARCHAR(100) NOT NULL,
   peso_kg DECIMAL(10,2) DEFAULT 0,
+  total_envio DECIMAL(10,2) NOT NULL DEFAULT 0,
   observaciones TEXT,
   prioridad ENUM('baja','normal','alta','urgente') DEFAULT 'normal',
   activo TINYINT(1) DEFAULT 1,
@@ -274,12 +275,12 @@ INSERT INTO estados_envio (codigo, nombre, descripcion, color_hex, orden, es_fin
 ('retrasado', 'Retrasado', 'Fuera del plazo estimado', '#ef4444', 4, 0),
 ('cancelado', 'Cancelado', 'Envío cancelado', '#6b7280', 5, 1);
 
-INSERT INTO clientes (razon_social, ruc, contacto, email, telefono, direccion, distrito) VALUES
-('Comercial Andina S.A.C.', '20123456789', 'Juan Pérez', 'contacto@andina.pe', '014567890', 'Av. Javier Prado 1234', 'La Molina'),
-('Distribuidora Norte E.I.R.L.', '20987654321', 'Ana Gómez', 'ventas@norte.pe', '014321098', 'Av. Túpac Amaru 567', 'Los Olivos'),
-('Importaciones del Pacífico S.A.', '20456789123', 'Luis Ramírez', 'logistica@pacifico.pe', '013456789', 'Calle Los Pinos 89', 'Miraflores'),
-('Grupo Industrial Sur S.A.C.', '20111222333', 'Rosa Mendoza', 'compras@industrial.pe', '016789012', 'Av. Industrial 456', 'Villa El Salvador'),
-('Tech Solutions Perú S.A.C.', '20555666777', 'Pedro Castillo', 'admin@techsol.pe', '012345678', 'Av. Arequipa 2100', 'Lince');
+INSERT INTO clientes (razon_social, dni, telefono) VALUES
+('Albert López Hoyos', '72345678', NULL),
+('María García Ruiz', '45678901', NULL),
+('Carlos Mendoza Vela', '73451289', NULL),
+('Rosa Quispe Huamán', '47892345', NULL),
+('José Torres Ramírez', '70123456', NULL);
 
 -- Procedimiento para generar código de envío
 DELIMITER //
@@ -394,7 +395,7 @@ INSERT INTO dim_estado (id_estado_origen, codigo, nombre, es_final, categoria, v
 SELECT id_estado, codigo, nombre, es_final, 'logistico', CURDATE(), 1 FROM estados_envio;
 
 INSERT INTO dim_cliente (id_cliente_origen, razon_social, ruc, ciudad, distrito, vigente_desde, es_actual)
-SELECT id_cliente, razon_social, ruc, ciudad, distrito, CURDATE(), 1 FROM clientes;
+SELECT id_cliente, razon_social, dni, NULL, NULL, CURDATE(), 1 FROM clientes;
 
 INSERT INTO dim_operador (id_usuario_origen, nombre_completo, rol, vigente_desde, es_actual)
 SELECT u.id_usuario, CONCAT(u.nombres, ' ', u.apellidos), r.nombre, CURDATE(), 1

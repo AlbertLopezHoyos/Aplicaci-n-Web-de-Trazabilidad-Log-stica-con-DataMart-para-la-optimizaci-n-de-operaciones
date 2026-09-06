@@ -6,6 +6,8 @@
 
 USE trazabilidad_logistica;
 
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 ALTER TABLE incidencias
   ADD COLUMN codigo_incidencia VARCHAR(30) NULL AFTER id_incidencia,
   ADD COLUMN area VARCHAR(100) NULL AFTER tipo,

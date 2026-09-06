@@ -13,8 +13,12 @@ const getEstados = async (req, res, next) => {
 
 const getClientes = async (req, res, next) => {
   try {
-    const clientes = await clienteService.list(req.query.search);
-    return success(res, clientes);
+    const result = await clienteService.list({
+      search: req.query.search,
+      page: req.query.page,
+      limit: req.query.limit,
+    });
+    return success(res, result);
   } catch (err) {
     next(err);
   }
@@ -29,4 +33,22 @@ const createCliente = async (req, res, next) => {
   }
 };
 
-module.exports = { getEstados, getClientes, createCliente };
+const updateCliente = async (req, res, next) => {
+  try {
+    const cliente = await clienteService.update(req.params.id, req.body);
+    return success(res, cliente, 'Cliente actualizado');
+  } catch (err) {
+    next(err);
+  }
+};
+
+const checkClienteDni = async (req, res, next) => {
+  try {
+    const cliente = await clienteService.findByDni(req.query.dni);
+    return success(res, { exists: Boolean(cliente), cliente });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getEstados, getClientes, createCliente, updateCliente, checkClienteDni };

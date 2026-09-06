@@ -25,6 +25,31 @@ const AREAS = ['Operaciones', 'Almacén', 'Transporte', 'Atención al cliente', 
 const FUENTES = ['Sistema web', 'Llamada telefónica', 'Correo electrónico', 'WhatsApp', 'Documento físico'];
 const TIPOS_INC = ['retraso', 'error', 'dano', 'observacion', 'otro'];
 
+/** Nombres peruanos para clientes simulados (persona natural) */
+const NOMBRES_CLIENTES = [
+  'Albert López Hoyos', 'María García Ruiz', 'Carlos Mendoza Vela', 'Rosa Quispe Huamán', 'José Torres Ramírez',
+  'Ana Flores Castillo', 'Luis Ramírez Paredes', 'Patricia Vargas Solís', 'Miguel Huamán Ccoyllor', 'Lucía Mendoza Ríos',
+  'Fernando Salazar Ortiz', 'Carmen Delgado Peña', 'Ricardo Chávez Luna', 'Elena Rojas Campos', 'Diego Paredes Silva',
+  'Gabriela Ortiz Mejía', 'Héctor Villanueva Cruz', 'Silvia Acosta Vega', 'Jorge Medina Ponce', 'Valeria Castro Núñez',
+  'Roberto Espinoza León', 'Claudia Fuentes Aguirre', 'Andrés Morales Quiroz', 'Daniela Suárez Palacios', 'Felipe Navarro Díaz',
+  'Isabel Cárdenas Ruiz', 'Oscar Herrera Guzmán', 'Mónica Peña Valdez', 'Raúl Soto Arévalo', 'Teresa Iglesias Molina',
+  'Pablo Ríos Carrasco', 'Adriana Campos Vela', 'Sergio Luna Tapia', 'Verónica Salinas Bravo', 'Gustavo Ponce Rojas',
+  'Natalia Vega Calderón', 'Emilio Córdova Paredes', 'Karina Toledo Espinoza', 'Iván Barrios Montoya', 'Paola Reyna Chávez',
+  'Manuel Aguilar Torres', 'Sandra Pizarro Huerta', 'César Domínguez León', 'Ruth Mercado Solano', 'Arturo Benítez Ramos',
+  'Lorena Figueroa Castro', 'Marco Avalos Quiñones', 'Jessica Palomino Vera', 'Renzo Cabrera Ortiz', 'Fiorella Zavala Ríos',
+];
+
+const dniFromIndex = (i) => String(10000000 + ((i * 7919) % 89999999)).slice(0, 8);
+
+const calcularTotalEnvio = (pesoKg, numeroPaquetes, prioridad = 'normal') => {
+  const peso = parseFloat(pesoKg) || 0;
+  const paquetes = parseInt(numeroPaquetes, 10) || 1;
+  const tarifaBase = 35;
+  const mult = { baja: 0.92, normal: 1, alta: 1.12, urgente: 1.28 };
+  const subtotal = tarifaBase + peso * 2.2 + paquetes * 8;
+  return Math.round(subtotal * (mult[prioridad] || 1) * 100) / 100;
+};
+
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -103,6 +128,9 @@ module.exports = {
   AREAS,
   FUENTES,
   TIPOS_INC,
+  NOMBRES_CLIENTES,
+  dniFromIndex,
+  calcularTotalEnvio,
   pick,
   randomInt,
   randomDate,

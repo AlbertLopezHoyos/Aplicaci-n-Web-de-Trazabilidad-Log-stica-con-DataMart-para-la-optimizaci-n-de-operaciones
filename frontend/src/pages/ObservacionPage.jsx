@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import api from '../services/api';
 import PageHeader from '../components/PageHeader';
 import KpiCard from '../components/KpiCard';
-import { ClipboardList, Download, Timer, AlertTriangle, MapPin, ClipboardCheck } from 'lucide-react';
+import StatChip from '../components/StatChip';
+import { ClipboardList, Download, Timer, AlertTriangle, MapPin, ClipboardCheck, Loader2 } from 'lucide-react';
 import { toastSuccess, toastError } from '../utils/alerts';
+import { exportFichaExcel } from '../utils/fichaExport';
 
 const DIMENSIONES = [
   { id: 1, titulo: 'Eficiencia operativa', indicador: 'TPRE', icon: Timer, color: 'blue' },
@@ -16,7 +18,10 @@ const ObservacionPage = () => {
   const [indicadores, setIndicadores] = useState(null);
   const [dimensionActiva, setDimensionActiva] = useState(1);
   const [datos, setDatos] = useState([]);
+  const [totalRegistros, setTotalRegistros] = useState(0);
+  const [tituloDim, setTituloDim] = useState('');
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const loadIndicadores = () => {
     api.get('/observacion/indicadores').then((r) => setIndicadores(r.data.data));
@@ -26,13 +31,18 @@ const ObservacionPage = () => {
     setLoading(true);
     api
       .get(`/observacion/ficha/${dim}`)
-      .then((r) => setDatos(r.data.data?.data || []))
+      .then((r) => {
+        const payload = r.data.data || {};
+        setDatos(payload.data || []);
+        setTotalRegistros(payload.total ?? payload.data?.length ?? 0);
+        setTituloDim(payload.titulo || DIMENSIONES.find((d) => d.id === dim)?.titulo || '');
+      })
+      .catch(() => toastError('Error', 'No se pudo cargar la ficha'))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
     loadIndicadores();
-    loadDimension(1);
   }, []);
 
   useEffect(() => {
@@ -40,32 +50,57 @@ const ObservacionPage = () => {
   }, [dimensionActiva]);
 
   const exportar = async (dim) => {
+    setExporting(true);
     try {
       const { data } = await api.get(`/observacion/ficha/${dim}/export`);
-      if (data.data?.downloadUrl) {
-        window.open(data.data.downloadUrl, '_blank');
-        toastSuccess('Ficha exportada', `Dimensión ${dim} — Excel listo para observación`);
-      }
+      const payload = data.data || {};
+      await exportFichaExcel({
+        titulo: payload.titulo,
+        indicador: payload.indicador,
+        dimension: payload.dimension ?? dim,
+        headers: payload.headers || [],
+        filas: payload.filas || [],
+        indicadores: payload.indicadores || indicadores || {},
+      });
+      toastSuccess(
+        'Ficha exportada',
+        `Dimensión ${dim} (${payload.indicador}) · últimos ${payload.filas?.length ?? 0} registros`
+      );
     } catch {
-      toastError('Error al exportar ficha');
+      toastError('Error', 'No se pudo exportar la ficha');
+    } finally {
+      setExporting(false);
     }
   };
 
+  const dimActual = DIMENSIONES.find((d) => d.id === dimensionActiva);
   const columnas = datos.length ? Object.keys(datos[0]) : [];
+  const labelCol = (key) => key.replace(/_/g, ' ');
 
   return (
-    <div>
+    <div className="page-shell">
       <PageHeader
         title="Fichas de observación"
         subtitle="Evidencia cuantitativa para preprueba y posprueba — Tesis 2026"
+        compact
         action={
-          <button type="button" className="btn-primary" onClick={() => exportar(dimensionActiva)}>
-            <Download className="h-4 w-4" /> Exportar dimensión {dimensionActiva}
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={exporting}
+            onClick={() => exportar(dimensionActiva)}
+          >
+            {exporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            Exportar dimensión {dimensionActiva} (Excel)
           </button>
         }
       />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
         <KpiCard
           title="TPRE (min)"
           value={indicadores?.tpre ?? '—'}
@@ -96,15 +131,22 @@ const ObservacionPage = () => {
         />
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+        <StatChip label="Dimensión activa" value={`${dimensionActiva} · ${dimActual?.indicador}`} />
+        <StatChip label="Vista previa" value={`${datos.length} filas`} accent="salazar" />
+        <StatChip label="En BD" value={totalRegistros} accent="slate" />
+        <StatChip label="Exportación" value="Últimos 50" accent="green" />
+      </div>
+
+      <div className="flex flex-wrap gap-2">
         {DIMENSIONES.map((d) => (
           <button
             key={d.id}
             type="button"
             onClick={() => setDimensionActiva(d.id)}
-            className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${
+            className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
               dimensionActiva === d.id
-                ? 'border-salazar-500 bg-salazar-800 text-white'
+                ? 'border-salazar-500 bg-salazar-800 text-white shadow-sm'
                 : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
             }`}
           >
@@ -114,41 +156,47 @@ const ObservacionPage = () => {
         ))}
       </div>
 
-      <div className="card overflow-hidden p-0">
+      <div className="table-panel">
         <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
           <h3 className="font-semibold text-salazar-900">
-            {DIMENSIONES.find((d) => d.id === dimensionActiva)?.titulo} — Vista previa
+            {tituloDim || dimActual?.titulo} — Vista previa
           </h3>
-          <p className="text-xs text-slate-500">{datos.length} registros · Máx. 50 para muestra</p>
+          <p className="text-xs text-slate-500">
+            Últimos {datos.length} registros (máx. 50) · Total en BD: {totalRegistros} · La exportación incluye los mismos {datos.length} registros mostrados
+          </p>
         </div>
         {loading ? (
-          <div className="flex h-40 items-center justify-center">
+          <div className="flex h-48 items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-salazar-200 border-t-salazar-800" />
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="table-panel-body">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 uppercase text-slate-500">
+              <thead className="sticky top-0 bg-slate-50 uppercase text-slate-500">
                 <tr>
-                  <th className="px-3 py-2">N°</th>
+                  <th className="px-3 py-2.5">N°</th>
                   {columnas.map((c) => (
-                    <th key={c} className="px-3 py-2 whitespace-nowrap">{c.replace(/_/g, ' ')}</th>
+                    <th key={c} className="whitespace-nowrap px-3 py-2.5">
+                      {labelCol(c)}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {datos.length === 0 && (
                   <tr>
-                    <td colSpan={columnas.length + 1} className="px-4 py-8 text-center text-slate-500">
-                      Sin registros. Cree incidencias con área y fuente de información para poblar la ficha.
+                    <td colSpan={columnas.length + 1} className="px-4 py-10 text-center text-slate-500">
+                      Sin registros. Cree envíos e incidencias con área y fuente de información para poblar la ficha.
                     </td>
                   </tr>
                 )}
                 {datos.map((row, i) => (
                   <tr key={i} className="border-t border-slate-50 hover:bg-slate-50/50">
-                    <td className="px-3 py-2">{i + 1}</td>
+                    <td className="px-3 py-2 text-slate-400">{i + 1}</td>
                     {columnas.map((c) => (
-                      <td key={c} className="px-3 py-2 whitespace-nowrap">{String(row[c] ?? '—')}</td>
+                      <td key={c} className="max-w-[200px] truncate px-3 py-2" title={String(row[c] ?? '')}>
+                        {String(row[c] ?? '—')}
+                      </td>
                     ))}
                   </tr>
                 ))}

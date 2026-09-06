@@ -14,6 +14,7 @@ const Envio = sequelize.define('envios', {
   fecha_entrega_real: DataTypes.DATEONLY,
   tipo_carga: { type: DataTypes.STRING(100), allowNull: false },
   peso_kg: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
+  total_envio: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
   numero_paquetes: { type: DataTypes.INTEGER, defaultValue: 1 },
   hora_inicio_registro: DataTypes.DATE,
   hora_fin_registro: DataTypes.DATE,

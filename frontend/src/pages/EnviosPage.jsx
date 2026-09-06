@@ -4,7 +4,9 @@ import { Plus, Search, Eye, Pencil, Trash2 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import PageHeader from '../components/PageHeader';
+import StatChip from '../components/StatChip';
 import StatusBadge from '../components/StatusBadge';
+import { labelCliente } from '../utils/cliente';
 import Pagination from '../components/Pagination';
 import { formatDate } from '../utils/format';
 import { confirmAction, toastSuccess, toastError } from '../utils/alerts';
@@ -71,10 +73,11 @@ const EnviosPage = () => {
   };
 
   return (
-    <div>
+    <div className="page-shell">
       <PageHeader
         title="Gestión de envíos"
         subtitle="CRUD, filtros, búsqueda y paginación"
+        compact
         action={
           <Link to="/envios/nuevo" className="btn-primary">
             <Plus className="h-4 w-4" /> Nuevo envío
@@ -82,7 +85,14 @@ const EnviosPage = () => {
         }
       />
 
-      <div className="card mb-6">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+        <StatChip label="Total registros" value={envios.total ?? 0} />
+        <StatChip label="Página actual" value={`${envios.page ?? 1} / ${Math.max(1, Math.ceil((envios.total || 0) / (envios.limit || 10)))}`} accent="slate" />
+        <StatChip label="Mostrando" value={envios.data?.length ?? 0} accent="salazar" />
+        <StatChip label="Estado filtro" value={filters.estado ? estados.find((s) => String(s.id_estado) === filters.estado)?.nombre || '—' : 'Todos'} accent="amber" />
+      </div>
+
+      <div className="card-compact">
         <form onSubmit={handleSearch} className="flex flex-wrap gap-3">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -130,14 +140,14 @@ const EnviosPage = () => {
         </form>
       </div>
 
-      <div className="card overflow-hidden p-0">
+      <div className="table-panel">
         {loading ? (
-          <div className="flex h-40 items-center justify-center">
+          <div className="flex h-48 items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-salazar-200 border-t-salazar-800" />
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            <div className="table-panel-body">
               <table className="w-full text-left text-sm">
                 <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase text-slate-500">
                   <tr>
@@ -165,7 +175,7 @@ const EnviosPage = () => {
                   {envios.data?.map((e) => (
                     <tr key={e.id_envio} className="border-b border-slate-50 hover:bg-slate-50/50">
                       <td className="px-4 py-3 font-mono font-medium text-salazar-800">{e.codigo_envio}</td>
-                      <td className="px-4 py-3">{e.cliente?.razon_social}</td>
+                      <td className="px-4 py-3">{labelCliente(e.cliente)}</td>
                       <td className="px-4 py-3 text-xs">
                         {e.origen} → {e.destino}
                       </td>
@@ -211,7 +221,7 @@ const EnviosPage = () => {
                 </tbody>
               </table>
             </div>
-            <div className="p-4">
+            <div className="border-t border-slate-100 px-3 py-2 sm:px-4">
               <Pagination
                 page={envios.page}
                 total={envios.total}

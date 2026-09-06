@@ -6,6 +6,9 @@ export const toastSuccess = (title, text = '') =>
 export const toastError = (title, text = '') =>
   Swal.fire({ icon: 'error', title, text });
 
+export const toastInfo = (title, text = '') =>
+  Swal.fire({ icon: 'info', title, text, timer: 2800, showConfirmButton: false });
+
 export const confirmAction = async (title, text) => {
   const result = await Swal.fire({
     title,

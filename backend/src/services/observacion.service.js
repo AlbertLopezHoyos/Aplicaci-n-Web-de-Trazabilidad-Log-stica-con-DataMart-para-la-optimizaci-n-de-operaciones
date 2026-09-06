@@ -1,16 +1,18 @@
 const path = require('path');
 const fs = require('fs');
-const ExcelJS = require('exceljs');
 const { sequelize, Envio, Reporte, ErrorRegistro, Incidencia } = require('../models');
 const { QueryTypes } = require('sequelize');
 
 const fichasDir = path.join(__dirname, '../../uploads/fichas');
 if (!fs.existsSync(fichasDir)) fs.mkdirSync(fichasDir, { recursive: true });
 
+const FICHA_MUESTRA = 50;
+
 const DIMENSIONES = {
   1: {
     id: 'eficiencia',
     titulo: 'Dimensión 1 - Eficiencia operativa (TPRE)',
+    indicador: 'TPRE',
     vista: 'vw_ficha_eficiencia',
     columnas: [
       'codigo_envio', 'fecha', 'tipo_mercaderia', 'peso_kg', 'numero_paquetes',
@@ -26,6 +28,7 @@ const DIMENSIONES = {
   2: {
     id: 'calidad',
     titulo: 'Dimensión 2 - Calidad información (PER)',
+    indicador: 'PER',
     vista: 'vw_ficha_calidad',
     columnas: [
       'codigo_envio', 'fecha', 'tipo_mercaderia', 'destino', 'numero_paquetes',
@@ -39,6 +42,7 @@ const DIMENSIONES = {
   3: {
     id: 'control',
     titulo: 'Dimensión 3 - Control y seguimiento (PEEA)',
+    indicador: 'PEEA',
     vista: 'vw_ficha_control',
     columnas: [
       'codigo_envio', 'fecha', 'tipo_mercaderia', 'origen', 'destino',
@@ -54,6 +58,7 @@ const DIMENSIONES = {
   4: {
     id: 'informacion_operativa',
     titulo: 'Dimensión 4 - Gestión de la información operativa (PICO)',
+    indicador: 'PICO',
     vista: 'vw_ficha_informacion_operativa',
     columnas: [
       'fecha', 'codigo_incidencia', 'tipo_incidencia', 'area', 'codigo_envio',
@@ -161,13 +166,30 @@ const queryFallback = async (dimension) => {
   return [];
 };
 
-const getDatosDimension = async (dimension) => {
+const getDatosDimension = async (dimension, { limit = null } = {}) => {
   const config = DIMENSIONES[dimension];
   if (!config) throw Object.assign(new Error('Dimensión no válida'), { statusCode: 400 });
+  const cap = limit ? Math.min(Number(limit) || FICHA_MUESTRA, FICHA_MUESTRA) : null;
   try {
-    return await sequelize.query(`SELECT * FROM ${config.vista}`, { type: QueryTypes.SELECT });
+    let sql = `SELECT * FROM ${config.vista} ORDER BY fecha DESC`;
+    if (cap) sql += ` LIMIT ${cap}`;
+    return await sequelize.query(sql, { type: QueryTypes.SELECT });
   } catch {
     return queryFallback(dimension);
+  }
+};
+
+const countDatosDimension = async (dimension) => {
+  const config = DIMENSIONES[dimension];
+  if (!config) return 0;
+  try {
+    const [row] = await sequelize.query(`SELECT COUNT(*) AS total FROM ${config.vista}`, {
+      type: QueryTypes.SELECT,
+    });
+    return Number(row?.total) || 0;
+  } catch {
+    const rows = await queryFallback(dimension);
+    return rows.length;
   }
 };
 
@@ -214,25 +236,41 @@ const calcularIndicadores = async () => {
   };
 };
 
-const exportarExcel = async (dimension) => {
+const buildExportPayload = async (dimension) => {
   const config = DIMENSIONES[dimension];
-  const filas = await getDatosDimension(dimension);
-  const filename = `ficha_dim${dimension}_${Date.now()}.xlsx`;
-  const filepath = path.join(fichasDir, filename);
-
-  const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet(`Dimensión ${dimension}`);
-  ws.addRow(config.labels);
-  filas.forEach((row) => ws.addRow(config.columnas.map((c) => row[c] ?? '')));
-  ws.getRow(1).font = { bold: true };
-  await wb.xlsx.writeFile(filepath);
-
-  return { downloadUrl: `/uploads/fichas/${filename}`, filas, config };
+  if (!config) throw Object.assign(new Error('Dimensión no válida'), { statusCode: 400 });
+  const [filas, totalBd, indicadores] = await Promise.all([
+    getDatosDimension(dimension, { limit: FICHA_MUESTRA }),
+    countDatosDimension(dimension),
+    calcularIndicadores(),
+  ]);
+  const headers = config.columnas.map((key, i) => ({ key, label: config.labels[i] }));
+  return {
+    dimension,
+    titulo: config.titulo,
+    indicador: config.indicador,
+    headers,
+    filas,
+    total: totalBd,
+    exportados: filas.length,
+    limite: FICHA_MUESTRA,
+    indicadores: {
+      tpre: indicadores.tpre,
+      per: indicadores.per,
+      peea: indicadores.peea,
+      pico: indicadores.pico,
+    },
+  };
 };
+
+const exportarExcel = (dimension) => buildExportPayload(dimension);
 
 module.exports = {
   DIMENSIONES,
   getDatosDimension,
+  countDatosDimension,
   calcularIndicadores,
   exportarExcel,
+  buildExportPayload,
+  FICHA_MUESTRA,
 };

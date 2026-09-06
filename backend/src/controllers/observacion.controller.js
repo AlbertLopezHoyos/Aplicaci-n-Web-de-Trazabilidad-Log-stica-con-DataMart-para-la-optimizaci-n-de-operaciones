@@ -14,9 +14,19 @@ const getIndicadores = async (_req, res, next) => {
 const getDimension = async (req, res, next) => {
   try {
     const dimension = parseInt(req.params.dimension, 10);
-    const data = await observacionService.getDatosDimension(dimension);
+    const [data, total] = await Promise.all([
+      observacionService.getDatosDimension(dimension, { limit: observacionService.FICHA_MUESTRA }),
+      observacionService.countDatosDimension(dimension),
+    ]);
     const config = observacionService.DIMENSIONES[dimension];
-    return success(res, { dimension, titulo: config?.titulo, data });
+    return success(res, {
+      dimension,
+      titulo: config?.titulo,
+      indicador: config?.indicador,
+      data,
+      total,
+      limite: observacionService.FICHA_MUESTRA,
+    });
   } catch (err) {
     next(err);
   }

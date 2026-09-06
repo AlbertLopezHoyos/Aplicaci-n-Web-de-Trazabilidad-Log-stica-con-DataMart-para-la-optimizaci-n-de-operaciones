@@ -1,6 +1,19 @@
 const { Sequelize } = require('sequelize');
 require('dotenv').config();
 
+const utf8Define = {
+  timestamps: true,
+  underscored: true,
+  freezeTableName: true,
+  charset: 'utf8mb4',
+  collate: 'utf8mb4_unicode_ci',
+};
+
+const utf8DialectOptions = (extra = {}) => ({
+  charset: 'utf8mb4',
+  ...extra,
+});
+
 const buildFromEnv = () => {
   const databaseUrl = process.env.DATABASE_URL || process.env.MYSQL_PUBLIC_URL;
 
@@ -11,15 +24,11 @@ const buildFromEnv = () => {
         dialect: 'mysql',
         logging: false,
         timezone: '-05:00',
-        define: {
-          timestamps: true,
-          underscored: true,
-          freezeTableName: true,
-        },
+        define: utf8Define,
         pool: { max: 10, min: 0, acquire: 30000, idle: 10000 },
-        dialectOptions: {
+        dialectOptions: utf8DialectOptions({
           ssl: { require: true, rejectUnauthorized: false },
-        },
+        }),
       },
     };
   }
@@ -40,15 +49,11 @@ const buildFromEnv = () => {
       dialect: 'mysql',
       logging: false,
       timezone: '-05:00',
-      define: {
-        timestamps: true,
-        underscored: true,
-        freezeTableName: true,
-      },
+      define: utf8Define,
       pool: { max: 10, min: 0, acquire: 30000, idle: 10000 },
-      dialectOptions: useSsl
-        ? { ssl: { require: true, rejectUnauthorized: false } }
-        : {},
+      dialectOptions: utf8DialectOptions(
+        useSsl ? { ssl: { require: true, rejectUnauthorized: false } } : {}
+      ),
     },
   };
 };

@@ -3,7 +3,7 @@ const { body } = require('express-validator');
 const envioController = require('../controllers/envio.controller');
 const validate = require('../middlewares/validate.middleware');
 const validateConRegistroErrores = require('../middlewares/validate.middleware').validateConRegistroErrores;
-const { authenticate } = require('../middlewares/auth.middleware');
+const { authenticate, authorize } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
@@ -35,7 +35,7 @@ router.put(
   validate,
   envioController.update
 );
-router.delete('/:id', envioController.remove);
+router.delete('/:id', authorize('Administrador'), envioController.remove);
 router.patch(
   '/:id/estado',
   [body('id_estado').isInt()],

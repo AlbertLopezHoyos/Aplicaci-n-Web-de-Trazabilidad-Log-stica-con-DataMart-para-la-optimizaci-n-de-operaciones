@@ -20,4 +20,13 @@ const historial = async (req, res, next) => {
   }
 };
 
-module.exports = { generar, historial };
+const getDatos = async (req, res, next) => {
+  try {
+    const datos = await reporteService.getDatos(req.params.tipo);
+    return success(res, datos);
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { generar, getDatos, historial };

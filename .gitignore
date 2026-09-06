@@ -1,6 +1,9 @@
 node_modules/
 dist/
 .env
+.env.railway
+backend/exports/
+backend/database/scripts/_diagnostico_ultimo.txt
 *.log
 .DS_Store
 backend/uploads/*

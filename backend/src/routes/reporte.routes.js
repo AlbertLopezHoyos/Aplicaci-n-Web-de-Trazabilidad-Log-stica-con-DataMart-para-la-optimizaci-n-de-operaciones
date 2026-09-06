@@ -8,6 +8,7 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get('/historial', reporteController.historial);
+router.get('/datos/:tipo', reporteController.getDatos);
 router.post(
   '/generar',
   [

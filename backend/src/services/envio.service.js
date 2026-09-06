@@ -23,12 +23,20 @@ const create = async (data, userId) => {
   const clean = sanitizeObject(data, ['origen', 'destino', 'tipo_carga', 'observaciones']);
   const codigo = await generarCodigoEnvio();
   const estadoInicial = await EstadoEnvio.findOne({ where: { codigo: 'recibido' } });
-  if (!estadoInicial) throw new Error('Estado inicial no configurado');
+  if (!estadoInicial) {
+    throw Object.assign(new Error('Estado inicial no configurado — ejecute el seed de la base de datos'), {
+      statusCode: 503,
+    });
+  }
 
   const tiempos = calcularTiemposRegistro(clean.hora_inicio_registro);
   const peso = parseFloat(clean.peso_kg);
   if (clean.peso_kg !== undefined && clean.peso_kg !== '' && (Number.isNaN(peso) || peso < 0)) {
     throw Object.assign(new Error('Peso inválido'), { statusCode: 400 });
+  }
+  const total = parseFloat(clean.total_envio);
+  if (clean.total_envio !== undefined && clean.total_envio !== '' && (Number.isNaN(total) || total < 0)) {
+    throw Object.assign(new Error('Total del envío inválido'), { statusCode: 400 });
   }
 
   const envio = await Envio.create({
@@ -39,6 +47,7 @@ const create = async (data, userId) => {
     fecha_registro: clean.fecha_registro || new Date().toISOString().split('T')[0],
     numero_paquetes: parseInt(clean.numero_paquetes, 10) || 1,
     peso_kg: Number.isNaN(peso) ? 0 : peso,
+    total_envio: Number.isNaN(total) ? 0 : total,
     ...tiempos,
     registro_correcto: true,
   });
@@ -62,6 +71,13 @@ const update = async (id, data, userId) => {
   if (!envio || !envio.activo) throw Object.assign(new Error('Envío no encontrado'), { statusCode: 404 });
   const clean = sanitizeObject(data, ['origen', 'destino', 'tipo_carga', 'observaciones']);
   if (clean.numero_paquetes !== undefined) clean.numero_paquetes = parseInt(clean.numero_paquetes, 10) || 1;
+  if (clean.total_envio !== undefined) {
+    const total = parseFloat(clean.total_envio);
+    if (Number.isNaN(total) || total < 0) {
+      throw Object.assign(new Error('Total del envío inválido'), { statusCode: 400 });
+    }
+    clean.total_envio = total;
+  }
   const anterior = envio.toJSON();
   await envio.update(clean);
   await Auditoria.create({

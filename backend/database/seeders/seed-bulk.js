@@ -13,6 +13,8 @@ const {
   AREAS,
   FUENTES,
   TIPOS_INC,
+  NOMBRES_CLIENTES,
+  calcularTotalEnvio,
   pick,
   randomInt,
   randomDate,
@@ -35,15 +37,11 @@ const ensureClientes = async () => {
   }
   const toCreate = [];
   for (let i = existing + 1; i <= 5 + EXTRA_CLIENTES; i++) {
+    const idx = (i - 1) % NOMBRES_CLIENTES.length;
     toCreate.push({
-      razon_social: `Cliente Logístico ${String(i).padStart(3, '0')} S.A.C.`,
-      ruc: String(20100000000 + i).slice(0, 11),
-      contacto: `Contacto ${i}`,
-      email: `cliente${i}@empresa.pe`,
-      telefono: `9${String(10000000 + i).slice(-8)}`,
-      direccion: `Av. Industrial ${100 + i}`,
-      distrito: pick(ORIGENES_LIMA).split(' - ').pop() || 'Lima',
-      ciudad: 'Lima',
+      razon_social: `${NOMBRES_CLIENTES[idx] || `Cliente ${String(i).padStart(3, '0')}`}${i > NOMBRES_CLIENTES.length ? ` (${i})` : ''}`,
+      dni: null,
+      telefono: null,
     });
   }
   if (toCreate.length) {
@@ -61,6 +59,10 @@ const buildEnvioRow = (seq, estadoMap, clientes, operadorId) => {
   const cliente = clientes[randomInt(0, clientes.length - 1)];
   const tiempoReg = Math.round((Math.random() * 8 + 1) * 100) / 100;
 
+  const peso = randomInt(5, 2500);
+  const paquetes = randomInt(1, 40);
+  const prioridad = pick(['baja', 'normal', 'normal', 'normal', 'alta', 'urgente']);
+
   return {
     codigo_envio: padCodigo(year, seq),
     id_cliente: cliente.id_cliente,
@@ -72,12 +74,13 @@ const buildEnvioRow = (seq, estadoMap, clientes, operadorId) => {
     fecha_estimada_entrega: fechaEstimada,
     fecha_entrega_real: fechaEntregaReal,
     tipo_carga: pick(TIPOS_CARGA),
-    peso_kg: randomInt(5, 2500),
-    numero_paquetes: randomInt(1, 40),
+    peso_kg: peso,
+    numero_paquetes: paquetes,
+    total_envio: calcularTotalEnvio(peso, paquetes, prioridad),
     tiempo_registro_min: tiempoReg,
     registro_correcto: Math.random() > 0.08,
     observaciones: 'Registro histórico — carga masiva DataMart Tesis 2026',
-    prioridad: pick(['baja', 'normal', 'normal', 'normal', 'alta', 'urgente']),
+    prioridad,
     activo: 1,
   };
 };

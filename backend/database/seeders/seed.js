@@ -54,6 +54,7 @@ const run = async () => {
         fecha_estimada_entrega: hoy,
         tipo_carga: s.tipo,
         peso_kg: s.peso,
+        total_envio: Math.round((35 + s.peso * 2.2 + 8) * 100) / 100,
         observaciones: 'Envío de demostración - Tesis 2026',
       });
     }

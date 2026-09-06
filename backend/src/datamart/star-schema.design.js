@@ -41,7 +41,7 @@ module.exports = {
     },
     dimensiones: {
       dim_fecha: { tipo: 'SCD Tipo 0', atributos: ['anio', 'trimestre', 'mes', 'dia_semana', 'es_fin_semana'] },
-      dim_cliente: { tipo: 'SCD Tipo 2', atributos: ['razon_social', 'ruc', 'ciudad', 'segmento'] },
+      dim_cliente: { tipo: 'SCD Tipo 2', atributos: ['razon_social', 'dni', 'segmento'] },
       dim_estado: { tipo: 'SCD Tipo 2', atributos: ['codigo', 'nombre', 'es_final', 'categoria'] },
       dim_operador: { tipo: 'SCD Tipo 2', atributos: ['nombre_completo', 'rol'] },
     },

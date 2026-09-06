@@ -29,10 +29,67 @@ El repo debe tener el código actualizado en `main`.
    - `MYSQLPASSWORD`
 5. En **Settings** → **Networking** → activa **Public Networking** (TCP proxy) si quieres conectar desde Workbench.
 6. En **MySQL Workbench** (conexión con host/puerto público de Railway):
-   - Ejecuta `backend/database/scripts/01_schema_completo.sql`
-   - Ejecuta `backend/database/scripts/02_medicion_fichas.sql`
+   - Ejecuta `backend/database/scripts/01_schema_railway.sql` (o `01_schema_completo.sql` adaptado a BD `railway`)
+   - Ejecuta `backend/database/scripts/02_medicion_fichas_railway.sql`
+   - Ejecuta `backend/database/scripts/03_dimension4_gestion_informacion.sql` (PICO / incidencias)
 
-> Si `01` falla por `DROP DATABASE`, crea la BD manualmente o quita esa línea y usa el nombre que Railway asignó (`MYSQLDATABASE`).
+> Host público típico: `tokaido.proxy.rlwy.net` — el puerto lo ves en Railway → MySQL → Connect.
+
+---
+
+## Paso 2b — Carga masiva DataMart en Railway (≥ 5,000 registros)
+
+Desde tu PC, **sin cambiar** el `.env` local (usa un archivo aparte):
+
+### 1. Obtener credenciales en Railway
+
+1. [railway.app](https://railway.app) → tu proyecto → servicio **MySQL**
+2. Pestaña **Variables** o **Connect**
+3. Anota: `MYSQLHOST`, `MYSQLPORT`, `MYSQLDATABASE`, `MYSQLUSER`, `MYSQLPASSWORD`
+
+### 2. Crear `backend/.env.railway`
+
+```powershell
+cd backend
+copy .env.railway.example .env.railway
+```
+
+Edita `.env.railway` y pega tu password de Railway (no lo subas a GitHub).
+
+### 3. Ejecutar pipeline (5–10 min)
+
+```powershell
+npm run db:railway:all
+```
+
+Esto hace en orden:
+
+| Paso | Qué hace |
+|------|----------|
+| `db:seed` | Contraseñas + 8 envíos demo (si vacío) |
+| `db:seed-bulk` | Hasta **5.500** envíos históricos |
+| `db:fix-estados` | ~99% entregado/cancelado según fecha |
+| `db:etl` | Carga **fact_operaciones_logisticas** |
+
+### 4. Verificar en producción
+
+1. Abre https://aplicaci-n-web-de-trazabilidad-log.vercel.app
+2. Login admin → **DataMart**
+3. Debe aparecer: *“Listo para sustentación: 5,500 registros”* y KPIs (OTIF, lead time)
+
+### Comandos por separado (opcional)
+
+Con `.env.railway` configurado, puedes correr solo un paso apuntando a Railway:
+
+```powershell
+# Cargar env Railway en la sesión (PowerShell)
+Get-Content .env.railway | ForEach-Object { if ($_ -match '^([^#=]+)=(.*)$') { [Environment]::SetEnvironmentVariable($matches[1], $matches[2], 'Process') } }
+npm run db:seed-bulk
+npm run db:fix-estados
+npm run db:etl
+```
+
+O usa el atajo: `npm run db:railway:all`
 
 ---
 

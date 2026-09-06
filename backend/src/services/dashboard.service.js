@@ -33,8 +33,18 @@ const getKpis = async () => {
 };
 
 const getEnviosPorEstado = async () => {
-  const rows = await sequelize.query('SELECT * FROM vw_envios_por_estado', { type: QueryTypes.SELECT });
-  return rows;
+  try {
+    return await sequelize.query('SELECT * FROM vw_envios_por_estado', { type: QueryTypes.SELECT });
+  } catch {
+    return sequelize.query(
+      `SELECT s.codigo, s.nombre AS estado, s.color_hex, COUNT(e.id_envio) AS cantidad
+       FROM estados_envio s
+       LEFT JOIN envios e ON e.id_estado_actual = s.id_estado AND e.activo = 1
+       GROUP BY s.id_estado, s.codigo, s.nombre, s.color_hex
+       ORDER BY s.orden`,
+      { type: QueryTypes.SELECT }
+    );
+  }
 };
 
 const getTendenciaMensual = async () => {

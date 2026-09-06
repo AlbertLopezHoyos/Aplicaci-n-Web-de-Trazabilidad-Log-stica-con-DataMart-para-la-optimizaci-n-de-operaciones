@@ -10,7 +10,7 @@ const runStaging = async () => {
   try {
     await sequelize.query(
       `INSERT INTO dim_cliente (id_cliente_origen, razon_social, ruc, ciudad, distrito, vigente_desde, es_actual)
-       SELECT c.id_cliente, c.razon_social, c.ruc, c.ciudad, c.distrito, CURDATE(), 1
+       SELECT c.id_cliente, c.razon_social, c.dni, NULL, NULL, CURDATE(), 1
        FROM clientes c
        WHERE c.activo = 1
        AND NOT EXISTS (
@@ -89,36 +89,44 @@ const runStaging = async () => {
 };
 
 const getPreview = async () => {
-  const [facts, dims] = await Promise.all([
-    sequelize.query('SELECT COUNT(*) AS total FROM fact_operaciones_logisticas', { type: QueryTypes.SELECT }),
-    sequelize.query(
-      `SELECT 'dim_fecha' AS tabla, COUNT(*) AS registros FROM dim_fecha
-       UNION SELECT 'dim_cliente', COUNT(*) FROM dim_cliente
-       UNION SELECT 'dim_estado', COUNT(*) FROM dim_estado
-       UNION SELECT 'dim_operador', COUNT(*) FROM dim_operador`,
-      { type: QueryTypes.SELECT }
-    ),
-  ]);
-  return { totalHechos: facts[0]?.total || 0, dimensiones: dims };
+  try {
+    const [facts, dims] = await Promise.all([
+      sequelize.query('SELECT COUNT(*) AS total FROM fact_operaciones_logisticas', { type: QueryTypes.SELECT }),
+      sequelize.query(
+        `SELECT 'dim_fecha' AS tabla, COUNT(*) AS registros FROM dim_fecha
+         UNION SELECT 'dim_cliente', COUNT(*) FROM dim_cliente
+         UNION SELECT 'dim_estado', COUNT(*) FROM dim_estado
+         UNION SELECT 'dim_operador', COUNT(*) FROM dim_operador`,
+        { type: QueryTypes.SELECT }
+      ),
+    ]);
+    return { totalHechos: facts[0]?.total || 0, dimensiones: dims, datamartReady: true };
+  } catch {
+    return { totalHechos: 0, dimensiones: [], datamartReady: false };
+  }
 };
 
 const getAnalytics = async () => {
-  const [row] = await sequelize.query(
-    `SELECT
-       COUNT(*) AS total_hechos,
-       ROUND(AVG(dias_transito), 1) AS lead_time_promedio,
-       ROUND(
-         SUM(CASE WHEN entregado_a_tiempo = 1 THEN 1 ELSE 0 END) * 100.0 /
-         NULLIF(SUM(CASE WHEN entregado_a_tiempo IS NOT NULL THEN 1 ELSE 0 END), 0),
-         1
-       ) AS otif_pct,
-       ROUND(SUM(cantidad_incidencias) * 100.0 / NULLIF(COUNT(*), 0), 1) AS tasa_incidencias,
-       SUM(tuvo_retraso) AS envios_con_retraso,
-       ROUND(AVG(peso_kg), 1) AS peso_promedio_kg
-     FROM fact_operaciones_logisticas`,
-    { type: QueryTypes.SELECT }
-  );
-  return row || null;
+  try {
+    const [row] = await sequelize.query(
+      `SELECT
+         COUNT(*) AS total_hechos,
+         ROUND(AVG(dias_transito), 1) AS lead_time_promedio,
+         ROUND(
+           SUM(CASE WHEN entregado_a_tiempo = 1 THEN 1 ELSE 0 END) * 100.0 /
+           NULLIF(SUM(CASE WHEN entregado_a_tiempo IS NOT NULL THEN 1 ELSE 0 END), 0),
+           1
+         ) AS otif_pct,
+         ROUND(SUM(cantidad_incidencias) * 100.0 / NULLIF(COUNT(*), 0), 1) AS tasa_incidencias,
+         SUM(tuvo_retraso) AS envios_con_retraso,
+         ROUND(AVG(peso_kg), 1) AS peso_promedio_kg
+       FROM fact_operaciones_logisticas`,
+      { type: QueryTypes.SELECT }
+    );
+    return row || null;
+  } catch {
+    return null;
+  }
 };
 
 module.exports = { runStaging, getPreview, getAnalytics };

@@ -17,3 +17,9 @@ export const formatDateTime = (date) => {
     minute: '2-digit',
   });
 };
+
+export const formatCurrency = (amount) => {
+  const n = parseFloat(amount);
+  if (Number.isNaN(n)) return 'S/ 0.00';
+  return new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(n);
+};

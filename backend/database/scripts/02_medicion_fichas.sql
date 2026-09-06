@@ -5,6 +5,8 @@
 
 USE trazabilidad_logistica;
 
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 -- Dimensión 1: Eficiencia operativa (TPRE)
 ALTER TABLE envios
   ADD COLUMN numero_paquetes INT DEFAULT 1 AFTER peso_kg,

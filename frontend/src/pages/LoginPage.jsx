@@ -7,8 +7,8 @@ import { toastError } from '../utils/alerts';
 const LoginPage = () => {
   const { user, login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('admin@salazarlogistica.pe');
-  const [password, setPassword] = useState('Admin123!');
+  const [email, setEmail] = useState(import.meta.env.DEV ? 'admin@salazarlogistica.pe' : '');
+  const [password, setPassword] = useState(import.meta.env.DEV ? 'Admin123!' : '');
   const [loading, setLoading] = useState(false);
 
   if (user) return <Navigate to="/dashboard" replace />;

@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { Menu, Bell, LogOut, User, FlaskConical } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { confirmAction } from '../utils/alerts';
+import { confirmAction, toastInfo } from '../utils/alerts';
+import { fixMojibake } from '../utils/textEncoding';
 
 const DEMO_NOTIFICATIONS = [
   {
@@ -50,7 +51,68 @@ const Navbar = ({ onMenuClick }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (isDemoMode) {
+      setNotifications(DEMO_NOTIFICATIONS);
+      return;
+    }
+    const loadAlerts = async () => {
+      try {
+        const [incAb, incRev, estRes] = await Promise.all([
+          api.get('/incidencias', { params: { estado: 'abierta', limit: 4 } }),
+          api.get('/incidencias', { params: { estado: 'en_revision', limit: 2 } }),
+          api.get('/catalogos/estados'),
+        ]);
+        const items = [];
+        (incAb.data.data?.data || []).forEach((inc) => {
+          items.push({
+            id: `inc-${inc.id_incidencia}`,
+            title: 'Incidencia abierta',
+            message: `${inc.codigo_incidencia || 'INC'} — ${inc.titulo}`,
+            link: '/incidencias',
+            time: 'Reciente',
+            unread: true,
+          });
+        });
+        (incRev.data.data?.data || []).forEach((inc) => {
+          items.push({
+            id: `inc-rev-${inc.id_incidencia}`,
+            title: 'En revisión',
+            message: `${inc.codigo_incidencia || 'INC'} — ${inc.tipo}`,
+            link: '/incidencias',
+            time: 'Pendiente',
+            unread: true,
+          });
+        });
+        const retrasado = (estRes.data.data || []).find((e) => e.codigo === 'retrasado');
+        if (retrasado) {
+          const { data: envRes } = await api.get('/envios', {
+            params: { estado: retrasado.id_estado, limit: 3 },
+          });
+          (envRes.data?.data?.data || []).forEach((e) => {
+            items.push({
+              id: `env-${e.id_envio}`,
+              title: 'Envío retrasado',
+              message: `${e.codigo_envio} — ${e.destino}`,
+              link: `/seguimiento/${e.id_envio}`,
+              time: 'Operativo',
+              unread: true,
+            });
+          });
+        }
+        setNotifications(items.length ? items.slice(0, 8) : []);
+      } catch {
+        setNotifications([]);
+      }
+    };
+    loadAlerts();
+  }, [isDemoMode]);
+
   const handleLogout = async () => {
+    if (isDemoMode) {
+      toastInfo('Modo demo', 'La sesión simulada permanece activa. Desactive VITE_DEMO_MODE para usar credenciales reales.');
+      return;
+    }
     const ok = await confirmAction('¿Cerrar sesión?', 'Saldrá del sistema de trazabilidad');
     if (ok) {
       await logout();
@@ -78,7 +140,9 @@ const Navbar = ({ onMenuClick }) => {
         <Menu className="h-6 w-6" />
       </button>
 
-      <div className="hidden flex-1 lg:block">
+      <div className="flex flex-1 items-center justify-between lg:justify-end">
+        <p className="text-sm font-semibold text-salazar-900 lg:hidden">Salazar Logística</p>
+        <div className="hidden flex-1 lg:block">
         <h1 className="text-lg font-semibold text-salazar-900">
           Sistema de Trazabilidad Logística
         </h1>
@@ -89,6 +153,7 @@ const Navbar = ({ onMenuClick }) => {
             Modo demo — sin base de datos (datos simulados)
           </p>
         )}
+        </div>
       </div>
 
       <div className="flex items-center gap-3">
@@ -123,6 +188,9 @@ const Navbar = ({ onMenuClick }) => {
                 )}
               </div>
               <ul className="max-h-72 overflow-y-auto">
+                {notifications.length === 0 && (
+                  <li className="px-4 py-6 text-center text-sm text-slate-500">Sin alertas operativas</li>
+                )}
                 {notifications.map((n) => (
                   <li key={n.id}>
                     <Link
@@ -145,7 +213,7 @@ const Navbar = ({ onMenuClick }) => {
                 ))}
               </ul>
               <p className="border-t border-slate-100 px-4 py-2 text-center text-[10px] text-slate-400">
-                Alertas operativas simuladas
+                {isDemoMode ? 'Alertas simuladas (modo demo)' : 'Incidencias y envíos retrasados'}
               </p>
             </div>
           )}
@@ -159,7 +227,7 @@ const Navbar = ({ onMenuClick }) => {
             <p className="text-sm font-medium text-slate-800">
               {user?.nombres} {user?.apellidos}
             </p>
-            <p className="text-xs text-slate-500">{user?.rol?.nombre}</p>
+            <p className="text-xs text-slate-500">{fixMojibake(user?.rol?.nombre)}</p>
           </div>
         </div>
 

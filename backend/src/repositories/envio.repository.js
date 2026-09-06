@@ -23,7 +23,7 @@ const findAllPaginated = async ({ page = 1, limit = 10, search, estado, cliente,
       { origen: { [Op.like]: `%${search}%` } },
       { destino: { [Op.like]: `%${search}%` } },
       { '$cliente.razon_social$': { [Op.like]: `%${search}%` } },
-      { '$cliente.ruc$': { [Op.like]: `%${search}%` } },
+      { '$cliente.dni$': { [Op.like]: `%${search}%` } },
     ];
   }
 
