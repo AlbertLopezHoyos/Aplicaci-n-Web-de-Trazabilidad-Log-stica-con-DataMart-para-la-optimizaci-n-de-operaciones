@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "db:seed": "node database/seeders/seed.js"
+    "db:seed": "node database/seeders/seed.js",
+    "db:seed-bulk": "node database/seeders/seed-bulk.js",
+    "db:fix-estados": "node database/seeders/fix-estados.js",
+    "db:etl": "node database/scripts/run-etl.js"
   },
   "keywords": ["logistica", "trazabilidad", "datamart", "express"],
   "author": "Tesis UIGV 2026",

@@ -16,6 +16,14 @@ router.get('/preview', authorize('Administrador'), async (req, res, next) => {
     next(err);
   }
 });
+router.get('/analytics', authorize('Administrador'), async (req, res, next) => {
+  try {
+    const analytics = await etlService.getAnalytics();
+    return success(res, analytics);
+  } catch (err) {
+    next(err);
+  }
+});
 router.post('/etl/run', authorize('Administrador'), async (req, res, next) => {
   try {
     const result = await etlService.runStaging();
