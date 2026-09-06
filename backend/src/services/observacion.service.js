@@ -1,7 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const ExcelJS = require('exceljs');
-const { sequelize, Envio, Reporte, ErrorRegistro } = require('../models');
+const { sequelize, Envio, Reporte, ErrorRegistro, Incidencia } = require('../models');
 const { QueryTypes } = require('sequelize');
 
 const fichasDir = path.join(__dirname, '../../uploads/fichas');
@@ -52,19 +52,16 @@ const DIMENSIONES = {
     ],
   },
   4: {
-    id: 'decisiones',
-    titulo: 'Dimensión 4 - Toma de decisiones (TPGRO)',
-    vista: 'vw_ficha_reportes',
+    id: 'informacion_operativa',
+    titulo: 'Dimensión 4 - Gestión de la información operativa (PICO)',
+    vista: 'vw_ficha_informacion_operativa',
     columnas: [
-      'fecha', 'tipo_reporte', 'area_solicitante', 'hora_inicio', 'hora_fin',
-      'tiempo_generacion_min', 'cantidad_registros_analizados',
-      'productividad_registros_hora', 'productividad_tiempos_registro',
-      'usuario_genera', 'observaciones',
+      'fecha', 'codigo_incidencia', 'tipo_incidencia', 'area', 'codigo_envio',
+      'estado_incidencia', 'informacion_completa', 'fuente_principal', 'observacion',
     ],
     labels: [
-      'Fecha', 'Tipo reporte', 'Área solicitante', 'Hora inicio', 'Hora fin',
-      'Tiempo generación (min)', 'Cantidad registros', 'Productividad reg/hora',
-      'Productividad tiempos', 'Usuario', 'Observaciones',
+      'Fecha', 'Código incidencia', 'Tipo incidencia', 'Área', 'Código envío (si aplica)',
+      'Estado incidencia', 'Información completa (Sí/No)', 'Fuente principal de información', 'Observación',
     ],
   },
 };
@@ -140,30 +137,26 @@ const queryFallback = async (dimension) => {
     );
   }
   if (dimension === 4) {
-    const rows = await Reporte.findAll({
-      where: { estado: 'generado' },
-      include: [{ association: 'usuario', attributes: ['nombres', 'apellidos'] }],
-      order: [['created_at', 'DESC']],
-      limit: 50,
-    });
-    return rows.map((r) => ({
-      fecha: r.hora_inicio ? r.hora_inicio.toISOString().split('T')[0] : null,
-      tipo_reporte: r.tipo_reporte,
-      area_solicitante: r.area_solicitante,
-      hora_inicio: r.hora_inicio ? new Date(r.hora_inicio).toTimeString().slice(0, 8) : null,
-      hora_fin: r.hora_fin ? new Date(r.hora_fin).toTimeString().slice(0, 8) : null,
-      tiempo_generacion_min: r.tiempo_generacion_min,
-      cantidad_registros_analizados: r.cantidad_registros,
-      productividad_registros_hora:
-        r.cantidad_registros && r.tiempo_generacion_min
-          ? Math.round((r.cantidad_registros / (r.tiempo_generacion_min / 60)) * 100) / 100
-          : null,
-      productividad_tiempos_registro: r.tiempo_generacion_min
-        ? Math.round((60 / r.tiempo_generacion_min) * 100) / 100
-        : null,
-      usuario_genera: r.usuario ? `${r.usuario.nombres} ${r.usuario.apellidos}` : null,
-      observaciones: r.observaciones,
-    }));
+    try {
+      return await sequelize.query('SELECT * FROM vw_ficha_informacion_operativa LIMIT 50', { type: QueryTypes.SELECT });
+    } catch {
+      const rows = await Incidencia.findAll({
+        include: [{ model: Envio, as: 'envio', attributes: ['codigo_envio'] }],
+        order: [['fecha_reporte', 'DESC']],
+        limit: 50,
+      });
+      return rows.map((i) => ({
+        fecha: i.fecha_reporte ? i.fecha_reporte.toISOString().split('T')[0] : null,
+        codigo_incidencia: i.codigo_incidencia,
+        tipo_incidencia: i.tipo,
+        area: i.area,
+        codigo_envio: i.envio?.codigo_envio || null,
+        estado_incidencia: i.estado_incidencia,
+        informacion_completa: i.informacion_completa ? 'Sí' : 'No',
+        fuente_principal: i.fuente_principal,
+        observacion: i.descripcion,
+      }));
+    }
   }
   return [];
 };
@@ -206,20 +199,18 @@ const calcularIndicadores = async () => {
     peea = totalEnvios ? ((row?.actualizados || 0) / totalEnvios) * 100 : 0;
   }
 
-  const reportes = await Reporte.findAll({
-    where: { estado: 'generado' },
-    attributes: ['tiempo_generacion_min'],
-  });
-  const tpgroRows = reportes.filter((r) => r.tiempo_generacion_min != null).map((r) => Number(r.tiempo_generacion_min));
-  const tpgro = tpgroRows.length ? tpgroRows.reduce((a, b) => a + b, 0) / tpgroRows.length : 0;
+  const incidencias = await Incidencia.findAll({ attributes: ['informacion_completa'] });
+  const totalIncidencias = incidencias.length;
+  const completas = incidencias.filter((i) => i.informacion_completa).length;
+  const pico = totalIncidencias ? (completas / totalIncidencias) * 100 : 0;
 
   return {
     tpre: Math.round(tpre * 100) / 100,
     per: Math.round(per * 100) / 100,
     peea: Math.round(peea * 100) / 100,
-    tpgro: Math.round(tpgro * 100) / 100,
+    pico: Math.round(pico * 100) / 100,
     totalEnvios,
-    totalReportes: reportes.length,
+    totalIncidencias,
   };
 };
 

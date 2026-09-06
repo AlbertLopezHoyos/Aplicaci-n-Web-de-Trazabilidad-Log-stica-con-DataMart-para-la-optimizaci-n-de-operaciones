@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
 const { Incidencia, Envio, Usuario, Cliente, EstadoEnvio } = require('../models');
 const { sanitizeObject } = require('../utils/sanitize');
+const { generarCodigoIncidencia, evaluarInformacionCompleta } = require('../utils/codigoIncidencia');
 
 const list = async ({ page = 1, limit = 10, tipo, estado, id_envio }) => {
   const where = {};
@@ -28,17 +29,26 @@ const list = async ({ page = 1, limit = 10, tipo, estado, id_envio }) => {
 };
 
 const create = async (data, userId) => {
-  const clean = sanitizeObject(data, ['titulo', 'descripcion', 'resolucion']);
-  return Incidencia.create({ ...clean, id_usuario_reporta: userId });
+  const clean = sanitizeObject(data, ['titulo', 'descripcion', 'resolucion', 'area', 'fuente_principal']);
+  const codigo_incidencia = await generarCodigoIncidencia();
+  const informacion_completa = evaluarInformacionCompleta(clean);
+  return Incidencia.create({
+    ...clean,
+    codigo_incidencia,
+    informacion_completa,
+    id_usuario_reporta: userId,
+  });
 };
 
 const update = async (id, data) => {
   const inc = await Incidencia.findByPk(id);
   if (!inc) throw Object.assign(new Error('Incidencia no encontrada'), { statusCode: 404 });
-  const clean = sanitizeObject(data, ['titulo', 'descripcion', 'resolucion']);
+  const clean = sanitizeObject(data, ['titulo', 'descripcion', 'resolucion', 'area', 'fuente_principal']);
   if (clean.estado_incidencia === 'resuelta' || clean.estado_incidencia === 'cerrada') {
     clean.fecha_resolucion = clean.fecha_resolucion || new Date();
   }
+  const merged = { ...inc.toJSON(), ...clean };
+  clean.informacion_completa = evaluarInformacionCompleta(merged);
   await inc.update(clean);
   return inc;
 };

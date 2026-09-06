@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Eye, Pencil, Trash2 } from 'lucide-react';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import PageHeader from '../components/PageHeader';
 import StatusBadge from '../components/StatusBadge';
 import Pagination from '../components/Pagination';
@@ -9,18 +10,26 @@ import { formatDate } from '../utils/format';
 import { confirmAction, toastSuccess, toastError } from '../utils/alerts';
 
 const EnviosPage = () => {
+  const { isAdmin } = useAuth();
   const [envios, setEnvios] = useState({ data: [], total: 0, page: 1, limit: 10 });
   const [estados, setEstados] = useState([]);
-  const [filters, setFilters] = useState({ search: '', estado: '', page: 1 });
+  const [filters, setFilters] = useState({ search: '', estado: '', fechaDesde: '', fechaHasta: '', page: 1 });
+  const [searchInput, setSearchInput] = useState('');
+  const [fechaDesdeInput, setFechaDesdeInput] = useState('');
+  const [fechaHastaInput, setFechaHastaInput] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  const load = useCallback(async () => {
+    setLoading(true);
     try {
       const { data } = await api.get('/envios', { params: { ...filters, limit: 10 } });
       setEnvios(data.data);
     } catch {
       toastError('Error', 'No se pudieron cargar los envíos');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [filters]);
 
   useEffect(() => {
     api.get('/catalogos/estados').then((r) => setEstados(r.data.data));
@@ -28,13 +37,27 @@ const EnviosPage = () => {
 
   useEffect(() => {
     load();
-  }, [filters.page, filters.estado]);
+  }, [load]);
 
   const handleSearch = (e) => {
     e.preventDefault();
-    setFilters((f) => ({ ...f, page: 1 }));
-    load();
+    setFilters((f) => ({
+      ...f,
+      search: searchInput.trim(),
+      fechaDesde: fechaDesdeInput,
+      fechaHasta: fechaHastaInput,
+      page: 1,
+    }));
   };
+
+  const clearFilters = () => {
+    setSearchInput('');
+    setFechaDesdeInput('');
+    setFechaHastaInput('');
+    setFilters({ search: '', estado: '', fechaDesde: '', fechaHasta: '', page: 1 });
+  };
+
+  const hasActiveFilters = filters.search || filters.estado || filters.fechaDesde || filters.fechaHasta;
 
   const handleDelete = async (id) => {
     if (!(await confirmAction('¿Eliminar envío?', 'Se marcará como inactivo'))) return;
@@ -66,8 +89,8 @@ const EnviosPage = () => {
             <input
               className="input-field pl-10"
               placeholder="Buscar código, origen, destino, cliente..."
-              value={filters.search}
-              onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
             />
           </div>
           <select
@@ -82,83 +105,122 @@ const EnviosPage = () => {
               </option>
             ))}
           </select>
+          <input
+            type="date"
+            className="input-field w-auto"
+            value={fechaDesdeInput}
+            onChange={(e) => setFechaDesdeInput(e.target.value)}
+            title="Desde"
+          />
+          <input
+            type="date"
+            className="input-field w-auto"
+            value={fechaHastaInput}
+            onChange={(e) => setFechaHastaInput(e.target.value)}
+            title="Hasta"
+          />
           <button type="submit" className="btn-primary">
             Buscar
           </button>
+          {hasActiveFilters && (
+            <button type="button" className="btn-secondary" onClick={clearFilters}>
+              Limpiar
+            </button>
+          )}
         </form>
       </div>
 
       <div className="card overflow-hidden p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Código</th>
-                <th className="px-4 py-3">Cliente</th>
-                <th className="px-4 py-3">Ruta</th>
-                <th className="px-4 py-3">Carga</th>
-                <th className="px-4 py-3">Tiempo reg.</th>
-                <th className="px-4 py-3">Estado</th>
-                <th className="px-4 py-3">Fecha</th>
-                <th className="px-4 py-3 text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {envios.data?.map((e) => (
-                <tr key={e.id_envio} className="border-b border-slate-50 hover:bg-slate-50/50">
-                  <td className="px-4 py-3 font-mono font-medium text-salazar-800">{e.codigo_envio}</td>
-                  <td className="px-4 py-3">{e.cliente?.razon_social}</td>
-                  <td className="px-4 py-3 text-xs">
-                    {e.origen} → {e.destino}
-                  </td>
-                  <td className="px-4 py-3">
-                    {e.tipo_carga}
-                    <span className="block text-xs text-slate-400">{e.peso_kg} kg · {e.numero_paquetes ?? 1} paq.</span>
-                  </td>
-                  <td className="px-4 py-3 text-xs">
-                    {e.tiempo_registro_min != null ? `${e.tiempo_registro_min} min` : '—'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge estado={e.estadoActual} />
-                  </td>
-                  <td className="px-4 py-3">{formatDate(e.fecha_registro)}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-1">
-                      <Link
-                        to={`/seguimiento/${e.id_envio}`}
-                        className="rounded p-2 text-slate-500 hover:bg-salazar-50 hover:text-salazar-800"
-                        title="Seguimiento"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Link>
-                      <Link
-                        to={`/envios/${e.id_envio}/editar`}
-                        className="rounded p-2 text-slate-500 hover:bg-slate-100"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(e.id_envio)}
-                        className="rounded p-2 text-slate-500 hover:bg-red-50 hover:text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="p-4">
-          <Pagination
-            page={envios.page}
-            total={envios.total}
-            limit={envios.limit}
-            onPageChange={(p) => setFilters((f) => ({ ...f, page: p }))}
-          />
-        </div>
+        {loading ? (
+          <div className="flex h-40 items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-salazar-200 border-t-salazar-800" />
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Código</th>
+                    <th className="px-4 py-3">Cliente</th>
+                    <th className="px-4 py-3">Ruta</th>
+                    <th className="px-4 py-3">Carga</th>
+                    <th className="px-4 py-3">Tiempo reg.</th>
+                    <th className="px-4 py-3">Estado</th>
+                    <th className="px-4 py-3">Fecha</th>
+                    <th className="px-4 py-3 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {envios.data?.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-10 text-center text-slate-500">
+                        No hay envíos registrados.{' '}
+                        <Link to="/envios/nuevo" className="text-salazar-700 underline">
+                          Crear el primero
+                        </Link>
+                      </td>
+                    </tr>
+                  )}
+                  {envios.data?.map((e) => (
+                    <tr key={e.id_envio} className="border-b border-slate-50 hover:bg-slate-50/50">
+                      <td className="px-4 py-3 font-mono font-medium text-salazar-800">{e.codigo_envio}</td>
+                      <td className="px-4 py-3">{e.cliente?.razon_social}</td>
+                      <td className="px-4 py-3 text-xs">
+                        {e.origen} → {e.destino}
+                      </td>
+                      <td className="px-4 py-3">
+                        {e.tipo_carga}
+                        <span className="block text-xs text-slate-400">{e.peso_kg} kg · {e.numero_paquetes ?? 1} paq.</span>
+                      </td>
+                      <td className="px-4 py-3 text-xs">
+                        {e.tiempo_registro_min != null ? `${e.tiempo_registro_min} min` : '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge estado={e.estadoActual} />
+                      </td>
+                      <td className="px-4 py-3">{formatDate(e.fecha_registro)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-1">
+                          <Link
+                            to={`/seguimiento/${e.id_envio}`}
+                            className="rounded p-2 text-slate-500 hover:bg-salazar-50 hover:text-salazar-800"
+                            title="Seguimiento"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Link>
+                          <Link
+                            to={`/envios/${e.id_envio}/editar`}
+                            className="rounded p-2 text-slate-500 hover:bg-slate-100"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Link>
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(e.id_envio)}
+                              className="rounded p-2 text-slate-500 hover:bg-red-50 hover:text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="p-4">
+              <Pagination
+                page={envios.page}
+                total={envios.total}
+                limit={envios.limit}
+                onPageChange={(p) => setFilters((f) => ({ ...f, page: p }))}
+              />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

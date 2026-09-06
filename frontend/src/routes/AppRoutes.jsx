@@ -11,6 +11,7 @@ import IncidenciasPage from '../pages/IncidenciasPage';
 import ReportesPage from '../pages/ReportesPage';
 import ObservacionPage from '../pages/ObservacionPage';
 import DataMartPage from '../pages/DataMartPage';
+import ClientesPage from '../pages/ClientesPage';
 
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -23,6 +24,12 @@ const PrivateRoute = ({ children }) => {
   }
   if (isDemoMode || user) return children;
   return <Navigate to="/login" replace />;
+};
+
+const AdminRoute = ({ children }) => {
+  const { isAdmin } = useAuth();
+  if (!isAdmin) return <Navigate to="/dashboard" replace />;
+  return children;
 };
 
 const AppRoutes = () => (
@@ -44,12 +51,13 @@ const AppRoutes = () => (
       <Route path="envios" element={<EnviosPage />} />
       <Route path="envios/nuevo" element={<EnvioFormPage />} />
       <Route path="envios/:id/editar" element={<EnvioFormPage />} />
+      <Route path="clientes" element={<ClientesPage />} />
       <Route path="seguimiento" element={<SeguimientoPage />} />
       <Route path="seguimiento/:id" element={<SeguimientoPage />} />
       <Route path="incidencias" element={<IncidenciasPage />} />
       <Route path="reportes" element={<ReportesPage />} />
       <Route path="observacion" element={<ObservacionPage />} />
-      <Route path="datamart" element={<DataMartPage />} />
+      <Route path="datamart" element={<AdminRoute><DataMartPage /></AdminRoute>} />
     </Route>
     <Route path="*" element={<Navigate to="/dashboard" replace />} />
   </Routes>

@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react';
 import api from '../services/api';
 import PageHeader from '../components/PageHeader';
 import KpiCard from '../components/KpiCard';
-import { ClipboardList, Download, Timer, AlertTriangle, MapPin, FileBarChart } from 'lucide-react';
+import { ClipboardList, Download, Timer, AlertTriangle, MapPin, ClipboardCheck } from 'lucide-react';
 import { toastSuccess, toastError } from '../utils/alerts';
 
 const DIMENSIONES = [
   { id: 1, titulo: 'Eficiencia operativa', indicador: 'TPRE', icon: Timer, color: 'blue' },
   { id: 2, titulo: 'Calidad información', indicador: 'PER', icon: AlertTriangle, color: 'red' },
   { id: 3, titulo: 'Control y seguimiento', indicador: 'PEEA', icon: MapPin, color: 'green' },
-  { id: 4, titulo: 'Toma de decisiones', indicador: 'TPGRO', icon: FileBarChart, color: 'amber' },
+  { id: 4, titulo: 'Gestión información operativa', indicador: 'PICO', icon: ClipboardCheck, color: 'amber' },
 ];
 
 const ObservacionPage = () => {
@@ -88,10 +88,10 @@ const ObservacionPage = () => {
           color="green"
         />
         <KpiCard
-          title="TPGRO (min)"
-          value={indicadores?.tpgro ?? '—'}
-          subtitle="Tiempo generación reportes"
-          icon={FileBarChart}
+          title="PICO (%)"
+          value={indicadores?.pico ?? '—'}
+          subtitle="Incidencias con información completa"
+          icon={ClipboardCheck}
           color="amber"
         />
       </div>
@@ -140,7 +140,7 @@ const ObservacionPage = () => {
                 {datos.length === 0 && (
                   <tr>
                     <td colSpan={columnas.length + 1} className="px-4 py-8 text-center text-slate-500">
-                      Sin registros. Cree envíos o reportes para poblar la ficha.
+                      Sin registros. Cree incidencias con área y fuente de información para poblar la ficha.
                     </td>
                   </tr>
                 )}

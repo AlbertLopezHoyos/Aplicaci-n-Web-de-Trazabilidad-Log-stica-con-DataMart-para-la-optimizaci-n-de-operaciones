@@ -99,11 +99,13 @@ const LoginPage = () => {
             </button>
           </form>
 
-          <div className="mt-8 rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">
-            <p className="font-semibold text-salazar-800">Credenciales demo:</p>
-            <p className="mt-1">Admin: admin@salazarlogistica.pe / Admin123!</p>
-            <p>Operador: operador@salazarlogistica.pe / Operador123!</p>
-          </div>
+          {import.meta.env.DEV && (
+            <div className="mt-8 rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">
+              <p className="font-semibold text-salazar-800">Credenciales demo:</p>
+              <p className="mt-1">Admin: admin@salazarlogistica.pe / Admin123!</p>
+              <p>Operador: operador@salazarlogistica.pe / Operador123!</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

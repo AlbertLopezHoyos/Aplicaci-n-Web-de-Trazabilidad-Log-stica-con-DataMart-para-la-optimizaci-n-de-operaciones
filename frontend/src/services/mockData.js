@@ -7,9 +7,9 @@ const estados = [
 ];
 
 const clientes = [
-  { id_cliente: 1, razon_social: 'Comercial Andina S.A.C.', ruc: '20123456789' },
-  { id_cliente: 2, razon_social: 'Distribuidora Norte E.I.R.L.', ruc: '20987654321' },
-  { id_cliente: 3, razon_social: 'Importaciones del Pacífico S.A.', ruc: '20456789123' },
+  { id_cliente: 1, razon_social: 'Comercial Andina S.A.C.', ruc: '20123456789', contacto: 'Juan Pérez', email: 'contacto@andina.pe', telefono: '999111222', ciudad: 'Lima' },
+  { id_cliente: 2, razon_social: 'Distribuidora Norte E.I.R.L.', ruc: '20987654321', contacto: 'Ana Ruiz', email: 'ventas@norte.pe', telefono: '999333444', ciudad: 'Trujillo' },
+  { id_cliente: 3, razon_social: 'Importaciones del Pacífico S.A.', ruc: '20456789123', contacto: 'Carlos Díaz', email: 'info@pacifico.pe', telefono: '999555666', ciudad: 'Callao' },
 ];
 
 const responsable = { nombres: 'María', apellidos: 'Torres Vega' };
@@ -107,9 +107,13 @@ let reportesHistorial = [
 let incidencias = [
   {
     id_incidencia: 1,
+    codigo_incidencia: 'INC-2026-00001',
     id_envio: 3,
     tipo: 'retraso',
     severidad: 'alta',
+    area: 'Transporte',
+    fuente_principal: 'Llamada telefónica',
+    informacion_completa: true,
     titulo: 'Retraso por obras viales',
     descripcion: 'Demora estimada 24h.',
     estado_incidencia: 'abierta',
@@ -120,6 +124,7 @@ let incidencias = [
 
 let evidencias = [];
 let nextEnvioId = 4;
+let nextClienteId = 4;
 let nextIncidenciaId = 2;
 let nextErrorId = 2;
 let nextReporteId = 2;
@@ -178,23 +183,17 @@ const buildFichaControl = () =>
     observaciones: e.observaciones,
   }));
 
-const buildFichaReportes = () =>
-  reportesHistorial.map((r) => ({
-    fecha: r.hora_inicio?.split('T')[0],
-    tipo_reporte: r.tipo_reporte,
-    area_solicitante: r.area_solicitante,
-    hora_inicio: fmtTime(r.hora_inicio),
-    hora_fin: fmtTime(r.hora_fin),
-    tiempo_generacion_min: r.tiempo_generacion_min,
-    cantidad_registros_analizados: r.cantidad_registros,
-    productividad_registros_hora: r.cantidad_registros && r.tiempo_generacion_min
-      ? Math.round((r.cantidad_registros / (r.tiempo_generacion_min / 60)) * 100) / 100
-      : null,
-    productividad_tiempos_registro: r.tiempo_generacion_min
-      ? Math.round((60 / r.tiempo_generacion_min) * 100) / 100
-      : null,
-    usuario_genera: 'Carlos Salazar Mendoza',
-    observaciones: r.observaciones,
+const buildFichaInformacionOperativa = () =>
+  incidencias.map((i) => ({
+    fecha: i.fecha_reporte?.split('T')[0],
+    codigo_incidencia: i.codigo_incidencia,
+    tipo_incidencia: i.tipo,
+    area: i.area,
+    codigo_envio: i.envio?.codigo_envio || null,
+    estado_incidencia: i.estado_incidencia,
+    informacion_completa: i.informacion_completa ? 'Sí' : 'No',
+    fuente_principal: i.fuente_principal,
+    observacion: i.descripcion,
   }));
 
 const calcIndicadores = () => {
@@ -204,15 +203,15 @@ const calcIndicadores = () => {
   const per = envios.length ? (conError / envios.length) * 100 : 0;
   const actualizados = envios.filter((e) => e.historial?.length > 1 || e.estadoActual?.codigo !== 'recibido').length;
   const peea = envios.length ? (actualizados / envios.length) * 100 : 0;
-  const tpgroRows = reportesHistorial.filter((r) => r.tiempo_generacion_min != null).map((r) => r.tiempo_generacion_min);
-  const tpgro = tpgroRows.length ? tpgroRows.reduce((a, b) => a + b, 0) / tpgroRows.length : 0;
+  const completas = incidencias.filter((i) => i.informacion_completa).length;
+  const pico = incidencias.length ? (completas / incidencias.length) * 100 : 0;
   return {
     tpre: Math.round(tpre * 100) / 100,
     per: Math.round(per * 100) / 100,
     peea: Math.round(peea * 100) / 100,
-    tpgro: Math.round(tpgro * 100) / 100,
+    pico: Math.round(pico * 100) / 100,
     totalEnvios: envios.length,
-    totalReportes: reportesHistorial.length,
+    totalIncidencias: incidencias.length,
   };
 };
 
@@ -260,16 +259,33 @@ export const mockHandlers = {
         (e) =>
           e.codigo_envio.toLowerCase().includes(q) ||
           e.origen.toLowerCase().includes(q) ||
-          e.destino.toLowerCase().includes(q)
+          e.destino.toLowerCase().includes(q) ||
+          e.cliente?.razon_social?.toLowerCase().includes(q)
       );
     }
     if (params.estado) list = list.filter((e) => String(e.id_estado_actual) === String(params.estado));
+    if (params.fechaDesde) list = list.filter((e) => e.fecha_registro >= params.fechaDesde);
+    if (params.fechaHasta) list = list.filter((e) => e.fecha_registro <= params.fechaHasta);
     return ok({ data: list, total: list.length, page, limit });
   },
 
   'GET /catalogos/estados': () => ok(estados),
-  'GET /catalogos/clientes': () => ok(clientes),
-  'GET /incidencias': (config) => ok({ data: incidencias, total: incidencias.length, page: Number(config.params?.page) || 1 }),
+  'GET /catalogos/clientes': (config) => {
+    const q = (config.params?.search || '').toLowerCase();
+    let list = [...clientes];
+    if (q) {
+      list = list.filter(
+        (c) => c.razon_social.toLowerCase().includes(q) || c.ruc.includes(q)
+      );
+    }
+    return ok(list);
+  },
+  'GET /incidencias': (config) => {
+    const params = config.params || {};
+    let list = [...incidencias];
+    if (params.estado) list = list.filter((i) => i.estado_incidencia === params.estado);
+    return ok({ data: list, total: list.length, page: Number(params.page) || 1 });
+  },
   'GET /reportes/historial': () => ok(reportesHistorial),
   'GET /observacion/indicadores': () => ok(calcIndicadores()),
   'GET /datamart/design': () =>
@@ -317,7 +333,7 @@ export const handleMockRequest = async (config) => {
   }
   if (key === 'GET_FICHA') {
     const dim = Number(path.split('/')[2]);
-    const builders = { 1: buildFichaEficiencia, 2: buildFichaCalidad, 3: buildFichaControl, 4: buildFichaReportes };
+    const builders = { 1: buildFichaEficiencia, 2: buildFichaCalidad, 3: buildFichaControl, 4: buildFichaInformacionOperativa };
     const data = builders[dim]?.() || [];
     return ok({ dimension: dim, data });
   }
@@ -389,9 +405,42 @@ export const handleMockRequest = async (config) => {
 
   if (method === 'post' && path === 'incidencias') {
     const envio = envios.find((e) => e.id_envio === Number(body.id_envio));
-    const inc = { id_incidencia: nextIncidenciaId++, ...body, fecha_reporte: new Date().toISOString(), envio: envio ? { codigo_envio: envio.codigo_envio } : {} };
+    const informacion_completa = Boolean(body.area && body.fuente_principal && body.titulo && body.descripcion);
+    const id = nextIncidenciaId++;
+    const inc = {
+      id_incidencia: id,
+      codigo_incidencia: `INC-2026-${String(id).padStart(5, '0')}`,
+      estado_incidencia: 'abierta',
+      ...body,
+      informacion_completa,
+      fecha_reporte: new Date().toISOString(),
+      envio: envio ? { codigo_envio: envio.codigo_envio } : {},
+    };
     incidencias.unshift(inc);
     return ok(inc);
+  }
+
+  if (method === 'put' && path.match(/^incidencias\/\d+$/)) {
+    const id = Number(path.split('/')[1]);
+    const idx = incidencias.findIndex((i) => i.id_incidencia === id);
+    if (idx === -1) return Promise.reject({ response: { status: 404, data: { message: 'No encontrada' } } });
+    const prev = incidencias[idx];
+    const merged = { ...prev, ...body };
+    merged.informacion_completa = Boolean(merged.area && merged.fuente_principal && merged.titulo && merged.descripcion);
+    if (['resuelta', 'cerrada'].includes(merged.estado_incidencia)) {
+      merged.fecha_resolucion = merged.fecha_resolucion || new Date().toISOString();
+    }
+    const envio = envios.find((e) => e.id_envio === Number(merged.id_envio));
+    if (envio) merged.envio = { codigo_envio: envio.codigo_envio };
+    incidencias[idx] = merged;
+    return ok(merged);
+  }
+
+  if (method === 'post' && path === 'catalogos/clientes') {
+    const id = nextClienteId++;
+    const cliente = { id_cliente: id, activo: true, ciudad: 'Lima', ...body };
+    clientes.push(cliente);
+    return ok(cliente);
   }
 
   if (method === 'post' && path === 'observacion/errores-registro') {

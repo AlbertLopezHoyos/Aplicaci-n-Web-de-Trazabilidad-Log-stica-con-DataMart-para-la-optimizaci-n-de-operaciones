@@ -11,7 +11,7 @@ router.get('/', incidenciaController.list);
 router.get('/:id', incidenciaController.getById);
 router.post(
   '/',
-  [body('id_envio').isInt(), body('titulo').notEmpty(), body('descripcion').notEmpty()],
+  [body('id_envio').isInt(), body('titulo').notEmpty(), body('descripcion').notEmpty(), body('area').notEmpty(), body('fuente_principal').notEmpty()],
   validate,
   incidenciaController.create
 );

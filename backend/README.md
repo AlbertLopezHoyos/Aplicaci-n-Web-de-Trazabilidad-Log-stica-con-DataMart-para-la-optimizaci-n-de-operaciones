@@ -23,7 +23,8 @@ cp .env.example .env
 
 1. Ejecutar `database/scripts/01_schema_completo.sql`
 2. Ejecutar `database/scripts/02_medicion_fichas.sql` (campos fichas observación)
-3. Ejecutar seeder:
+3. Ejecutar `database/scripts/03_dimension4_gestion_informacion.sql` (dimensión 4 PICO)
+4. Ejecutar seeder:
 
 ```bash
 npm run db:seed
@@ -55,7 +56,7 @@ API: `http://localhost:5000/api`
 | CRUD | /api/incidencias | Incidencias |
 | POST | /api/evidencias/upload | Subir evidencia |
 | POST | /api/reportes/generar | PDF/Excel |
-| GET | /api/observacion/indicadores | KPIs TPRE, PER, PEEA, TPGRO |
+| GET | /api/observacion/indicadores | KPIs TPRE, PER, PEEA, PICO |
 | GET | /api/observacion/ficha/:1-4 | Datos ficha por dimensión |
 | GET | /api/observacion/ficha/:dim/export | Excel ficha observación |
 | POST | /api/observacion/errores-registro | Registrar error validación |

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
 import PageHeader from '../components/PageHeader';
 import StatusBadge from '../components/StatusBadge';
@@ -9,9 +9,11 @@ import { Upload, MapPin } from 'lucide-react';
 
 const SeguimientoPage = () => {
   const { id: paramId } = useParams();
+  const navigate = useNavigate();
   const [envios, setEnvios] = useState([]);
   const [selectedId, setSelectedId] = useState(paramId || '');
   const [envio, setEnvio] = useState(null);
+  const [loadError, setLoadError] = useState(false);
   const [estados, setEstados] = useState([]);
   const [evidencias, setEvidencias] = useState([]);
   const [estadoForm, setEstadoForm] = useState({ id_estado: '', ubicacion: '', comentario: '' });
@@ -23,14 +25,32 @@ const SeguimientoPage = () => {
   }, []);
 
   useEffect(() => {
-    if (paramId) setSelectedId(paramId);
+    setSelectedId(paramId || '');
   }, [paramId]);
 
   useEffect(() => {
-    if (!selectedId) return;
-    api.get(`/envios/${selectedId}`).then((r) => setEnvio(r.data.data));
-    api.get(`/evidencias/envio/${selectedId}`).then((r) => setEvidencias(r.data.data));
+    if (!selectedId) {
+      setEnvio(null);
+      setEvidencias([]);
+      setLoadError(false);
+      return;
+    }
+    setLoadError(false);
+    api
+      .get(`/envios/${selectedId}`)
+      .then((r) => setEnvio(r.data.data))
+      .catch(() => {
+        setEnvio(null);
+        setLoadError(true);
+      });
+    api.get(`/evidencias/envio/${selectedId}`).then((r) => setEvidencias(r.data.data)).catch(() => setEvidencias([]));
   }, [selectedId]);
+
+  const handleSelect = (e) => {
+    const id = e.target.value;
+    setSelectedId(id);
+    navigate(id ? `/seguimiento/${id}` : '/seguimiento', { replace: true });
+  };
 
   const handleEstado = async (e) => {
     e.preventDefault();
@@ -76,7 +96,7 @@ const SeguimientoPage = () => {
         <select
           className="input-field max-w-xl"
           value={selectedId}
-          onChange={(e) => setSelectedId(e.target.value)}
+          onChange={handleSelect}
         >
           <option value="">— Elegir código de envío —</option>
           {envios.map((e) => (
@@ -86,6 +106,15 @@ const SeguimientoPage = () => {
           ))}
         </select>
       </div>
+
+      {loadError && (
+        <div className="card mb-6 border-amber-200 bg-amber-50 text-sm text-amber-800">
+          No se encontró el envío seleccionado.{' '}
+          <Link to="/seguimiento" className="font-medium underline" onClick={() => setSelectedId('')}>
+            Volver al listado
+          </Link>
+        </div>
+      )}
 
       {envio && (
         <div className="grid gap-6 lg:grid-cols-3">

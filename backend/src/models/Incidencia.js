@@ -3,12 +3,16 @@ const sequelize = require('../config/database');
 
 const Incidencia = sequelize.define('incidencias', {
   id_incidencia: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  codigo_incidencia: { type: DataTypes.STRING(30), unique: true },
   id_envio: { type: DataTypes.INTEGER, allowNull: false },
   id_usuario_reporta: DataTypes.INTEGER,
   tipo: {
     type: DataTypes.ENUM('error', 'retraso', 'dano', 'perdida', 'observacion', 'otro'),
     defaultValue: 'observacion',
   },
+  area: { type: DataTypes.STRING(100) },
+  fuente_principal: { type: DataTypes.STRING(120) },
+  informacion_completa: { type: DataTypes.BOOLEAN, defaultValue: false },
   severidad: {
     type: DataTypes.ENUM('baja', 'media', 'alta', 'critica'),
     defaultValue: 'media',

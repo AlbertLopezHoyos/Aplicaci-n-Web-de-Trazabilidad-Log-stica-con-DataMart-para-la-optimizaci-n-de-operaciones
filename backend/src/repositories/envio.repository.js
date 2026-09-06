@@ -22,6 +22,8 @@ const findAllPaginated = async ({ page = 1, limit = 10, search, estado, cliente,
       { codigo_envio: { [Op.like]: `%${search}%` } },
       { origen: { [Op.like]: `%${search}%` } },
       { destino: { [Op.like]: `%${search}%` } },
+      { '$cliente.razon_social$': { [Op.like]: `%${search}%` } },
+      { '$cliente.ruc$': { [Op.like]: `%${search}%` } },
     ];
   }
 
@@ -33,6 +35,7 @@ const findAllPaginated = async ({ page = 1, limit = 10, search, estado, cliente,
     limit: parseInt(limit, 10),
     offset,
     distinct: true,
+    subQuery: false,
   });
   return { total: count, page: parseInt(page, 10), limit: parseInt(limit, 10), data: rows };
 };

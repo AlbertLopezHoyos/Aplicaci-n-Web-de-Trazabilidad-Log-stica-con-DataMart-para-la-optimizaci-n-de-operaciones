@@ -41,7 +41,7 @@ const ReportesPage = () => {
       const tiempo = data.data?.reporte?.tiempo_generacion_min;
       toastSuccess(
         'Reporte generado',
-        tiempo != null ? `Tiempo de generación: ${tiempo} min (TPGRO)` : ''
+        tiempo != null ? `Tiempo de generación: ${tiempo} min` : ''
       );
       if (data.data?.downloadUrl) window.open(data.data.downloadUrl, '_blank');
       loadHistorial();
@@ -57,7 +57,7 @@ const ReportesPage = () => {
     <div>
       <PageHeader
         title="Reportes operativos"
-        subtitle="Medición automática del tiempo de generación — ficha dimensión 4 (TPGRO)"
+        subtitle="Exportación PDF/Excel con registro del tiempo de generación"
       />
 
       <div className="grid gap-6 lg:grid-cols-2">

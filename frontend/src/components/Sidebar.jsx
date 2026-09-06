@@ -9,12 +9,14 @@ import {
   Truck,
   X,
   ClipboardList,
+  Users,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/envios', icon: Package, label: 'Envíos' },
+  { to: '/clientes', icon: Users, label: 'Clientes' },
   { to: '/seguimiento', icon: MapPin, label: 'Seguimiento' },
   { to: '/incidencias', icon: AlertTriangle, label: 'Incidencias' },
   { to: '/reportes', icon: FileBarChart, label: 'Reportes' },

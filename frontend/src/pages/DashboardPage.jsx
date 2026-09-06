@@ -13,11 +13,16 @@ import { Link } from 'react-router-dom';
 const DashboardPage = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     api
       .get('/dashboard')
-      .then((res) => setData(res.data.data))
+      .then((res) => {
+        setData(res.data.data);
+        setError(false);
+      })
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
 
@@ -25,6 +30,18 @@ const DashboardPage = () => {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-salazar-200 border-t-salazar-800" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div>
+        <PageHeader title="Dashboard operativo" subtitle="Indicadores clave de desempeño logístico" />
+        <div className="card py-12 text-center text-slate-600">
+          <p className="font-medium text-salazar-900">No se pudo cargar el dashboard</p>
+          <p className="mt-2 text-sm">Verifique que el backend esté activo e intente recargar la página.</p>
+        </div>
       </div>
     );
   }
