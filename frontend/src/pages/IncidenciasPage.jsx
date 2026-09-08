@@ -141,7 +141,7 @@ const IncidenciasPage = () => {
     <div className="page-shell">
       <PageHeader
         title="Gestión de incidencias"
-        subtitle="Registro operativo — ficha dimensión 4 (PICO): información completa"
+        subtitle="Registro operativo — ficha dimensión 4 (PIOIC): información completa"
         compact
         action={
           <button type="button" className="btn-primary" onClick={() => setShowForm(!showForm)}>
@@ -259,7 +259,7 @@ const IncidenciasPage = () => {
             required
           />
           <p className="text-xs text-slate-500">
-            Información completa (PICO): requiere área, fuente, título y observación.
+            Información completa (PIOIC): requiere tipo, área, fuente, título y descripción.
           </p>
           <button type="submit" className="btn-primary">
             Registrar

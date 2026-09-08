@@ -1,5 +1,6 @@
 const { Incidencia } = require('../models');
 const { Op } = require('sequelize');
+const { esIncidenciaCompleta } = require('./reglasIndicadores');
 
 const generarCodigoIncidencia = async () => {
   const anio = new Date().getFullYear();
@@ -16,13 +17,8 @@ const generarCodigoIncidencia = async () => {
   return `${prefix}${String(seq).padStart(5, '0')}`;
 };
 
-const evaluarInformacionCompleta = (data) =>
-  Boolean(
-    data.tipo &&
-      data.area?.trim() &&
-      data.titulo?.trim() &&
-      data.descripcion?.trim() &&
-      data.fuente_principal?.trim()
-  );
+// El criterio de "información completa" (PIOIC) vive en reglasIndicadores.js
+// para que backend, reportes y fichas usen exactamente la misma definición.
+const evaluarInformacionCompleta = esIncidenciaCompleta;
 
 module.exports = { generarCodigoIncidencia, evaluarInformacionCompleta };

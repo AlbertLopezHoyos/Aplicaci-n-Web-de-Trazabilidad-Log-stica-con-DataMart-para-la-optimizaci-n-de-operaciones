@@ -6,16 +6,24 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch",
     "db:seed": "node database/seeders/seed.js",
     "db:seed-bulk": "node database/seeders/seed-bulk.js",
     "db:fix-estados": "node database/seeders/fix-estados.js",
     "db:etl": "node database/scripts/run-etl.js",
     "db:phase-b": "node database/scripts/run-phase-b.js",
     "db:fix-utf8": "node database/scripts/fix-utf8-data.js",
+    "db:muestra": "node database/scripts/marcar-muestra.js",
     "db:export-powerbi": "node database/scripts/export-powerbi-csv.js",
     "db:railway:all": "node database/scripts/railway-pipeline.js"
   },
-  "keywords": ["logistica", "trazabilidad", "datamart", "express"],
+  "keywords": [
+    "logistica",
+    "trazabilidad",
+    "datamart",
+    "express"
+  ],
   "author": "Tesis UIGV 2026",
   "license": "MIT",
   "dependencies": {
@@ -32,6 +40,8 @@
     "sequelize": "^6.37.5"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9"
+    "jest": "^30.5.1",
+    "nodemon": "^3.1.9",
+    "supertest": "^7.2.2"
   }
 }

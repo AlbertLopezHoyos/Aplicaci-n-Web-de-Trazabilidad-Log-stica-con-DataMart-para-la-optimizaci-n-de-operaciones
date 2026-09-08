@@ -1,6 +1,9 @@
 /**
  * Fase B — Reset limpio de BD local
- * 01_schema → 02_medicion → 03_dimension4 → seed → seed-bulk → ETL → diagnóstico
+ * 01_schema → 02_medicion → 03_dimension4 → 07_muestra → seed → seed-bulk → ETL → diagnóstico
+ *
+ * La migración 07 debe ejecutarse ANTES de los seeders para que estos puedan
+ * marcar sus registros como datos sintéticos.
  *
  * Uso: npm run db:phase-b
  *      SKIP_BULK=1 npm run db:phase-b   (omitir carga masiva)
@@ -57,6 +60,7 @@ const main = async () => {
   runSql('01_schema_completo.sql');
   runSql('02_medicion_fichas.sql');
   runSql('03_dimension4_gestion_informacion.sql');
+  runSql('07_muestra_investigacion.sql');
 
   runNode('database/seeders/seed.js');
 

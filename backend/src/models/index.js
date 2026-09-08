@@ -10,6 +10,7 @@ const Evidencia = require('./Evidencia');
 const Reporte = require('./Reporte');
 const Auditoria = require('./Auditoria');
 const ErrorRegistro = require('./ErrorRegistro');
+const EtlEjecucion = require('./EtlEjecucion');
 
 // Asociaciones
 Rol.hasMany(Usuario, { foreignKey: 'id_rol', as: 'usuarios' });
@@ -61,4 +62,5 @@ module.exports = {
   Reporte,
   Auditoria,
   ErrorRegistro,
+  EtlEjecucion,
 };

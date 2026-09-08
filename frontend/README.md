@@ -29,12 +29,26 @@ Cuando conectes MySQL, cambia a `VITE_DEMO_MODE=false` y levanta el backend.
 
 ## Módulos
 
-| Ruta | Función |
-|------|---------|
-| /login | Autenticación JWT |
-| /dashboard | KPIs y gráficos Recharts |
-| /envios | CRUD con filtros y paginación |
-| /seguimiento | Timeline y cambio de estados |
-| /incidencias | Registro de errores y retrasos |
-| /reportes | Export PDF/Excel |
-| /datamart | Vista diseño BI y ETL (admin) |
+| Ruta | Función | Rol |
+|------|---------|-----|
+| /login | Autenticación JWT | Público |
+| /dashboard | KPIs y gráficos Recharts | Autenticado |
+| /envios | CRUD con filtros y paginación | Autenticado |
+| /clientes | Gestión de clientes | Autenticado |
+| /seguimiento | Timeline y cambio de estados | Autenticado |
+| /incidencias | Registro de incidencias operativas (PIOIC) | Autenticado |
+| /reportes | Export PDF/Excel | Autenticado |
+| /observacion | Fichas de observación por dimensión (TPRE, PER, PEEA, PIOIC) | Autenticado |
+| /medicion | Medición de investigación: preprueba vs. posprueba | **Administrador** |
+| /datamart | Esquema estrella, ETL y KPIs analíticos | **Administrador** |
+
+## Indicadores de investigación en la interfaz
+
+- **`/observacion`** muestra las fichas de cada dimensión con un selector de alcance:
+  *Muestra de investigación* (por defecto, solo registros reales de preprueba y posprueba) o
+  *Toda la operación* (incluye los datos sintéticos del DataMart, con advertencia visible).
+- **`/medicion`** presenta preprueba y posprueba **por separado** para TPRE, PER, PEEA y PIOIC, con
+  el numerador y el denominador de cada fórmula, y permite exportar la ficha de cada dimensión por
+  grupo. Estos indicadores **no** se mezclan con los KPI analíticos del DataMart.
+- **`/datamart`** advierte explícitamente que el conjunto masivo cargado contiene datos sintéticos
+  generados para pruebas técnicas, que no participan del contraste de hipótesis.

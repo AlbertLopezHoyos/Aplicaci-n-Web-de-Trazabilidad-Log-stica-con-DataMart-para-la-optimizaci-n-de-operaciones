@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import api from '../services/api';
 import PageHeader from '../components/PageHeader';
 import KpiCard from '../components/KpiCard';
-import { Database, Play, Layers, TrendingUp, Clock, AlertTriangle, Package } from 'lucide-react';
+import { Database, Play, Layers, TrendingUp, Clock, AlertTriangle, Package, Info } from 'lucide-react';
 import { toastSuccess, toastError } from '../utils/alerts';
 
 const DataMartPage = () => {
@@ -29,7 +29,7 @@ const DataMartPage = () => {
     setLoading(true);
     try {
       const { data } = await api.post('/datamart/etl/run');
-      toastSuccess('ETL ejecutado', `${data.data?.filasCargadas ?? 0} filas cargadas`);
+      toastSuccess('ETL ejecutado', data.data?.mensaje || `${data.data?.filasCargadas ?? 0} filas cargadas`);
       await loadPreview();
     } catch {
       toastError('Error al ejecutar ETL');
@@ -39,7 +39,13 @@ const DataMartPage = () => {
   };
 
   const hechos = preview?.totalHechos ?? 0;
+  const sinteticos = preview?.hechosSinteticos ?? 0;
   const listoSustentacion = hechos >= 5000;
+  const ejecuciones = preview?.ultimasEjecuciones ?? [];
+  const metricasDefinidas = design?.tablas?.hechos?.fact_operaciones_logisticas?.metricas;
+  const metricas = Array.isArray(metricasDefinidas)
+    ? metricasDefinidas.map((m) => [m, null])
+    : Object.entries(metricasDefinidas || {});
 
   return (
     <div className="page-shell">
@@ -49,9 +55,23 @@ const DataMartPage = () => {
         compact
       />
 
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <p className="flex items-start gap-2">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            <strong>Datos sintéticos.</strong> {sinteticos.toLocaleString()} de los{' '}
+            {hechos.toLocaleString()} hechos cargados son datos generados artificialmente para las
+            pruebas técnicas del DataMart (ETL, esquema estrella, consultas analíticas y volumen),
+            debido a las restricciones de confidencialidad sobre los datos históricos reales de la
+            empresa. No forman parte de la muestra de investigación ni del contraste de hipótesis:
+            esos indicadores se calculan en <strong>Medición de investigación</strong>.
+          </span>
+        </p>
+      </div>
+
       {listoSustentacion && (
         <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-800">
-          DataMart listo para sustentación: <strong>{hechos.toLocaleString()}</strong> registros en tabla de hechos (objetivo ≥ 5,000).
+          Volumen de prueba alcanzado: <strong>{hechos.toLocaleString()}</strong> registros en la tabla de hechos (objetivo ≥ 5,000).
         </div>
       )}
 
@@ -144,7 +164,8 @@ dim_cliente ──► fact_operaciones_logisticas ◄── dim_estado
           </button>
           <p className="mt-2 text-xs text-slate-500">
             Carga envíos hacia <code className="text-salazar-700">fact_operaciones_logisticas</code>.
-            Para ≥5,000 hechos: <code className="text-salazar-700">npm run db:seed-bulk</code> y luego ETL.
+            Para ≥5,000 hechos de prueba: <code className="text-salazar-700">npm run db:seed-bulk</code>{' '}
+            (genera datos sintéticos) y luego ETL.
           </p>
           {analytics && hechos > 0 && (
             <div className="mt-2 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
@@ -156,13 +177,71 @@ dim_cliente ──► fact_operaciones_logisticas ◄── dim_estado
       </div>
 
       <div className="card">
-        <h3 className="panel-title">Métricas definidas (analytics)</h3>
+        <h3 className="panel-title">Métricas de la tabla de hechos</h3>
+        <p className="mb-2 text-xs text-slate-500">
+          Grano: {design?.tablas?.hechos?.fact_operaciones_logisticas?.grain || 'una fila por operación de envío'}
+        </p>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {design?.tablas?.hechos?.fact_operaciones_logisticas?.metricas?.map((m) => (
-            <span key={m} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
-              {m}
-            </span>
+          {metricas.map(([nombre, info]) => (
+            <div key={nombre} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
+              <p className="font-medium text-slate-700">{nombre}</p>
+              {info?.aditividad && <p className="text-xs text-slate-500">{info.aditividad}</p>}
+            </div>
           ))}
+        </div>
+      </div>
+
+      <div className="table-panel">
+        <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
+          <h3 className="font-semibold text-salazar-900">Bitácora de ejecuciones ETL</h3>
+          <p className="text-xs text-slate-500">
+            El proceso es idempotente: reejecutarlo actualiza métricas pero no duplica hechos.
+          </p>
+        </div>
+        <div className="table-panel-body">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50 uppercase text-slate-500">
+              <tr>
+                <th className="px-3 py-2.5">Inicio</th>
+                <th className="px-3 py-2.5">Fin</th>
+                <th className="px-3 py-2.5">Estado</th>
+                <th className="px-3 py-2.5 text-right">Extraídos</th>
+                <th className="px-3 py-2.5 text-right">Transformados</th>
+                <th className="px-3 py-2.5 text-right">Cargados</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ejecuciones.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                    Sin ejecuciones registradas. Ejecute el ETL para generar la primera entrada.
+                  </td>
+                </tr>
+              )}
+              {ejecuciones.map((e) => (
+                <tr key={e.id_ejecucion} className="border-t border-slate-50">
+                  <td className="px-3 py-2">{new Date(e.fecha_inicio).toLocaleString()}</td>
+                  <td className="px-3 py-2">{e.fecha_fin ? new Date(e.fecha_fin).toLocaleString() : '—'}</td>
+                  <td className="px-3 py-2">
+                    <span
+                      className={`rounded px-1.5 py-0.5 font-medium ${
+                        e.estado === 'EXITOSO'
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : e.estado === 'FALLIDO'
+                            ? 'bg-red-50 text-red-700'
+                            : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {e.estado}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums">{e.registros_extraidos}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{e.registros_transformados}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{e.registros_cargados}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

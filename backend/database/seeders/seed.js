@@ -56,6 +56,9 @@ const run = async () => {
         peso_kg: s.peso,
         total_envio: Math.round((35 + s.peso * 2.2 + 8) * 100) / 100,
         observaciones: 'Envío de demostración - Tesis 2026',
+        // Datos de demostración: no forman parte de la muestra de investigación.
+        origen_dato: 'SINTETICO',
+        grupo_muestra: 'NO_MUESTRA',
       });
     }
     console.log(`✓ ${samples.length} envíos de ejemplo creados`);
@@ -74,6 +77,8 @@ const run = async () => {
           informacion_completa: true,
           titulo: 'Retraso por congestión en Panamericana Norte',
           descripcion: 'Demora estimada de 24 horas por obras viales.',
+          origen_dato: 'SINTETICO',
+          grupo_muestra: 'NO_MUESTRA',
         },
         {
           id_envio: envioRetrasado.id_envio,
@@ -88,6 +93,8 @@ const run = async () => {
           descripcion: 'Se informó al cliente sobre nueva fecha estimada.',
           estado_incidencia: 'resuelta',
           fecha_resolucion: new Date(),
+          origen_dato: 'SINTETICO',
+          grupo_muestra: 'NO_MUESTRA',
         },
       ]);
       console.log('✓ Incidencias de ejemplo creadas');

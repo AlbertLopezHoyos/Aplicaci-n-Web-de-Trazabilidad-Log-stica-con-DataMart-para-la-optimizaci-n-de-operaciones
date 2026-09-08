@@ -2,10 +2,25 @@ const observacionService = require('../services/observacion.service');
 const errorRegistroService = require('../services/errorRegistro.service');
 const { success } = require('../utils/response');
 
-const getIndicadores = async (_req, res, next) => {
+/** Alcance y grupo se leen del query string; por defecto solo la muestra real. */
+const opcionesDesdeQuery = (req) => ({
+  alcance: req.query.alcance,
+  grupo: req.query.grupo,
+});
+
+const getIndicadores = async (req, res, next) => {
   try {
-    const indicadores = await observacionService.calcularIndicadores();
+    const indicadores = await observacionService.calcularIndicadores(opcionesDesdeQuery(req));
     return success(res, indicadores);
+  } catch (err) {
+    next(err);
+  }
+};
+
+const getMedicion = async (_req, res, next) => {
+  try {
+    const medicion = await observacionService.getMedicionInvestigacion();
+    return success(res, medicion);
   } catch (err) {
     next(err);
   }
@@ -14,15 +29,21 @@ const getIndicadores = async (_req, res, next) => {
 const getDimension = async (req, res, next) => {
   try {
     const dimension = parseInt(req.params.dimension, 10);
+    const opciones = opcionesDesdeQuery(req);
     const [data, total] = await Promise.all([
-      observacionService.getDatosDimension(dimension, { limit: observacionService.FICHA_MUESTRA }),
-      observacionService.countDatosDimension(dimension),
+      observacionService.getDatosDimension(dimension, {
+        ...opciones,
+        limit: req.query.limit || observacionService.FICHA_MUESTRA,
+      }),
+      observacionService.countDatosDimension(dimension, opciones),
     ]);
     const config = observacionService.DIMENSIONES[dimension];
     return success(res, {
       dimension,
       titulo: config?.titulo,
       indicador: config?.indicador,
+      alcance: opciones.alcance || observacionService.ALCANCE.MUESTRA,
+      grupo: opciones.grupo || null,
       data,
       total,
       limite: observacionService.FICHA_MUESTRA,
@@ -35,7 +56,7 @@ const getDimension = async (req, res, next) => {
 const exportarFicha = async (req, res, next) => {
   try {
     const dimension = parseInt(req.params.dimension, 10);
-    const result = await observacionService.exportarExcel(dimension);
+    const result = await observacionService.exportarExcel(dimension, opcionesDesdeQuery(req));
     return success(res, result, 'Ficha exportada');
   } catch (err) {
     next(err);
@@ -63,4 +84,11 @@ const logErrorCliente = async (req, res, next) => {
   }
 };
 
-module.exports = { getIndicadores, getDimension, exportarFicha, listErrores, logErrorCliente };
+module.exports = {
+  getIndicadores,
+  getMedicion,
+  getDimension,
+  exportarFicha,
+  listErrores,
+  logErrorCliente,
+};

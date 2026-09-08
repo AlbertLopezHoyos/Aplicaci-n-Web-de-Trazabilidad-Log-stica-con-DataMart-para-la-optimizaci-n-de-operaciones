@@ -1,5 +1,5 @@
 -- =============================================================================
--- MIGRACIÓN: Dimensión 4 — Gestión de la información operativa (PICO)
+-- MIGRACIÓN: Dimensión 4 — Gestión de la información operativa (PIOIC)
 -- Indicador: % incidencias operativas con información completa
 -- Ejecutar DESPUÉS de 01_schema_completo.sql y 02_medicion_fichas.sql
 -- =============================================================================

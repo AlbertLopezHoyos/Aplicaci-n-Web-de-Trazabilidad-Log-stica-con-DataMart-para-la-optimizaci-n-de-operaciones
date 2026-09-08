@@ -10,6 +10,7 @@ import SeguimientoPage from '../pages/SeguimientoPage';
 import IncidenciasPage from '../pages/IncidenciasPage';
 import ReportesPage from '../pages/ReportesPage';
 import ObservacionPage from '../pages/ObservacionPage';
+import MedicionPage from '../pages/MedicionPage';
 import DataMartPage from '../pages/DataMartPage';
 import ClientesPage from '../pages/ClientesPage';
 
@@ -57,6 +58,7 @@ const AppRoutes = () => (
       <Route path="incidencias" element={<IncidenciasPage />} />
       <Route path="reportes" element={<ReportesPage />} />
       <Route path="observacion" element={<ObservacionPage />} />
+      <Route path="medicion" element={<AdminRoute><MedicionPage /></AdminRoute>} />
       <Route path="datamart" element={<AdminRoute><DataMartPage /></AdminRoute>} />
     </Route>
     <Route path="*" element={<Navigate to="/dashboard" replace />} />

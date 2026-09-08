@@ -31,7 +31,8 @@ El repo debe tener el código actualizado en `main`.
 6. En **MySQL Workbench** (conexión con host/puerto público de Railway):
    - Ejecuta `backend/database/scripts/01_schema_railway.sql` (o `01_schema_completo.sql` adaptado a BD `railway`)
    - Ejecuta `backend/database/scripts/02_medicion_fichas_railway.sql`
-   - Ejecuta `backend/database/scripts/03_dimension4_gestion_informacion.sql` (PICO / incidencias)
+   - Ejecuta `backend/database/scripts/03_dimension4_gestion_informacion.sql` (PIOIC / incidencias)
+   - Ejecuta `backend/database/scripts/07_muestra_investigacion.sql` (muestra vs. datos sintéticos, bitácora ETL)
 
 > Host público típico: `tokaido.proxy.rlwy.net` — el puerto lo ves en Railway → MySQL → Connect.
 

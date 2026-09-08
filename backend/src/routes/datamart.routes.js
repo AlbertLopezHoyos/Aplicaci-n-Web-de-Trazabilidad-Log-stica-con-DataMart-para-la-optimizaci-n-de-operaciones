@@ -32,5 +32,13 @@ router.post('/etl/run', authorize('Administrador'), async (req, res, next) => {
     next(err);
   }
 });
+router.get('/etl/ejecuciones', authorize('Administrador'), async (req, res, next) => {
+  try {
+    const ejecuciones = await etlService.getUltimasEjecuciones(req.query.limit);
+    return success(res, ejecuciones);
+  } catch (err) {
+    next(err);
+  }
+});
 
 module.exports = router;

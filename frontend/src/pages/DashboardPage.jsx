@@ -24,7 +24,7 @@ import { Link } from 'react-router-dom';
 const QUICK_LINKS = [
   { to: '/envios/nuevo', label: 'Registrar envío', icon: Package, desc: 'Nuevo registro operativo' },
   { to: '/seguimiento', label: 'Seguimiento', icon: Truck, desc: 'Estados y evidencias' },
-  { to: '/incidencias', label: 'Incidencias', icon: AlertTriangle, desc: 'Gestión PICO' },
+  { to: '/incidencias', label: 'Incidencias', icon: AlertTriangle, desc: 'Gestión PIOIC' },
   { to: '/reportes', label: 'Reportes', icon: FileBarChart, desc: 'PDF y Excel' },
 ];
 

@@ -128,6 +128,7 @@ let incidencias = [
 
 let evidencias = [];
 let mockDatamartHechos = 0;
+const mockEtlEjecuciones = [];
 let nextEnvioId = 4;
 let nextClienteId = 6;
 let nextIncidenciaId = 2;
@@ -205,7 +206,7 @@ const buildFichaControl = () =>
     origen: e.origen,
     destino: e.destino,
     estado_actual: e.estadoActual?.nombre,
-    estado_actualizado: (e.historial?.length > 1 || e.estadoActual?.codigo !== 'recibido') ? 'Sí' : 'No',
+    estado_actualizado: tieneEstadoActualizadoMock(e) ? 'Sí' : 'No',
     fecha_actualizacion: e.historial?.[0]?.fecha_hora?.split('T')[0] || null,
     hora_actualizacion: fmtTime(e.historial?.[0]?.fecha_hora),
     responsable_actualizacion: e.historial?.[0]?.usuario
@@ -357,8 +358,8 @@ const FICHA_CONFIG = {
     ],
   },
   4: {
-    titulo: 'Dimensión 4 - Gestión de la información operativa (PICO)',
-    indicador: 'PICO',
+    titulo: 'Dimensión 4 - Gestión de la información operativa (PIOIC)',
+    indicador: 'PIOIC',
     columnas: [
       'fecha', 'codigo_incidencia', 'tipo_incidencia', 'area', 'codigo_envio',
       'estado_incidencia', 'informacion_completa', 'fuente_principal', 'observacion',
@@ -401,26 +402,79 @@ const buildFichaExportPayload = (dim) => {
     total: all.length,
     exportados: filas.length,
     limite: FICHA_MUESTRA,
-    indicadores: { tpre: ind.tpre, per: ind.per, peea: ind.peea, pico: ind.pico },
+    indicadores: { tpre: ind.tpre, per: ind.per, peea: ind.peea, pioic: ind.pioic },
   };
+};
+
+const redondear = (v) => Math.round((Number(v) || 0) * 100) / 100;
+
+// Mismo criterio PIOIC que backend/src/utils/reglasIndicadores.js
+const esIncidenciaCompletaMock = (i) =>
+  Boolean(i?.tipo && i?.area?.trim() && i?.titulo?.trim() && i?.descripcion?.trim() && i?.fuente_principal?.trim());
+
+// PEEA: el estado actual coincide con el último movimiento del historial
+// (el historial mock está ordenado del más reciente al más antiguo).
+const tieneEstadoActualizadoMock = (e) => {
+  const ultimo = e?.historial?.[0];
+  if (!ultimo?.estado) return false;
+  return ultimo.estado.id_estado === e.estadoActual?.id_estado;
 };
 
 const calcIndicadores = () => {
   const tiempos = envios.filter((e) => e.tiempo_registro_min != null).map((e) => e.tiempo_registro_min);
-  const tpre = tiempos.length ? tiempos.reduce((a, b) => a + b, 0) / tiempos.length : 0;
-  const conError = envios.filter((e) => !e.registro_correcto || erroresRegistro.some((x) => x.id_envio === e.id_envio)).length;
+  const sumaTre = tiempos.reduce((a, b) => a + b, 0);
+  const tpre = tiempos.length ? sumaTre / tiempos.length : 0;
+
+  const conError = envios.filter(
+    (e) => !e.registro_correcto || erroresRegistro.some((x) => x.id_envio === e.id_envio)
+  ).length;
   const per = envios.length ? (conError / envios.length) * 100 : 0;
-  const actualizados = envios.filter((e) => e.historial?.length > 1 || e.estadoActual?.codigo !== 'recibido').length;
+
+  const actualizados = envios.filter(tieneEstadoActualizadoMock).length;
   const peea = envios.length ? (actualizados / envios.length) * 100 : 0;
-  const completas = incidencias.filter((i) => i.informacion_completa).length;
-  const pico = incidencias.length ? (completas / incidencias.length) * 100 : 0;
+
+  const completas = incidencias.filter(esIncidenciaCompletaMock).length;
+  const pioic = incidencias.length ? (completas / incidencias.length) * 100 : 0;
+
   return {
-    tpre: Math.round(tpre * 100) / 100,
-    per: Math.round(per * 100) / 100,
-    peea: Math.round(peea * 100) / 100,
-    pico: Math.round(pico * 100) / 100,
+    alcance: 'MUESTRA',
+    grupo: 'PREPRUEBA+POSPRUEBA',
+    incluyeDatosSinteticos: false,
+    tpre: redondear(tpre),
+    per: redondear(per),
+    peea: redondear(peea),
+    pioic: redondear(pioic),
     totalEnvios: envios.length,
     totalIncidencias: incidencias.length,
+    detalle: {
+      tpre: { suma_tre: redondear(sumaTre), ner: tiempos.length, unidad: 'minutos' },
+      per: { rce: conError, treg: envios.length },
+      peea: { eea: actualizados, tee: envios.length },
+      pioic: { nioc: completas, ntir: incidencias.length },
+    },
+  };
+};
+
+const buildMedicionMock = () => {
+  const base = calcIndicadores();
+  const mitad = (v) => redondear(v);
+  return {
+    preprueba: { ...base, grupo: 'PREPRUEBA' },
+    posprueba: { ...base, grupo: 'POSPRUEBA', tpre: mitad(base.tpre * 0.6), per: mitad(base.per * 0.5) },
+    muestra: {
+      esperadoPorGrupo: 50,
+      esperadoTotal: 100,
+      registradoPreprueba: 0,
+      registradoPosprueba: 0,
+      registradoTotal: 0,
+      completa: false,
+      pareada: false,
+    },
+    datosSinteticos: {
+      envios: 0,
+      totalEnviosActivos: envios.length,
+      nota: 'Modo demostración: cifras ilustrativas, no corresponden a la muestra de investigación.',
+    },
   };
 };
 
@@ -515,18 +569,34 @@ export const mockHandlers = {
   },
   'GET /reportes/historial': () => ok(reportesHistorial),
   'GET /observacion/indicadores': () => ok(calcIndicadores()),
+  'GET /observacion/medicion': () => ok(buildMedicionMock()),
   'GET /datamart/design': () =>
     ok({
       nombre: 'DataMart Operaciones Logísticas',
-      version: '1.0.0',
+      version: '2.0.0',
       esquema: 'estrella',
       etl: { extraccion: 'Modo demo' },
       dashboardsBI: ['Panel OTIF'],
-      tablas: { hechos: { fact_operaciones_logisticas: { metricas: ['peso_kg'] } } },
+      tablas: {
+        hechos: {
+          fact_operaciones_logisticas: {
+            grain: 'Una fila de la tabla de hechos representa una operación de envío',
+            metricas: {
+              peso_kg: { aditividad: 'aditiva' },
+              dias_transito: { aditividad: 'semiaditiva' },
+              cantidad_incidencias: { aditividad: 'aditiva' },
+            },
+          },
+        },
+      },
     }),
+  'GET /datamart/etl/ejecuciones': () => ok(mockEtlEjecuciones),
   'GET /datamart/preview': () =>
     ok({
       totalHechos: mockDatamartHechos,
+      hechosSinteticos: mockDatamartHechos,
+      hechosReales: 0,
+      ultimasEjecuciones: mockEtlEjecuciones,
       dimensiones: [
         { tabla: 'dim_fecha', registros: 1461 },
         { tabla: 'dim_cliente', registros: clientes.length },
@@ -545,8 +615,29 @@ export const mockHandlers = {
         })
       : ok(null),
   'POST /datamart/etl/run': () => {
+    const previos = mockDatamartHechos;
     mockDatamartHechos = envios.length;
-    return ok({ ok: true, filasCargadas: mockDatamartHechos });
+    const nuevos = Math.max(0, mockDatamartHechos - previos);
+    const inicio = new Date();
+    mockEtlEjecuciones.unshift({
+      id_ejecucion: mockEtlEjecuciones.length + 1,
+      proceso: 'staging_datamart',
+      fecha_inicio: inicio.toISOString(),
+      fecha_fin: new Date(inicio.getTime() + 1200).toISOString(),
+      estado: 'EXITOSO',
+      registros_extraidos: envios.length + incidencias.length + clientes.length,
+      registros_transformados: envios.length,
+      registros_cargados: nuevos,
+      mensaje_error: null,
+    });
+    return ok({
+      ok: true,
+      filasCargadas: nuevos,
+      filasActualizadas: mockDatamartHechos - nuevos,
+      mensaje: nuevos
+        ? `ETL completado: ${nuevos} hechos nuevos`
+        : 'ETL completado sin hechos nuevos (proceso idempotente)',
+    });
   },
 };
 

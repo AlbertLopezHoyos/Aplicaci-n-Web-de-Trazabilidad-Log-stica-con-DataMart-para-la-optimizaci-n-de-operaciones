@@ -26,6 +26,14 @@ const Envio = sequelize.define('envios', {
     defaultValue: 'normal',
   },
   activo: { type: DataTypes.BOOLEAN, defaultValue: true },
+  origen_dato: {
+    type: DataTypes.ENUM('REAL', 'SINTETICO'),
+    defaultValue: 'REAL',
+  },
+  grupo_muestra: {
+    type: DataTypes.ENUM('PREPRUEBA', 'POSPRUEBA', 'NO_MUESTRA'),
+    defaultValue: 'NO_MUESTRA',
+  },
 }, { tableName: 'envios', createdAt: 'created_at', updatedAt: 'updated_at' });
 
 module.exports = Envio;

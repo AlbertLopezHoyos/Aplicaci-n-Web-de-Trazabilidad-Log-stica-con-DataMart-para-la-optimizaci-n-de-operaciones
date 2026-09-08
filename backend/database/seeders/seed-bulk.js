@@ -1,5 +1,17 @@
 /**
- * Generador masivo de envíos e incidencias para DataMart (sustentación tesis)
+ * Generador de DATOS SINTÉTICOS para las pruebas técnicas del DataMart.
+ *
+ * Los registros producidos por este script NO provienen de la empresa: son
+ * datos generados artificialmente porque los datos históricos reales están
+ * sujetos a restricciones de confidencialidad. Sirven únicamente para probar
+ * el ETL, el esquema estrella, las consultas analíticas, los dashboards y el
+ * volumen (>5000 filas).
+ *
+ * Todos los registros se marcan con origen_dato = 'SINTETICO' y
+ * grupo_muestra = 'NO_MUESTRA', por lo que quedan EXCLUIDOS de los
+ * indicadores de investigación (TPRE, PER, PEEA, PIOIC) y del contraste de
+ * hipótesis de la tesis.
+ *
  * Uso: npm run db:seed-bulk
  *      BULK_COUNT=5500 npm run db:seed-bulk
  */
@@ -22,6 +34,7 @@ const {
   resolveEstadoOperativo,
   REF_DATE,
 } = require('./bulk-data');
+const { ORIGEN_DATO, GRUPO_MUESTRA, esIncidenciaCompleta } = require('../../src/utils/reglasIndicadores');
 
 const TARGET = parseInt(process.env.BULK_COUNT || '5500', 10);
 const BATCH = parseInt(process.env.BULK_BATCH || '500', 10);
@@ -79,9 +92,11 @@ const buildEnvioRow = (seq, estadoMap, clientes, operadorId) => {
     total_envio: calcularTotalEnvio(peso, paquetes, prioridad),
     tiempo_registro_min: tiempoReg,
     registro_correcto: Math.random() > 0.08,
-    observaciones: 'Registro histórico — carga masiva DataMart Tesis 2026',
+    observaciones: 'Dato sintético — carga masiva DataMart Tesis 2026',
     prioridad,
     activo: 1,
+    origen_dato: ORIGEN_DATO.SINTETICO,
+    grupo_muestra: GRUPO_MUESTRA.NO_MUESTRA,
   };
 };
 
@@ -144,22 +159,26 @@ const run = async () => {
 
     const incRows = shuffled.map(({ id_envio }) => {
       const tipo = pick(TIPOS_INC);
+      // Una parte de las incidencias sintéticas se genera con campos obligatorios
+      // vacíos para poder ejercitar el criterio PIOIC de información completa.
       const completa = Math.random() > 0.12;
-      return {
+      const fila = {
         id_envio,
         id_usuario_reporta: operadorId,
         codigo_incidencia: padInc(incSeq++),
         tipo,
         severidad: pick(['baja', 'media', 'media', 'alta', 'critica']),
-        area: pick(AREAS),
-        fuente_principal: pick(FUENTES),
-        informacion_completa: completa,
-        titulo: completa ? `Incidencia ${tipo} operativa` : 'Incidencia incompleta',
+        area: completa ? pick(AREAS) : null,
+        fuente_principal: completa ? pick(FUENTES) : null,
+        titulo: completa ? `Incidencia ${tipo} operativa` : 'Incidencia sin detalle',
         descripcion: completa
-          ? 'Registro generado para análisis PICO y tasa de incidencias en DataMart.'
+          ? 'Dato sintético generado para pruebas de volumen del DataMart.'
           : 'Falta detalle operativo.',
         estado_incidencia: pick(['abierta', 'en_revision', 'resuelta', 'cerrada']),
+        origen_dato: ORIGEN_DATO.SINTETICO,
+        grupo_muestra: GRUPO_MUESTRA.NO_MUESTRA,
       };
+      return { ...fila, informacion_completa: esIncidenciaCompleta(fila) };
     });
 
     for (let i = 0; i < incRows.length; i += BATCH) {

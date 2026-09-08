@@ -11,26 +11,34 @@ const DIMENSIONES = [
   { id: 1, titulo: 'Eficiencia operativa', indicador: 'TPRE', icon: Timer, color: 'blue' },
   { id: 2, titulo: 'Calidad información', indicador: 'PER', icon: AlertTriangle, color: 'red' },
   { id: 3, titulo: 'Control y seguimiento', indicador: 'PEEA', icon: MapPin, color: 'green' },
-  { id: 4, titulo: 'Gestión información operativa', indicador: 'PICO', icon: ClipboardCheck, color: 'amber' },
+  { id: 4, titulo: 'Gestión información operativa', indicador: 'PIOIC', icon: ClipboardCheck, color: 'amber' },
+];
+
+const ALCANCES = [
+  { valor: 'MUESTRA', etiqueta: 'Muestra de investigación', ayuda: 'Solo registros reales de preprueba y posprueba' },
+  { valor: 'TODOS', etiqueta: 'Toda la operación', ayuda: 'Incluye los datos sintéticos del DataMart' },
 ];
 
 const ObservacionPage = () => {
   const [indicadores, setIndicadores] = useState(null);
   const [dimensionActiva, setDimensionActiva] = useState(1);
+  const [alcance, setAlcance] = useState('MUESTRA');
   const [datos, setDatos] = useState([]);
   const [totalRegistros, setTotalRegistros] = useState(0);
   const [tituloDim, setTituloDim] = useState('');
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  const loadIndicadores = () => {
-    api.get('/observacion/indicadores').then((r) => setIndicadores(r.data.data));
+  const loadIndicadores = (modo) => {
+    api
+      .get('/observacion/indicadores', { params: { alcance: modo } })
+      .then((r) => setIndicadores(r.data.data));
   };
 
-  const loadDimension = (dim) => {
+  const loadDimension = (dim, modo) => {
     setLoading(true);
     api
-      .get(`/observacion/ficha/${dim}`)
+      .get(`/observacion/ficha/${dim}`, { params: { alcance: modo } })
       .then((r) => {
         const payload = r.data.data || {};
         setDatos(payload.data || []);
@@ -42,17 +50,17 @@ const ObservacionPage = () => {
   };
 
   useEffect(() => {
-    loadIndicadores();
-  }, []);
+    loadIndicadores(alcance);
+  }, [alcance]);
 
   useEffect(() => {
-    loadDimension(dimensionActiva);
-  }, [dimensionActiva]);
+    loadDimension(dimensionActiva, alcance);
+  }, [dimensionActiva, alcance]);
 
   const exportar = async (dim) => {
     setExporting(true);
     try {
-      const { data } = await api.get(`/observacion/ficha/${dim}/export`);
+      const { data } = await api.get(`/observacion/ficha/${dim}/export`, { params: { alcance } });
       const payload = data.data || {};
       await exportFichaExcel({
         titulo: payload.titulo,
@@ -123,19 +131,53 @@ const ObservacionPage = () => {
           color="green"
         />
         <KpiCard
-          title="PICO (%)"
-          value={indicadores?.pico ?? '—'}
+          title="PIOIC (%)"
+          value={indicadores?.pioic ?? '—'}
           subtitle="Incidencias con información completa"
           icon={ClipboardCheck}
           color="amber"
         />
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        {ALCANCES.map(({ valor, etiqueta, ayuda }) => (
+          <button
+            key={valor}
+            type="button"
+            title={ayuda}
+            onClick={() => setAlcance(valor)}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+              alcance === valor
+                ? 'border-salazar-500 bg-salazar-800 text-white'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {etiqueta}
+          </button>
+        ))}
+      </div>
+
+      {alcance === 'TODOS' ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
+          Vista operativa: incluye los datos sintéticos generados para las pruebas técnicas del
+          DataMart. <strong>No usar estos valores para el contraste de hipótesis.</strong>
+        </div>
+      ) : (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-xs text-blue-900">
+          Muestra de investigación: solo registros reales marcados como preprueba o posprueba
+          (50 + 50). El desglose por grupo está en <strong>Medición de investigación</strong>.
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
         <StatChip label="Dimensión activa" value={`${dimensionActiva} · ${dimActual?.indicador}`} />
         <StatChip label="Vista previa" value={`${datos.length} filas`} accent="salazar" />
         <StatChip label="En BD" value={totalRegistros} accent="slate" />
-        <StatChip label="Exportación" value="Últimos 50" accent="green" />
+        <StatChip
+          label="Alcance"
+          value={alcance === 'TODOS' ? 'Con sintéticos' : 'Solo muestra'}
+          accent={alcance === 'TODOS' ? 'amber' : 'green'}
+        />
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -186,7 +228,9 @@ const ObservacionPage = () => {
                 {datos.length === 0 && (
                   <tr>
                     <td colSpan={columnas.length + 1} className="px-4 py-10 text-center text-slate-500">
-                      Sin registros. Cree envíos e incidencias con área y fuente de información para poblar la ficha.
+                      {alcance === 'MUESTRA'
+                        ? 'Sin registros en la muestra. Marque envíos reales como preprueba o posprueba (npm run db:muestra) o cambie el alcance a "Toda la operación".'
+                        : 'Sin registros. Cree envíos e incidencias con área y fuente de información para poblar la ficha.'}
                     </td>
                   </tr>
                 )}
