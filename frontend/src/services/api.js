@@ -2,6 +2,7 @@ import axios from 'axios';
 import { isDemoMode } from './demoMode';
 import { handleMockRequest } from './mockData';
 import { resolveApiUrl } from '../config/apiUrl';
+import { isPresentacionAcademica } from './presentacionAcademica';
 
 const api = axios.create({
   baseURL: resolveApiUrl(),
@@ -26,6 +27,9 @@ api.interceptors.request.use(async (config) => {
   }
   const token = localStorage.getItem('token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (isPresentacionAcademica()) {
+    config.headers['X-Presentacion-Academica'] = '1';
+  }
   return config;
 });
 

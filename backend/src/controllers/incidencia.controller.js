@@ -3,7 +3,13 @@ const { success } = require('../utils/response');
 
 const list = async (req, res, next) => {
   try {
-    return success(res, await incidenciaService.list(req.query));
+    const alcance = String(req.query.alcance || 'todos').toLowerCase();
+    const idUsuarioReporta = alcance === 'mios' ? req.user.id_usuario : undefined;
+    return success(res, await incidenciaService.list({
+      ...req.query,
+      presentacionAcademica: req.presentacionAcademica,
+      idUsuarioReporta,
+    }));
   } catch (err) {
     next(err);
   }
@@ -29,7 +35,9 @@ const update = async (req, res, next) => {
 
 const getById = async (req, res, next) => {
   try {
-    return success(res, await incidenciaService.getById(req.params.id));
+    return success(res, await incidenciaService.getById(req.params.id, {
+      presentacionAcademica: req.presentacionAcademica,
+    }));
   } catch (err) {
     next(err);
   }

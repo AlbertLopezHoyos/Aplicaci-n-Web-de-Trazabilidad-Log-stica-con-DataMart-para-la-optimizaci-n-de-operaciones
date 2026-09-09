@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
+import PresentacionBanner from '../components/PresentacionBanner';
 import { useState } from 'react';
 
 const MainLayout = () => {
@@ -11,6 +12,7 @@ const MainLayout = () => {
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex flex-1 flex-col lg:pl-64">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
+        <PresentacionBanner />
         <main className="flex-1 p-3 md:p-4 lg:p-5 animate-fade-in">
           <Outlet />
         </main>

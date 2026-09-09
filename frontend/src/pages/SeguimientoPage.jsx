@@ -1,17 +1,20 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
+import { usePresentacion } from '../context/PresentacionContext';
 import PageHeader from '../components/PageHeader';
 import StatusBadge from '../components/StatusBadge';
 import { labelCliente } from '../utils/cliente';
 import Timeline from '../components/Timeline';
 import { toastSuccess, toastError, confirmAction } from '../utils/alerts';
 import { Upload, MapPin, Search, Trash2, Loader2, Download } from 'lucide-react';
+import RegistroScopeFilter from '../components/RegistroScopeFilter';
 import { descargarComprobanteEnvio } from '../utils/comprobanteEnvioPdf';
 import { formatCurrency } from '../utils/format';
 
 const SeguimientoPage = () => {
   const { id: paramId } = useParams();
+  const { presentacionActiva } = usePresentacion();
   const navigate = useNavigate();
   const [recentEnvios, setRecentEnvios] = useState([]);
   const [searchInput, setSearchInput] = useState('');
@@ -27,11 +30,12 @@ const SeguimientoPage = () => {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [alcance, setAlcance] = useState('todos');
 
   useEffect(() => {
-    api.get('/envios', { params: { limit: 10, page: 1 } }).then((r) => setRecentEnvios(r.data.data?.data || []));
+    api.get('/envios', { params: { limit: 10, page: 1, alcance } }).then((r) => setRecentEnvios(r.data.data?.data || []));
     api.get('/catalogos/estados').then((r) => setEstados(r.data.data));
-  }, []);
+  }, [presentacionActiva, alcance]);
 
   useEffect(() => {
     setSelectedId(paramId || '');
@@ -63,7 +67,7 @@ const SeguimientoPage = () => {
 
   useEffect(() => {
     loadEnvio(selectedId);
-  }, [selectedId, loadEnvio]);
+  }, [selectedId, presentacionActiva, loadEnvio]);
 
   useEffect(() => {
     const q = searchInput.trim();
@@ -74,13 +78,13 @@ const SeguimientoPage = () => {
     const timer = setTimeout(() => {
       setSearching(true);
       api
-        .get('/envios', { params: { search: q, limit: 15 } })
+        .get('/envios', { params: { search: q, limit: 15, alcance } })
         .then((r) => setSearchResults(r.data.data?.data || []))
         .catch(() => setSearchResults([]))
         .finally(() => setSearching(false));
     }, 350);
     return () => clearTimeout(timer);
-  }, [searchInput]);
+  }, [searchInput, presentacionActiva, alcance]);
 
   const selectEnvio = (id) => {
     setSelectedId(String(id));
@@ -147,6 +151,7 @@ const SeguimientoPage = () => {
         title="Seguimiento logístico"
         subtitle="Actualización de estados y línea de tiempo del envío"
         compact
+        action={<RegistroScopeFilter value={alcance} onChange={setAlcance} />}
       />
 
       <div className="grid gap-3 xl:grid-cols-12">
@@ -156,7 +161,7 @@ const SeguimientoPage = () => {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               className="input-field pl-10"
-              placeholder="Código, cliente, origen o destino..."
+              placeholder={presentacionActiva ? 'Código, alias, origen o destino...' : 'Código, cliente, origen o destino...'}
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
             />

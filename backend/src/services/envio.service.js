@@ -2,6 +2,7 @@ const { Envio, HistorialEstado, EstadoEnvio, Auditoria } = require('../models');
 const envioRepo = require('../repositories/envio.repository');
 const { generarCodigoEnvio } = require('../utils/codigoEnvio');
 const { sanitizeObject } = require('../utils/sanitize');
+const anonimizacion = require('./anonimizacion.service');
 
 const calcularTiemposRegistro = (horaInicio) => {
   const inicio = horaInicio ? new Date(horaInicio) : new Date();
@@ -11,15 +12,23 @@ const calcularTiemposRegistro = (horaInicio) => {
   return { hora_inicio_registro: inicio, hora_fin_registro: fin, tiempo_registro_min: minutos };
 };
 
-const list = (filters) => envioRepo.findAllPaginated(filters);
-
-const getById = async (id) => {
-  const envio = await envioRepo.findById(id);
-  if (!envio || !envio.activo) throw Object.assign(new Error('Envío no encontrado'), { statusCode: 404 });
-  return envio;
+const list = async (filters, { presentacionAcademica = false } = {}) => {
+  const resultado = await envioRepo.findAllPaginated({
+    ...filters,
+    presentacionAcademica,
+  });
+  if (!presentacionAcademica) return resultado;
+  return anonimizacion.anonimizarListaEnvios(resultado);
 };
 
-const create = async (data, userId) => {
+const getById = async (id, { presentacionAcademica = false } = {}) => {
+  const envio = await envioRepo.findById(id);
+  if (!envio || !envio.activo) throw Object.assign(new Error('Envío no encontrado'), { statusCode: 404 });
+  if (!presentacionAcademica) return envio;
+  return anonimizacion.anonimizarEnvioUnico(envio);
+};
+
+const create = async (data, userId, opciones = {}) => {
   const clean = sanitizeObject(data, ['origen', 'destino', 'tipo_carga', 'observaciones']);
   const codigo = await generarCodigoEnvio();
   const estadoInicial = await EstadoEnvio.findOne({ where: { codigo: 'recibido' } });
@@ -52,6 +61,16 @@ const create = async (data, userId) => {
     registro_correcto: true,
   });
 
+  // Hito inicial de trazabilidad: sin él el envío nace sin historial y PEEA
+  // lo contaría como no actualizado hasta el primer cambio de estado.
+  await HistorialEstado.create({
+    id_envio: envio.id_envio,
+    id_estado: envio.id_estado_actual,
+    id_usuario: userId,
+    comentario: 'Envío registrado en el sistema',
+    fecha_hora: tiempos.hora_fin_registro || new Date(),
+  });
+
   await Auditoria.create({
     id_usuario: userId,
     tabla_afectada: 'envios',
@@ -63,10 +82,11 @@ const create = async (data, userId) => {
     },
   });
 
-  return getById(envio.id_envio);
+  anonimizacion.invalidarCache();
+  return getById(envio.id_envio, opciones);
 };
 
-const update = async (id, data, userId) => {
+const update = async (id, data, userId, opciones = {}) => {
   const envio = await Envio.findByPk(id);
   if (!envio || !envio.activo) throw Object.assign(new Error('Envío no encontrado'), { statusCode: 404 });
   const clean = sanitizeObject(data, ['origen', 'destino', 'tipo_carga', 'observaciones']);
@@ -88,13 +108,14 @@ const update = async (id, data, userId) => {
     datos_anteriores: anterior,
     datos_nuevos: clean,
   });
-  return getById(id);
+  return getById(id, opciones);
 };
 
 const remove = async (id, userId) => {
   const envio = await Envio.findByPk(id);
   if (!envio) throw Object.assign(new Error('Envío no encontrado'), { statusCode: 404 });
   await envio.update({ activo: false });
+  anonimizacion.invalidarCache();
   await Auditoria.create({
     id_usuario: userId,
     tabla_afectada: 'envios',
@@ -103,7 +124,7 @@ const remove = async (id, userId) => {
   });
 };
 
-const actualizarEstado = async (id, { id_estado, ubicacion, comentario }, userId) => {
+const actualizarEstado = async (id, { id_estado, ubicacion, comentario }, userId, opciones = {}) => {
   const envio = await Envio.findByPk(id);
   if (!envio || !envio.activo) throw Object.assign(new Error('Envío no encontrado'), { statusCode: 404 });
 
@@ -124,11 +145,12 @@ const actualizarEstado = async (id, { id_estado, ubicacion, comentario }, userId
     fecha_hora: new Date(),
   });
 
-  return getById(id);
+  return getById(id, opciones);
 };
 
 const getTimeline = async (id) => {
-  const envio = await getById(id);
+  const envio = await envioRepo.findById(id);
+  if (!envio || !envio.activo) throw Object.assign(new Error('Envío no encontrado'), { statusCode: 404 });
   return envio.historial || [];
 };
 

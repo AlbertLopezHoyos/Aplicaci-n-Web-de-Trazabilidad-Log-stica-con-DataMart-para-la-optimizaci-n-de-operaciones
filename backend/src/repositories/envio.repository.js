@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
 const { Envio, Cliente, EstadoEnvio, Usuario, HistorialEstado } = require('../models');
+const anonimizacion = require('../services/anonimizacion.service');
 
 const includeDefault = [
   { model: Cliente, as: 'cliente' },
@@ -7,10 +8,21 @@ const includeDefault = [
   { model: Usuario, as: 'responsable', attributes: ['id_usuario', 'nombres', 'apellidos', 'email'] },
 ];
 
-const findAllPaginated = async ({ page = 1, limit = 10, search, estado, cliente, fechaDesde, fechaHasta }) => {
+const findAllPaginated = async ({
+  page = 1,
+  limit = 10,
+  search,
+  estado,
+  cliente,
+  fechaDesde,
+  fechaHasta,
+  presentacionAcademica = false,
+  idResponsable,
+}) => {
   const where = { activo: true };
   if (estado) where.id_estado_actual = estado;
   if (cliente) where.id_cliente = cliente;
+  if (idResponsable) where.id_responsable = idResponsable;
   if (fechaDesde || fechaHasta) {
     where.fecha_registro = {};
     if (fechaDesde) where.fecha_registro[Op.gte] = fechaDesde;
@@ -18,13 +30,27 @@ const findAllPaginated = async ({ page = 1, limit = 10, search, estado, cliente,
   }
 
   if (search) {
-    where[Op.or] = [
+    const criterios = [
       { codigo_envio: { [Op.like]: `%${search}%` } },
       { origen: { [Op.like]: `%${search}%` } },
       { destino: { [Op.like]: `%${search}%` } },
-      { '$cliente.razon_social$': { [Op.like]: `%${search}%` } },
-      { '$cliente.dni$': { [Op.like]: `%${search}%` } },
     ];
+    if (!presentacionAcademica) {
+      criterios.push(
+        { '$cliente.razon_social$': { [Op.like]: `%${search}%` } },
+        { '$cliente.dni$': { [Op.like]: `%${search}%` } }
+      );
+    } else {
+      const mapa = await anonimizacion.cargarMapaAlias();
+      const q = search.toLowerCase();
+      const idsPorAlias = [...mapa.entries()]
+        .filter(([, meta]) => meta.alias.toLowerCase().includes(q))
+        .map(([idCliente]) => idCliente);
+      if (idsPorAlias.length) {
+        criterios.push({ id_cliente: { [Op.in]: idsPorAlias } });
+      }
+    }
+    where[Op.or] = criterios;
   }
 
   const offset = (page - 1) * limit;

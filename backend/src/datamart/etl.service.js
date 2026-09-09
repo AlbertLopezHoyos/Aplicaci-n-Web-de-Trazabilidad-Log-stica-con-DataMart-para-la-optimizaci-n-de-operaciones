@@ -81,6 +81,30 @@ const extraer = async (transaction) => {
   return { detalle, total: Object.values(detalle).reduce((a, b) => a + b, 0) };
 };
 
+/**
+ * Cierra las filas vigentes cuyo registro de origen desapareció o fue dado de
+ * baja. Sin esto la dimensión conserva indefinidamente miembros que ya no
+ * existen en el OLTP y los reportes muestran nombres inválidos.
+ */
+const expirarMiembrosDeBaja = async (transaction) => {
+  const cerrar = async (tabla, columnaOrigen, origen, pkOrigen) => {
+    const [res] = await sequelize.query(
+      `UPDATE ${tabla} d
+       LEFT JOIN ${origen} o ON o.${pkOrigen} = d.${columnaOrigen} AND o.activo = 1
+       SET d.es_actual = 0, d.vigente_hasta = CURDATE()
+       WHERE d.es_actual = 1 AND o.${pkOrigen} IS NULL`,
+      { transaction }
+    );
+    return res?.affectedRows ?? 0;
+  };
+
+  return {
+    dim_cliente: await cerrar('dim_cliente', 'id_cliente_origen', 'clientes', 'id_cliente'),
+    dim_estado: await cerrar('dim_estado', 'id_estado_origen', 'estados_envio', 'id_estado'),
+    dim_operador: await cerrar('dim_operador', 'id_usuario_origen', 'usuarios', 'id_usuario'),
+  };
+};
+
 /** CARGA de dimensiones (conformadas, comportamiento tipo 1 / insert-once). */
 const cargarDimensiones = async (transaction) => {
   const [cliente] = await sequelize.query(
@@ -190,6 +214,19 @@ const cargarHechos = async (transaction) => {
     { transaction }
   );
 
+  // Reasignación de responsables en el origen: el hecho debe apuntar al
+  // miembro vigente, no a la fila de dimensión cerrada.
+  await sequelize.query(
+    `UPDATE fact_operaciones_logisticas f
+     JOIN envios e ON f.id_envio = e.id_envio
+     LEFT JOIN dim_operador dop ON dop.id_usuario_origen = e.id_responsable AND dop.es_actual = 1
+     SET f.id_dim_operador = dop.id_dim_operador
+     WHERE e.activo = 1
+       AND (f.id_dim_operador IS NULL OR f.id_dim_operador <> dop.id_dim_operador
+            OR dop.id_dim_operador IS NULL)`,
+    { transaction }
+  );
+
   // Refresco de métricas y claves de los hechos ya existentes (sin duplicar).
   const [actualizados] = await sequelize.query(
     `UPDATE fact_operaciones_logisticas f
@@ -219,6 +256,7 @@ const runStaging = async () => {
   const transaction = await sequelize.transaction();
   try {
     const extraccion = await extraer(transaction);
+    const expirados = await expirarMiembrosDeBaja(transaction);
     const dimensiones = await cargarDimensiones(transaction);
     const transformados = await contarTransformables(transaction);
     const hechos = await cargarHechos(transaction);
@@ -239,6 +277,7 @@ const runStaging = async () => {
       registrosExtraidos: extraccion.total,
       registrosTransformados: transformados,
       dimensiones,
+      dimensionesExpiradas: expirados,
       filasCargadas: hechos.insertados,
       filasActualizadas: hechos.actualizados,
       mensaje: hechos.insertados
@@ -263,10 +302,10 @@ const getPreview = async () => {
         { type: QueryTypes.SELECT }
       ),
       sequelize.query(
-        `SELECT 'dim_fecha' AS tabla, COUNT(*) AS registros FROM dim_fecha
-         UNION SELECT 'dim_cliente', COUNT(*) FROM dim_cliente
-         UNION SELECT 'dim_estado', COUNT(*) FROM dim_estado
-         UNION SELECT 'dim_operador', COUNT(*) FROM dim_operador`,
+        `SELECT 'dim_fecha' AS tabla, COUNT(*) AS registros, COUNT(*) AS vigentes FROM dim_fecha
+         UNION SELECT 'dim_cliente', COUNT(*), SUM(es_actual = 1) FROM dim_cliente
+         UNION SELECT 'dim_estado', COUNT(*), SUM(es_actual = 1) FROM dim_estado
+         UNION SELECT 'dim_operador', COUNT(*), SUM(es_actual = 1) FROM dim_operador`,
         { type: QueryTypes.SELECT }
       ),
     ]);

@@ -31,6 +31,48 @@ const GRUPOS_MUESTRA_VALIDOS = [GRUPO_MUESTRA.PREPRUEBA, GRUPO_MUESTRA.POSPRUEBA
 const TAMANIO_GRUPO_MUESTRA = 50;
 
 /**
+ * Periodos de observación declarados en los instrumentos de la tesis.
+ * Un registro fuera de su ventana invalida la ficha correspondiente.
+ */
+const VENTANAS_MEDICION = Object.freeze({
+  [GRUPO_MUESTRA.PREPRUEBA]: Object.freeze({
+    desde: '2026-08-01',
+    hasta: '2026-08-31',
+    anexo: 'Anexo 2',
+    fuente: 'Registros manuales de la empresa, previos a la implementación.',
+  }),
+  [GRUPO_MUESTRA.POSPRUEBA]: Object.freeze({
+    desde: '2026-09-01',
+    hasta: '2026-09-20',
+    anexo: 'Anexo 3',
+    fuente: 'Registros capturados desde la aplicación web.',
+  }),
+});
+
+const ventanaDeGrupo = (grupo) => VENTANAS_MEDICION[String(grupo || '').toUpperCase()] || null;
+
+/** Normaliza Date | string | DATEONLY a 'YYYY-MM-DD' en hora local. */
+const aFechaISO = (valor) => {
+  if (!valor) return null;
+  if (valor instanceof Date) {
+    const y = valor.getFullYear();
+    const m = String(valor.getMonth() + 1).padStart(2, '0');
+    const d = String(valor.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  const texto = String(valor).trim();
+  return /^\d{4}-\d{2}-\d{2}/.test(texto) ? texto.slice(0, 10) : null;
+};
+
+/** ¿La fecha de registro cae dentro de la ventana declarada para ese grupo? */
+const estaEnVentana = (grupo, fecha) => {
+  const ventana = ventanaDeGrupo(grupo);
+  const iso = aFechaISO(fecha);
+  if (!ventana || !iso) return false;
+  return iso >= ventana.desde && iso <= ventana.hasta;
+};
+
+/**
  * Campos que determinan que una incidencia operativa está COMPLETA (PIOIC).
  * Se corresponden uno a uno con columnas reales de la tabla `incidencias`.
  */
@@ -129,6 +171,10 @@ module.exports = {
   GRUPO_MUESTRA,
   GRUPOS_MUESTRA_VALIDOS,
   TAMANIO_GRUPO_MUESTRA,
+  VENTANAS_MEDICION,
+  ventanaDeGrupo,
+  estaEnVentana,
+  aFechaISO,
   CAMPOS_INCIDENCIA_COMPLETA,
   esIncidenciaCompleta,
   camposFaltantesIncidencia,

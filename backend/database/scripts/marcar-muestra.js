@@ -29,6 +29,8 @@ const {
   ORIGEN_DATO,
   GRUPO_MUESTRA,
   TAMANIO_GRUPO_MUESTRA,
+  ventanaDeGrupo,
+  estaEnVentana,
 } = require('../../src/utils/reglasIndicadores');
 
 const parseArgs = () => {
@@ -119,6 +121,20 @@ const run = async () => {
   console.log(`\nEnvíos seleccionados: ${candidatos.length} → grupo ${grupo}`);
   console.log(candidatos.slice(0, 10).map((e) => `  ${e.codigo_envio}  ${e.fecha_registro}`).join('\n'));
   if (candidatos.length > 10) console.log(`  ... y ${candidatos.length - 10} más`);
+
+  const ventana = ventanaDeGrupo(grupo);
+  if (ventana) {
+    const fuera = candidatos.filter((e) => !estaEnVentana(grupo, e.fecha_registro));
+    if (fuera.length) {
+      console.error(
+        `\n${fuera.length} de ${candidatos.length} envíos quedan fuera del periodo de observación ` +
+        `declarado en el ${ventana.anexo} (${ventana.desde} a ${ventana.hasta}), por ejemplo ` +
+        fuera.slice(0, 3).map((e) => `${e.codigo_envio} (${e.fecha_registro})`).join(', ') + '.\n' +
+        'Marcarlos invalidaría la ficha. Ajuste el rango de fechas. Operación cancelada.'
+      );
+      process.exit(1);
+    }
+  }
 
   if (!args.aplicar) {
     console.log('\nSimulación. Vuelva a ejecutar con --aplicar para guardar los cambios.');

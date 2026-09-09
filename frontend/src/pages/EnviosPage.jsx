@@ -3,19 +3,22 @@ import { Link } from 'react-router-dom';
 import { Plus, Search, Eye, Pencil, Trash2 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { usePresentacion } from '../context/PresentacionContext';
 import PageHeader from '../components/PageHeader';
 import StatChip from '../components/StatChip';
 import StatusBadge from '../components/StatusBadge';
 import { labelCliente } from '../utils/cliente';
 import Pagination from '../components/Pagination';
 import { formatDate } from '../utils/format';
+import RegistroScopeFilter from '../components/RegistroScopeFilter';
 import { confirmAction, toastSuccess, toastError } from '../utils/alerts';
 
 const EnviosPage = () => {
   const { isAdmin } = useAuth();
+  const { presentacionActiva } = usePresentacion();
   const [envios, setEnvios] = useState({ data: [], total: 0, page: 1, limit: 10 });
   const [estados, setEstados] = useState([]);
-  const [filters, setFilters] = useState({ search: '', estado: '', fechaDesde: '', fechaHasta: '', page: 1 });
+  const [filters, setFilters] = useState({ search: '', estado: '', fechaDesde: '', fechaHasta: '', page: 1, alcance: 'todos' });
   const [searchInput, setSearchInput] = useState('');
   const [fechaDesdeInput, setFechaDesdeInput] = useState('');
   const [fechaHastaInput, setFechaHastaInput] = useState('');
@@ -31,7 +34,7 @@ const EnviosPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, presentacionActiva]);
 
   useEffect(() => {
     api.get('/catalogos/estados').then((r) => setEstados(r.data.data));
@@ -56,7 +59,7 @@ const EnviosPage = () => {
     setSearchInput('');
     setFechaDesdeInput('');
     setFechaHastaInput('');
-    setFilters({ search: '', estado: '', fechaDesde: '', fechaHasta: '', page: 1 });
+    setFilters({ search: '', estado: '', fechaDesde: '', fechaHasta: '', page: 1, alcance: filters.alcance });
   };
 
   const hasActiveFilters = filters.search || filters.estado || filters.fechaDesde || filters.fechaHasta;
@@ -92,13 +95,20 @@ const EnviosPage = () => {
         <StatChip label="Estado filtro" value={filters.estado ? estados.find((s) => String(s.id_estado) === filters.estado)?.nombre || '—' : 'Todos'} accent="amber" />
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <RegistroScopeFilter
+          value={filters.alcance}
+          onChange={(alcance) => setFilters((f) => ({ ...f, alcance, page: 1 }))}
+        />
+      </div>
+
       <div className="card-compact">
         <form onSubmit={handleSearch} className="flex flex-wrap gap-3">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               className="input-field pl-10"
-              placeholder="Buscar código, origen, destino, cliente..."
+              placeholder={presentacionActiva ? 'Buscar código, origen, destino, alias...' : 'Buscar código, origen, destino, cliente...'}
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
             />

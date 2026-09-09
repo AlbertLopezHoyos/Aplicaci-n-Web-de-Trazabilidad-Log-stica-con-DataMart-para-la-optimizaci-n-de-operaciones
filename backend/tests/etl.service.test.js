@@ -16,14 +16,18 @@ const etlService = require('../src/datamart/etl.service');
 const sqls = () => sequelize.query.mock.calls.map(([sql]) => sql.replace(/\s+/g, ' '));
 
 /**
- * Simula la secuencia de consultas de runStaging:
- * bitácora → extracción → 3 INSERT dim → 3 UPDATE dim → conteo → INSERT hechos → UPDATE hechos.
+ * Simula la secuencia de consultas de runStaging: bitácora → extracción →
+ * 3 UPDATE de expiración → 3 INSERT dim → 3 UPDATE dim → conteo →
+ * INSERT hechos → UPDATE operador de hechos → UPDATE métricas de hechos.
  */
-const mockRunStaging = ({ insertados = 0, actualizados = 0 } = {}) => {
+const mockRunStaging = ({ insertados = 0, actualizados = 0, expirados = 0 } = {}) => {
   sequelize.transaction.mockResolvedValue(transaction);
   sequelize.query
     .mockResolvedValueOnce([101])                                              // abrirBitacora
     .mockResolvedValueOnce([{ envios: 5500, clientes: 50, estados: 6, usuarios: 2, incidencias: 990 }])
+    .mockResolvedValueOnce([{ affectedRows: expirados }])                      // expira dim_cliente
+    .mockResolvedValueOnce([{ affectedRows: 0 }])                              // expira dim_estado
+    .mockResolvedValueOnce([{ affectedRows: expirados }])                      // expira dim_operador
     .mockResolvedValueOnce([{ affectedRows: 0 }])                              // dim_cliente
     .mockResolvedValueOnce([{ affectedRows: 0 }])                              // dim_estado
     .mockResolvedValueOnce([{ affectedRows: 0 }])                              // dim_operador
@@ -32,6 +36,7 @@ const mockRunStaging = ({ insertados = 0, actualizados = 0 } = {}) => {
     .mockResolvedValueOnce([{}])                                               // update dim_operador
     .mockResolvedValueOnce([{ total: 5500 }])                                  // transformables
     .mockResolvedValueOnce([{ affectedRows: insertados }])                     // insert hechos
+    .mockResolvedValueOnce([{}])                                               // reapunta operador
     .mockResolvedValueOnce([{ affectedRows: actualizados }])                   // update hechos
     .mockResolvedValueOnce([{}]);                                              // cerrarBitacora
 };
@@ -76,6 +81,24 @@ describe('runStaging — idempotencia', () => {
 
     const insertHechos = sqls().find((s) => s.includes('INSERT INTO fact_operaciones_logisticas'));
     expect(insertHechos).toContain('origen_dato');
+  });
+
+  it('cierra los miembros de dimensión cuyo registro de origen ya no está vigente', async () => {
+    mockRunStaging({ expirados: 2 });
+    const resultado = await etlService.runStaging();
+
+    const cierres = sqls().filter((s) => s.includes('SET d.es_actual = 0'));
+    expect(cierres).toHaveLength(3);
+    cierres.forEach((sql) => expect(sql).toContain('d.vigente_hasta = CURDATE()'));
+    expect(resultado.dimensionesExpiradas.dim_operador).toBe(2);
+  });
+
+  it('reapunta los hechos al operador vigente cuando cambia el responsable en el origen', async () => {
+    mockRunStaging();
+    await etlService.runStaging();
+
+    const reapunte = sqls().find((s) => s.includes('SET f.id_dim_operador = dop.id_dim_operador'));
+    expect(reapunte).toContain('dop.es_actual = 1');
   });
 
   it('confirma la transacción al terminar correctamente', async () => {
@@ -128,11 +151,15 @@ describe('runStaging — bitácora de ejecución', () => {
       .mockResolvedValueOnce([{ affectedRows: 0 }])
       .mockResolvedValueOnce([{ affectedRows: 0 }])
       .mockResolvedValueOnce([{ affectedRows: 0 }])
+      .mockResolvedValueOnce([{ affectedRows: 0 }])
+      .mockResolvedValueOnce([{ affectedRows: 0 }])
+      .mockResolvedValueOnce([{ affectedRows: 0 }])
       .mockResolvedValueOnce([{}])
       .mockResolvedValueOnce([{}])
       .mockResolvedValueOnce([{}])
       .mockResolvedValueOnce([{ total: 8 }])
       .mockResolvedValueOnce([{ affectedRows: 8 }])
+      .mockResolvedValueOnce([{}])
       .mockResolvedValueOnce([{ affectedRows: 0 }]);
 
     const resultado = await etlService.runStaging();

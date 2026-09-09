@@ -153,7 +153,7 @@ export async function exportFichaExcel({ titulo, indicador, dimension, headers, 
   const lastRow = headerRowNum + Math.max(filas.length, 1) + 2;
   ws.mergeCells(lastRow, 1, lastRow, colCount + 1);
   ws.getCell(lastRow, 1).value =
-    'Salazar Perú · Ficha de observación — Uso académico y operativo interno';
+    'Grupo Logístico Salazar · Ficha de observación — Uso interno';
   ws.getCell(lastRow, 1).font = { size: 8, color: { argb: 'FF94A3B8' } };
   ws.getCell(lastRow, 1).alignment = { horizontal: 'center' };
 

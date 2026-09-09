@@ -11,6 +11,7 @@ import {
   Loader2,
   FlaskConical,
   Info,
+  CalendarClock,
 } from 'lucide-react';
 import { toastSuccess, toastError } from '../utils/alerts';
 import { exportFichaExcel } from '../utils/fichaExport';
@@ -70,6 +71,54 @@ const GRUPOS = [
 const formatoValor = (valor, unidad) =>
   valor === null || valor === undefined ? '—' : `${valor}${unidad === '%' ? '%' : ''}`;
 
+const formatoFecha = (iso) => {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+};
+
+const VentanaCard = ({ etiqueta, ventana }) => {
+  if (!ventana) return null;
+  const completa = ventana.faltantes === 0 && ventana.fueraDeVentana === 0;
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-800">{etiqueta}</p>
+          <p className="text-xs text-slate-500">
+            {ventana.anexo} · {formatoFecha(ventana.desde)} — {formatoFecha(ventana.hasta)}
+          </p>
+        </div>
+        <span
+          className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+            completa ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
+          }`}
+        >
+          {ventana.dentroDeVentana} / 50
+        </span>
+      </div>
+      <p className="mt-2 text-xs text-slate-500">{ventana.fuente}</p>
+      <div className="mt-2 space-y-1 text-xs">
+        {ventana.fueraDeVentana > 0 && (
+          <p className="flex items-center gap-1.5 text-red-700">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            {ventana.fueraDeVentana} registro(s) marcados fuera del periodo declarado
+          </p>
+        )}
+        {ventana.faltantes > 0 && (
+          <p className="flex items-center gap-1.5 text-amber-700">
+            <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+            Faltan {ventana.faltantes} registro(s)
+            {ventana.abierta
+              ? ` · quedan ${ventana.diasRestantes} día(s) de observación`
+              : ' · el periodo de observación ya cerró'}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const MedicionPage = () => {
   const [medicion, setMedicion] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -116,34 +165,35 @@ const MedicionPage = () => {
   }
 
   const muestra = medicion?.muestra;
-  const sinteticos = medicion?.datosSinteticos;
+  const ventanas = medicion?.ventanas;
 
   return (
     <div className="page-shell">
       <PageHeader
         title="Medición de investigación"
-        subtitle="Indicadores TPRE, PER, PEEA y PIOIC sobre la muestra real — preprueba y posprueba por separado"
+        subtitle="Indicadores TPRE, PER, PEEA y PIOIC — preprueba y posprueba por separado"
         compact
       />
 
-      <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+      <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
         <p className="flex items-start gap-2">
-          <Info className="mt-0.5 h-4 w-4 shrink-0" />
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-salazar-700" />
           <span>
-            Estos indicadores se calculan <strong>únicamente</strong> sobre registros marcados como
-            reales y asignados a la muestra ({muestra?.esperadoPorGrupo} preprueba +{' '}
-            {muestra?.esperadoPorGrupo} posprueba = {muestra?.esperadoTotal}). Los{' '}
-            {sinteticos?.envios?.toLocaleString() ?? 0} envíos sintéticos del DataMart están
-            excluidos y no intervienen en el contraste de hipótesis. Las muestras no son pareadas.
+            Los indicadores se calculan sobre la muestra de {muestra?.esperadoPorGrupo} registros
+            de preprueba y {muestra?.esperadoPorGrupo} de posprueba ({muestra?.esperadoTotal} en total).
           </span>
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <VentanaCard etiqueta="Periodo de preprueba" ventana={ventanas?.preprueba} />
+        <VentanaCard etiqueta="Periodo de posprueba" ventana={ventanas?.posprueba} />
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <StatChip label="Preprueba registrada" value={`${muestra?.registradoPreprueba ?? 0} / ${muestra?.esperadoPorGrupo ?? 50}`} accent="salazar" />
         <StatChip label="Posprueba registrada" value={`${muestra?.registradoPosprueba ?? 0} / ${muestra?.esperadoPorGrupo ?? 50}`} accent="salazar" />
         <StatChip label="Muestra total" value={`${muestra?.registradoTotal ?? 0} / ${muestra?.esperadoTotal ?? 100}`} accent={muestra?.completa ? 'green' : 'slate'} />
-        <StatChip label="Datos sintéticos excluidos" value={(sinteticos?.envios ?? 0).toLocaleString()} accent="slate" />
       </div>
 
       {!muestra?.completa && (
@@ -151,10 +201,8 @@ const MedicionPage = () => {
           <p className="flex items-start gap-2">
             <FlaskConical className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              La muestra todavía no está completa. Marque los registros reales con{' '}
-              <code className="rounded bg-amber-100 px-1">npm run db:muestra -- --grupo=PREPRUEBA --aplicar</code>{' '}
-              (y su equivalente para posprueba) desde el backend. Mientras tanto los valores
-              mostrados corresponden solo a los registros ya clasificados.
+              La preprueba todavía no está cargada. Cuando la suba, los indicadores de ese periodo
+              aparecerán aquí para compararlos con la posprueba.
             </span>
           </p>
         </div>

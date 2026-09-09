@@ -6,6 +6,7 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get('/estados', catalogoController.getEstados);
+router.get('/roles', catalogoController.getRoles);
 router.get('/clientes', catalogoController.getClientes);
 router.get('/clientes/check-dni', catalogoController.checkClienteDni);
 router.post('/clientes', catalogoController.createCliente);

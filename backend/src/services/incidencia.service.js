@@ -2,12 +2,14 @@ const { Op } = require('sequelize');
 const { Incidencia, Envio, Usuario, Cliente, EstadoEnvio } = require('../models');
 const { sanitizeObject } = require('../utils/sanitize');
 const { generarCodigoIncidencia, evaluarInformacionCompleta } = require('../utils/codigoIncidencia');
+const anonimizacion = require('./anonimizacion.service');
 
-const list = async ({ page = 1, limit = 10, tipo, estado, id_envio }) => {
+const list = async ({ page = 1, limit = 10, tipo, estado, id_envio, presentacionAcademica = false, idUsuarioReporta }) => {
   const where = {};
   if (tipo) where.tipo = tipo;
   if (estado) where.estado_incidencia = estado;
   if (id_envio) where.id_envio = id_envio;
+  if (idUsuarioReporta) where.id_usuario_reporta = idUsuarioReporta;
 
   const offset = (page - 1) * limit;
   const { count, rows } = await Incidencia.findAndCountAll({
@@ -16,8 +18,8 @@ const list = async ({ page = 1, limit = 10, tipo, estado, id_envio }) => {
       {
         model: Envio,
         as: 'envio',
-        attributes: ['id_envio', 'codigo_envio', 'origen', 'destino'],
-        include: [{ model: Cliente, as: 'cliente', attributes: ['razon_social'] }],
+        attributes: ['id_envio', 'codigo_envio', 'origen', 'destino', 'id_cliente'],
+        include: [{ model: Cliente, as: 'cliente', attributes: ['id_cliente', 'razon_social', 'dni', 'telefono', 'activo'] }],
       },
       { model: Usuario, as: 'reportadoPor', attributes: ['nombres', 'apellidos'] },
     ],
@@ -25,7 +27,9 @@ const list = async ({ page = 1, limit = 10, tipo, estado, id_envio }) => {
     limit: parseInt(limit, 10),
     offset,
   });
-  return { total: count, page: parseInt(page, 10), data: rows };
+  const resultado = { total: count, page: parseInt(page, 10), data: rows };
+  if (!presentacionAcademica) return resultado;
+  return anonimizacion.anonimizarListaIncidencias(resultado);
 };
 
 const create = async (data, userId) => {
@@ -53,12 +57,23 @@ const update = async (id, data) => {
   return inc;
 };
 
-const getById = async (id) => {
+const getById = async (id, { presentacionAcademica = false } = {}) => {
   const inc = await Incidencia.findByPk(id, {
-    include: [{ model: Envio, as: 'envio', include: [{ model: EstadoEnvio, as: 'estadoActual' }] }],
+    include: [
+      {
+        model: Envio,
+        as: 'envio',
+        include: [
+          { model: EstadoEnvio, as: 'estadoActual' },
+          { model: Cliente, as: 'cliente' },
+        ],
+      },
+    ],
   });
   if (!inc) throw Object.assign(new Error('Incidencia no encontrada'), { statusCode: 404 });
-  return inc;
+  if (!presentacionAcademica) return inc;
+  const mapa = await anonimizacion.cargarMapaAlias();
+  return anonimizacion.anonimizarIncidencia(inc, mapa);
 };
 
 module.exports = { list, create, update, getById };

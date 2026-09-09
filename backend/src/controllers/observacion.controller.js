@@ -42,6 +42,8 @@ const getDimension = async (req, res, next) => {
       dimension,
       titulo: config?.titulo,
       indicador: config?.indicador,
+      columnas: config?.columnas || [],
+      labels: config?.labels || [],
       alcance: opciones.alcance || observacionService.ALCANCE.MUESTRA,
       grupo: opciones.grupo || null,
       data,

@@ -14,7 +14,7 @@ const Timeline = ({ items = [] }) => {
     <div className="relative space-y-0">
       {sorted.map((item, idx) => {
         const estado = item.estado || {};
-        const color = estado.color_hex || '#0B3D6E';
+        const color = estado.color_hex || '#833a3c';
         const isFirst = idx === 0;
         return (
           <div key={item.id_historial || idx} className="relative flex gap-4 pb-8 last:pb-0">

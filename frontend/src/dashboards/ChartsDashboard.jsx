@@ -16,7 +16,8 @@ import {
 
 import { fixMojibake } from '../utils/textEncoding';
 
-const COLORS = ['#0B3D6E', '#2563eb', '#22c55e', '#f59e0b', '#ef4444', '#6b7280'];
+/** Paleta institucional: rojo ladrillo y gris del isotipo, con apoyos neutros. */
+const COLORS = ['#833a3c', '#86888a', '#a95f64', '#c08a2e', '#58595b', '#dbafb2'];
 
 const tooltipStyle = {
   borderRadius: 8,
@@ -78,9 +79,9 @@ export const TendenciaMensualChart = ({ data = [] }) => {
             type="monotone"
             dataKey="total"
             name="Total envíos"
-            stroke="#0B3D6E"
+            stroke="#833a3c"
             strokeWidth={2.5}
-            dot={{ r: 3, fill: '#0B3D6E' }}
+            dot={{ r: 3, fill: '#833a3c' }}
             activeDot={{ r: 5 }}
           />
           <Line
@@ -108,7 +109,7 @@ export const IncidenciasChart = ({ data = [] }) => {
           <XAxis dataKey="tipo" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
           <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'rgba(11, 61, 110, 0.06)' }} />
-          <Bar dataKey="cantidad" fill="#f97316" radius={[6, 6, 0, 0]} maxBarSize={48} />
+          <Bar dataKey="cantidad" fill="#86888a" radius={[6, 6, 0, 0]} maxBarSize={48} />
         </BarChart>
       </ResponsiveContainer>
     </div>

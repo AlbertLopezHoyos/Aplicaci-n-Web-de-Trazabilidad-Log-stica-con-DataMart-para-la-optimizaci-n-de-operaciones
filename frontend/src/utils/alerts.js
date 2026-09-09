@@ -15,7 +15,7 @@ export const confirmAction = async (title, text) => {
     text,
     icon: 'warning',
     showCancelButton: true,
-    confirmButtonColor: '#0B3D6E',
+    confirmButtonColor: '#833a3c',
     cancelButtonColor: '#64748b',
     confirmButtonText: 'Sí, continuar',
     cancelButtonText: 'Cancelar',

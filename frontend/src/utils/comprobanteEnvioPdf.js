@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatCurrency, formatDate, formatDateTime } from './format';
-import { labelCliente } from './cliente';
+import { labelCliente, nombreCliente, docCliente, telefonoCliente } from './cliente';
 import { BRAND, loadLogo, drawPdfHeader, drawPdfFooter } from './pdfBrand';
 
 /** Genera y descarga el comprobante PDF del envío. */
@@ -53,9 +53,9 @@ export async function descargarComprobanteEnvio(envio) {
     styles: { fontSize: 10, cellPadding: 2.5 },
     columnStyles: { 0: { fontStyle: 'bold', cellWidth: 42, textColor: BRAND.muted } },
     body: [
-      ['Nombre', cliente.nombre_completo || cliente.razon_social || '—'],
-      ['DNI', cliente.dni || '—'],
-      ['Teléfono', cliente.telefono || '—'],
+      ['Nombre', nombreCliente(cliente)],
+      ['DNI', docCliente(cliente)],
+      ['Teléfono', telefonoCliente(cliente)],
     ],
   });
   y = doc.lastAutoTable.finalY + 10;

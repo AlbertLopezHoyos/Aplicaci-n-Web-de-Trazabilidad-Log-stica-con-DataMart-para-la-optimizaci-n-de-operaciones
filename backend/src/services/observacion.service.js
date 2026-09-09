@@ -8,6 +8,8 @@ const {
   GRUPOS_MUESTRA_VALIDOS,
   TAMANIO_GRUPO_MUESTRA,
   CAMPOS_INCIDENCIA_COMPLETA,
+  VENTANAS_MEDICION,
+  aFechaISO,
   calcularTPRE,
   calcularPER,
   calcularPEEA,
@@ -303,13 +305,53 @@ const calcularIndicadores = async ({ alcance, grupo } = {}) => {
 };
 
 /**
+ * Cobertura de un grupo respecto al periodo declarado en su ficha: cuántos
+ * registros hay, cuántos caen fuera de la ventana y cuántos días quedan.
+ */
+const getCoberturaVentana = async (grupo) => {
+  const ventana = VENTANAS_MEDICION[grupo];
+  if (!ventana) return null;
+
+  const [row] = await sequelize.query(
+    `SELECT COUNT(*) AS total,
+            SUM(CASE WHEN e.fecha_registro BETWEEN :desde AND :hasta THEN 1 ELSE 0 END) AS dentro
+     FROM envios e
+     WHERE e.activo = 1 AND e.origen_dato = :real AND e.grupo_muestra = :grupo`,
+    {
+      type: QueryTypes.SELECT,
+      replacements: { desde: ventana.desde, hasta: ventana.hasta, real: ORIGEN_DATO.REAL, grupo },
+    }
+  );
+
+  const total = Number(row?.total) || 0;
+  const dentro = Number(row?.dentro) || 0;
+  const hoy = aFechaISO(new Date());
+  const msPorDia = 86400000;
+  const diasRestantes = hoy > ventana.hasta
+    ? 0
+    : Math.round((new Date(`${ventana.hasta}T12:00:00`) - new Date(`${(hoy < ventana.desde ? ventana.desde : hoy)}T12:00:00`)) / msPorDia);
+
+  return {
+    ...ventana,
+    registrados: total,
+    dentroDeVentana: dentro,
+    fueraDeVentana: total - dentro,
+    faltantes: Math.max(0, TAMANIO_GRUPO_MUESTRA - dentro),
+    abierta: hoy <= ventana.hasta,
+    diasRestantes,
+  };
+};
+
+/**
  * Resultado consolidado de la medición de investigación:
  * preprueba (50) y posprueba (50) por separado, nunca mezcladas.
  */
 const getMedicionInvestigacion = async () => {
-  const [preprueba, posprueba] = await Promise.all([
+  const [preprueba, posprueba, ventanaPre, ventanaPos] = await Promise.all([
     calcularIndicadores({ alcance: ALCANCE.MUESTRA, grupo: GRUPO_MUESTRA.PREPRUEBA }),
     calcularIndicadores({ alcance: ALCANCE.MUESTRA, grupo: GRUPO_MUESTRA.POSPRUEBA }),
+    getCoberturaVentana(GRUPO_MUESTRA.PREPRUEBA),
+    getCoberturaVentana(GRUPO_MUESTRA.POSPRUEBA),
   ]);
 
   const [cobertura] = await sequelize.query(
@@ -325,16 +367,23 @@ const getMedicionInvestigacion = async () => {
   const enPreprueba = Number(cobertura?.preprueba) || 0;
   const enPosprueba = Number(cobertura?.posprueba) || 0;
 
+  const fueraDeVentana = (ventanaPre?.fueraDeVentana || 0) + (ventanaPos?.fueraDeVentana || 0);
+
   return {
     preprueba,
     posprueba,
+    ventanas: { preprueba: ventanaPre, posprueba: ventanaPos },
     muestra: {
       esperadoPorGrupo: TAMANIO_GRUPO_MUESTRA,
       esperadoTotal: TAMANIO_GRUPO_MUESTRA * 2,
       registradoPreprueba: enPreprueba,
       registradoPosprueba: enPosprueba,
       registradoTotal: enPreprueba + enPosprueba,
-      completa: enPreprueba === TAMANIO_GRUPO_MUESTRA && enPosprueba === TAMANIO_GRUPO_MUESTRA,
+      fueraDeVentana,
+      completa:
+        enPreprueba === TAMANIO_GRUPO_MUESTRA
+        && enPosprueba === TAMANIO_GRUPO_MUESTRA
+        && fueraDeVentana === 0,
       pareada: false,
     },
     datosSinteticos: {
@@ -392,6 +441,7 @@ module.exports = {
   getDatosDimension,
   countDatosDimension,
   calcularIndicadores,
+  getCoberturaVentana,
   getMedicionInvestigacion,
   exportarExcel,
   buildExportPayload,

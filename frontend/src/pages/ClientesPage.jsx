@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Plus, Search, Pencil, X } from 'lucide-react';
 import api from '../services/api';
+import { usePresentacion } from '../context/PresentacionContext';
 import PageHeader from '../components/PageHeader';
 import StatChip from '../components/StatChip';
 import Pagination from '../components/Pagination';
+import { nombreCliente } from '../utils/cliente';
 import { toastSuccess, toastError } from '../utils/alerts';
 
 const emptyForm = {
@@ -13,7 +15,9 @@ const emptyForm = {
 };
 
 const ClientesPage = () => {
+  const { presentacionActiva } = usePresentacion();
   const [clientes, setClientes] = useState({ data: [], total: 0, page: 1, limit: 25 });
+  const [modoPresentacion, setModoPresentacion] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -32,15 +36,17 @@ const ClientesPage = () => {
       const payload = data.data;
       if (payload?.data) {
         setClientes(payload);
+        setModoPresentacion(Boolean(payload.presentacion_academica || presentacionActiva));
       } else {
         setClientes({ data: Array.isArray(payload) ? payload : [], total: 0, page: 1, limit: 25 });
+        setModoPresentacion(presentacionActiva);
       }
     } catch {
       toastError('Error', 'No se pudieron cargar los clientes');
     } finally {
       setLoading(false);
     }
-  }, [search, page]);
+  }, [search, page, presentacionActiva]);
 
   useEffect(() => {
     load();
@@ -114,16 +120,24 @@ const ClientesPage = () => {
     setForm(emptyForm);
   };
 
+  const vistaAcademica = modoPresentacion || presentacionActiva;
+
   return (
     <div className="page-shell">
       <PageHeader
         title="Gestión de clientes"
-        subtitle="Personas naturales: nombre completo, DNI y teléfono (opcional)"
+        subtitle={
+          vistaAcademica
+            ? 'Datos personales ocultos: los clientes se muestran con alias'
+            : 'Personas naturales: nombre completo, DNI y teléfono (opcional)'
+        }
         compact
         action={
-          <button type="button" className="btn-primary" onClick={openNew}>
-            <Plus className="h-4 w-4" /> Nuevo cliente
-          </button>
+          !vistaAcademica ? (
+            <button type="button" className="btn-primary" onClick={openNew}>
+              <Plus className="h-4 w-4" /> Nuevo cliente
+            </button>
+          ) : null
         }
       />
 
@@ -136,7 +150,7 @@ const ClientesPage = () => {
       <form onSubmit={handleSearch} className="card-compact flex flex-wrap gap-3">
         <input
           className="input-field min-w-[200px] flex-1"
-          placeholder="Buscar por nombre o DNI..."
+          placeholder={vistaAcademica ? 'Buscar por alias...' : 'Buscar por nombre o DNI...'}
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
         />
@@ -158,7 +172,7 @@ const ClientesPage = () => {
         )}
       </form>
 
-      {(showForm || editing) && (
+      {!vistaAcademica && (showForm || editing) && (
         <form onSubmit={handleSubmit} className="card space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-salazar-900">
@@ -215,30 +229,56 @@ const ClientesPage = () => {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                 <tr>
-                  <th className="px-4 py-3 text-left">Nombre completo</th>
-                  <th className="px-4 py-3 text-left">DNI</th>
-                  <th className="px-4 py-3 text-left">Teléfono</th>
-                  <th className="px-4 py-3 text-right">Acciones</th>
+                  {vistaAcademica ? (
+                    <>
+                      <th className="px-4 py-3 text-left">Alias</th>
+                      <th className="px-4 py-3 text-left">Tipo</th>
+                      <th className="px-4 py-3 text-left">Envíos</th>
+                      <th className="px-4 py-3 text-left">Estado</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="px-4 py-3 text-left">Nombre completo</th>
+                      <th className="px-4 py-3 text-left">DNI</th>
+                      <th className="px-4 py-3 text-left">Teléfono</th>
+                      <th className="px-4 py-3 text-right">Acciones</th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {clientes.data.map((c) => (
                   <tr key={c.id_cliente} className="border-t border-slate-50 hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-800">
-                      {c.nombre_completo || c.razon_social}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-slate-600">{c.dni || '—'}</td>
-                    <td className="px-4 py-3">{c.telefono || '—'}</td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        className="rounded p-2 text-slate-500 hover:bg-slate-100 hover:text-salazar-800"
-                        title="Editar"
-                        onClick={() => startEdit(c)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                    </td>
+                    {vistaAcademica ? (
+                      <>
+                        <td className="px-4 py-3 font-medium text-slate-800">{nombreCliente(c)}</td>
+                        <td className="px-4 py-3 text-slate-600">{c.tipo_cliente || '—'}</td>
+                        <td className="px-4 py-3">{c.total_envios ?? '—'}</td>
+                        <td className="px-4 py-3">
+                          <span className={`badge ${c.activo !== false ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'}`}>
+                            {c.activo !== false ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-4 py-3 font-medium text-slate-800">
+                          {c.nombre_completo || c.razon_social}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-slate-600">{c.dni || '—'}</td>
+                        <td className="px-4 py-3">{c.telefono || '—'}</td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            className="rounded p-2 text-slate-500 hover:bg-slate-100 hover:text-salazar-800"
+                            title="Editar"
+                            onClick={() => startEdit(c)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>

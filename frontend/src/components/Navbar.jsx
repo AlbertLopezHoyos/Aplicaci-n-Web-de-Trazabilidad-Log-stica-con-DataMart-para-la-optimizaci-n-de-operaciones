@@ -1,42 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
-import { Menu, Bell, LogOut, User, FlaskConical } from 'lucide-react';
+import { Menu, Bell, LogOut, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { usePresentacion } from '../context/PresentacionContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { confirmAction, toastInfo } from '../utils/alerts';
-import { fixMojibake } from '../utils/textEncoding';
-
-const DEMO_NOTIFICATIONS = [
-  {
-    id: 1,
-    title: 'Incidencia abierta',
-    message: 'INC-2026-00001 — Retraso por obras viales',
-    link: '/incidencias',
-    time: 'Hace 2 h',
-    unread: true,
-  },
-  {
-    id: 2,
-    title: 'Envío con retraso',
-    message: 'GLS-2026-00003 — Lima Ate → Piura',
-    link: '/seguimiento/3',
-    time: 'Hace 5 h',
-    unread: true,
-  },
-  {
-    id: 3,
-    title: 'Reporte disponible',
-    message: 'Reporte de envíos por estado (PDF)',
-    link: '/reportes',
-    time: 'Ayer',
-    unread: false,
-  },
-];
+import { confirmAction } from '../utils/alerts';
+import api from '../services/api';
+import UserAccountMenu from './UserAccountMenu';
+import BrandLogo from './BrandLogo';
 
 const Navbar = ({ onMenuClick }) => {
-  const { user, logout, isDemoMode } = useAuth();
+  const { logout } = useAuth();
+  const { presentacionActiva, togglePresentacion, puedeActivar } = usePresentacion();
   const navigate = useNavigate();
   const [notifOpen, setNotifOpen] = useState(false);
-  const [notifications, setNotifications] = useState(DEMO_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState([]);
   const notifRef = useRef(null);
 
   const unreadCount = notifications.filter((n) => n.unread).length;
@@ -52,10 +29,6 @@ const Navbar = ({ onMenuClick }) => {
   }, []);
 
   useEffect(() => {
-    if (isDemoMode) {
-      setNotifications(DEMO_NOTIFICATIONS);
-      return;
-    }
     const loadAlerts = async () => {
       try {
         const [incAb, incRev, estRes] = await Promise.all([
@@ -106,13 +79,9 @@ const Navbar = ({ onMenuClick }) => {
       }
     };
     loadAlerts();
-  }, [isDemoMode]);
+  }, []);
 
   const handleLogout = async () => {
-    if (isDemoMode) {
-      toastInfo('Modo demo', 'La sesión simulada permanece activa. Desactive VITE_DEMO_MODE para usar credenciales reales.');
-      return;
-    }
     const ok = await confirmAction('¿Cerrar sesión?', 'Saldrá del sistema de trazabilidad');
     if (ok) {
       await logout();
@@ -141,22 +110,31 @@ const Navbar = ({ onMenuClick }) => {
       </button>
 
       <div className="flex flex-1 items-center justify-between lg:justify-end">
-        <p className="text-sm font-semibold text-salazar-900 lg:hidden">Salazar Logística</p>
+        <BrandLogo variant="full" className="h-7 w-auto lg:hidden" />
         <div className="hidden flex-1 lg:block">
         <h1 className="text-lg font-semibold text-salazar-900">
           Sistema de Trazabilidad Logística
         </h1>
-        <p className="text-xs text-slate-500">Optimización operativa · Lima 2026</p>
-        {isDemoMode && (
-          <p className="mt-1 flex items-center gap-1 text-xs font-medium text-amber-700">
-            <FlaskConical className="h-3.5 w-3.5" />
-            Modo demo — sin base de datos (datos simulados)
-          </p>
-        )}
+        <p className="text-xs text-slate-500">Optimización operativa · Lima</p>
         </div>
       </div>
 
       <div className="flex items-center gap-3">
+        {puedeActivar && (
+          <button
+            type="button"
+            onClick={togglePresentacion}
+            className={`hidden items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition sm:flex ${
+              presentacionActiva
+                ? 'border-indigo-300 bg-indigo-50 text-indigo-800'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+            title="Ocultar datos personales de clientes"
+          >
+            <ShieldCheck className="h-3.5 w-3.5" />
+            {presentacionActiva ? 'Datos protegidos' : 'Proteger datos'}
+          </button>
+        )}
         <div className="relative" ref={notifRef}>
           <button
             type="button"
@@ -167,7 +145,7 @@ const Navbar = ({ onMenuClick }) => {
           >
             <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
-              <span className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-accent-orange px-1 text-[10px] font-bold text-white">
+              <span className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-salazar-700 px-1 text-[10px] font-bold text-white">
                 {unreadCount}
               </span>
             )}
@@ -201,7 +179,7 @@ const Navbar = ({ onMenuClick }) => {
                       }`}
                     >
                       <div className="flex items-start gap-2">
-                        {n.unread && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent-orange" />}
+                        {n.unread && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-salazar-600" />}
                         <div className={n.unread ? '' : 'pl-4'}>
                           <p className="text-sm font-medium text-slate-800">{n.title}</p>
                           <p className="text-xs text-slate-500">{n.message}</p>
@@ -213,23 +191,13 @@ const Navbar = ({ onMenuClick }) => {
                 ))}
               </ul>
               <p className="border-t border-slate-100 px-4 py-2 text-center text-[10px] text-slate-400">
-                {isDemoMode ? 'Alertas simuladas (modo demo)' : 'Incidencias y envíos retrasados'}
+                Incidencias y envíos retrasados
               </p>
             </div>
           )}
         </div>
 
-        <div className="hidden items-center gap-2 border-l border-slate-200 pl-3 sm:flex">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-salazar-100 text-salazar-800">
-            <User className="h-4 w-4" />
-          </div>
-          <div className="text-right">
-            <p className="text-sm font-medium text-slate-800">
-              {user?.nombres} {user?.apellidos}
-            </p>
-            <p className="text-xs text-slate-500">{fixMojibake(user?.rol?.nombre)}</p>
-          </div>
-        </div>
+        <UserAccountMenu />
 
         <button
           type="button"

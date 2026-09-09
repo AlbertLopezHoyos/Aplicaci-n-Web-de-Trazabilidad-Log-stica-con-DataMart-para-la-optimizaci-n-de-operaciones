@@ -1,12 +1,13 @@
 import logoSrc from '../assets/logo-salazar-peru-1.png';
 
+/** Paleta institucional tomada del isotipo de Grupo Logístico Salazar. */
 export const BRAND = {
-  primary: [11, 61, 110],
-  accent: [180, 35, 45],
+  primary: [131, 58, 60], // #833A3C rojo ladrillo
+  accent: [134, 136, 138], // #86888A gris corporativo
   muted: [100, 116, 139],
   light: [241, 245, 249],
-  excelHeader: 'FF0B3D6E',
-  excelAccent: 'FFB4232F',
+  excelHeader: 'FF833A3C',
+  excelAccent: 'FF86888A',
 };
 
 export const loadLogo = () =>

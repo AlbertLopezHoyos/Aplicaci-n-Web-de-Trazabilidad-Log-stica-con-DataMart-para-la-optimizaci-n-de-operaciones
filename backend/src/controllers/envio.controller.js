@@ -1,9 +1,19 @@
 const envioService = require('../services/envio.service');
-const { success, error } = require('../utils/response');
+const { success } = require('../utils/response');
+const { resolveIdResponsable } = require('../utils/alcanceRegistros');
+
+const opcionesPresentacion = (req) => ({
+  presentacionAcademica: Boolean(req.presentacionAcademica),
+});
+
+const filtrosLista = (req) => ({
+  ...req.query,
+  idResponsable: resolveIdResponsable(req),
+});
 
 const list = async (req, res, next) => {
   try {
-    const result = await envioService.list(req.query);
+    const result = await envioService.list(filtrosLista(req), opcionesPresentacion(req));
     return success(res, result);
   } catch (err) {
     next(err);
@@ -12,7 +22,7 @@ const list = async (req, res, next) => {
 
 const getById = async (req, res, next) => {
   try {
-    const data = await envioService.getById(req.params.id);
+    const data = await envioService.getById(req.params.id, opcionesPresentacion(req));
     return success(res, data);
   } catch (err) {
     next(err);
@@ -21,7 +31,7 @@ const getById = async (req, res, next) => {
 
 const create = async (req, res, next) => {
   try {
-    const data = await envioService.create(req.body, req.user.id_usuario);
+    const data = await envioService.create(req.body, req.user.id_usuario, opcionesPresentacion(req));
     return success(res, data, 'Envío registrado', 201);
   } catch (err) {
     next(err);
@@ -30,7 +40,12 @@ const create = async (req, res, next) => {
 
 const update = async (req, res, next) => {
   try {
-    const data = await envioService.update(req.params.id, req.body, req.user.id_usuario);
+    const data = await envioService.update(
+      req.params.id,
+      req.body,
+      req.user.id_usuario,
+      opcionesPresentacion(req)
+    );
     return success(res, data, 'Envío actualizado');
   } catch (err) {
     next(err);
@@ -48,7 +63,12 @@ const remove = async (req, res, next) => {
 
 const actualizarEstado = async (req, res, next) => {
   try {
-    const data = await envioService.actualizarEstado(req.params.id, req.body, req.user.id_usuario);
+    const data = await envioService.actualizarEstado(
+      req.params.id,
+      req.body,
+      req.user.id_usuario,
+      opcionesPresentacion(req)
+    );
     return success(res, data, 'Estado actualizado');
   } catch (err) {
     next(err);

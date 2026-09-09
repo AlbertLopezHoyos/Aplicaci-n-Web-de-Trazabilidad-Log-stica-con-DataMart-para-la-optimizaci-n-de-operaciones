@@ -4,30 +4,45 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Rojo ladrillo institucional del isotipo (gruposalazarperu.com)
         salazar: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#2563eb',
-          600: '#1d4ed8',
-          700: '#1e40af',
-          800: '#0B3D6E',
-          900: '#082847',
-          950: '#051a2e',
+          50: '#fbf6f6',
+          100: '#f6e9ea',
+          200: '#ecd3d5',
+          300: '#dbafb2',
+          400: '#c48489',
+          500: '#a95f64',
+          600: '#94484d',
+          700: '#833a3c',
+          800: '#6f3133',
+          900: '#572729',
+          950: '#331617',
+        },
+        // Gris corporativo de la "G" del isotipo
+        graphite: {
+          50: '#f6f6f7',
+          100: '#ebebec',
+          200: '#d8d9da',
+          300: '#bcbdbf',
+          400: '#9b9d9f',
+          500: '#86888a',
+          600: '#6d6f71',
+          700: '#58595b',
+          800: '#414244',
+          900: '#2e2f31',
+          950: '#1c1d1e',
         },
         accent: {
-          orange: '#f97316',
-          gold: '#eab308',
+          brick: '#a4433f',
+          gold: '#c08a2e',
         },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
-        card: '0 4px 24px rgba(11, 61, 110, 0.08)',
-        nav: '0 2px 12px rgba(11, 61, 110, 0.12)',
+        card: '0 4px 24px rgba(46, 47, 49, 0.08)',
+        nav: '0 2px 12px rgba(46, 47, 49, 0.14)',
       },
       animation: {
         'fade-in': 'fadeIn 0.4s ease-out',

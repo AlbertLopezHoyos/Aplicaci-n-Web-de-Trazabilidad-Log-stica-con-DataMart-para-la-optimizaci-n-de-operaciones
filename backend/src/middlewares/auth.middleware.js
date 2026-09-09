@@ -20,6 +20,11 @@ const authenticate = async (req, res, next) => {
     }
     req.user = usuario;
     req.userRole = usuario.rol?.nombre;
+    const solicitaPresentacion =
+      req.headers['x-presentacion-academica'] === '1' ||
+      req.headers['x-presentacion-academica'] === 'true';
+    req.presentacionAcademica =
+      solicitaPresentacion && req.userRole === 'Administrador';
     next();
   } catch (err) {
     return error(res, 'Token inválido o expirado', 401);

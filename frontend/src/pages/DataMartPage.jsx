@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import api from '../services/api';
 import PageHeader from '../components/PageHeader';
 import KpiCard from '../components/KpiCard';
-import { Database, Play, Layers, TrendingUp, Clock, AlertTriangle, Package, Info } from 'lucide-react';
+import { Database, Play, Layers, TrendingUp, Clock, AlertTriangle, Package } from 'lucide-react';
 import { toastSuccess, toastError } from '../utils/alerts';
 
 const DataMartPage = () => {
@@ -39,8 +39,6 @@ const DataMartPage = () => {
   };
 
   const hechos = preview?.totalHechos ?? 0;
-  const sinteticos = preview?.hechosSinteticos ?? 0;
-  const listoSustentacion = hechos >= 5000;
   const ejecuciones = preview?.ultimasEjecuciones ?? [];
   const metricasDefinidas = design?.tablas?.hechos?.fact_operaciones_logisticas?.metricas;
   const metricas = Array.isArray(metricasDefinidas)
@@ -51,29 +49,9 @@ const DataMartPage = () => {
     <div className="page-shell">
       <PageHeader
         title="DataMart — Business Intelligence"
-        subtitle="Arquitectura analítica para optimización operacional · Lima 2026"
+        subtitle="Indicadores analíticos de la operación logística"
         compact
       />
-
-      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        <p className="flex items-start gap-2">
-          <Info className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>
-            <strong>Datos sintéticos.</strong> {sinteticos.toLocaleString()} de los{' '}
-            {hechos.toLocaleString()} hechos cargados son datos generados artificialmente para las
-            pruebas técnicas del DataMart (ETL, esquema estrella, consultas analíticas y volumen),
-            debido a las restricciones de confidencialidad sobre los datos históricos reales de la
-            empresa. No forman parte de la muestra de investigación ni del contraste de hipótesis:
-            esos indicadores se calculan en <strong>Medición de investigación</strong>.
-          </span>
-        </p>
-      </div>
-
-      {listoSustentacion && (
-        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-800">
-          Volumen de prueba alcanzado: <strong>{hechos.toLocaleString()}</strong> registros en la tabla de hechos (objetivo ≥ 5,000).
-        </div>
-      )}
 
       <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         <KpiCard
@@ -121,8 +99,13 @@ const DataMartPage = () => {
             <div key={d.tabla} className="card-compact flex items-center gap-3">
               <Layers className="h-7 w-7 shrink-0 text-salazar-500" />
               <div className="min-w-0">
-                <p className="text-lg font-bold tabular-nums">{Number(d.registros).toLocaleString()}</p>
+                <p className="text-lg font-bold tabular-nums">{Number(d.vigentes ?? d.registros).toLocaleString()}</p>
                 <p className="truncate text-xs text-slate-500">{d.tabla}</p>
+                {Number(d.registros) !== Number(d.vigentes ?? d.registros) && (
+                  <p className="truncate text-[11px] text-slate-400">
+                    {Number(d.registros) - Number(d.vigentes)} histórica(s)
+                  </p>
+                )}
               </div>
             </div>
           ))}
@@ -153,7 +136,7 @@ dim_cliente ──► fact_operaciones_logisticas ◄── dim_estado
           <ul className="grid flex-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
             {(design?.dashboardsBI || ['Panel OTIF', 'Volumen por cliente', 'Lead time por ruta']).map((d) => (
               <li key={d} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm">
-                <span className="h-2 w-2 shrink-0 rounded-full bg-accent-orange" />
+                <span className="h-2 w-2 shrink-0 rounded-full bg-salazar-600" />
                 {d}
               </li>
             ))}
@@ -163,9 +146,7 @@ dim_cliente ──► fact_operaciones_logisticas ◄── dim_estado
             {loading ? 'Ejecutando ETL...' : 'Ejecutar ETL de staging'}
           </button>
           <p className="mt-2 text-xs text-slate-500">
-            Carga envíos hacia <code className="text-salazar-700">fact_operaciones_logisticas</code>.
-            Para ≥5,000 hechos de prueba: <code className="text-salazar-700">npm run db:seed-bulk</code>{' '}
-            (genera datos sintéticos) y luego ETL.
+            Actualiza el DataMart con los envíos, estados e incidencias de la operación.
           </p>
           {analytics && hechos > 0 && (
             <div className="mt-2 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">

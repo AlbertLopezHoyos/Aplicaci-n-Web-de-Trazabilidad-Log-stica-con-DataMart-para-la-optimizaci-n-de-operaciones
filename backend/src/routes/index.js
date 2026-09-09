@@ -7,6 +7,7 @@ const evidenciaRoutes = require('./evidencia.routes');
 const reporteRoutes = require('./reporte.routes');
 const catalogoRoutes = require('./catalogo.routes');
 const datamartRoutes = require('./datamart.routes');
+const usuarioRoutes = require('./usuario.routes');
 
 const observacionRoutes = require('./observacion.routes');
 
@@ -20,6 +21,7 @@ router.use('/evidencias', evidenciaRoutes);
 router.use('/reportes', reporteRoutes);
 router.use('/catalogos', catalogoRoutes);
 router.use('/datamart', datamartRoutes);
+router.use('/usuarios', usuarioRoutes);
 router.use('/observacion', observacionRoutes);
 
 router.get('/health', (_req, res) =>

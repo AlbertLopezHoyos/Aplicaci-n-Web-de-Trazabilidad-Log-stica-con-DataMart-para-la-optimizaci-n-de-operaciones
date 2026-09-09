@@ -1,29 +1,70 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import PageHeader from '../components/PageHeader';
-import KpiCard from '../components/KpiCard';
-import StatChip from '../components/StatChip';
-import { ClipboardList, Download, Timer, AlertTriangle, MapPin, ClipboardCheck, Loader2 } from 'lucide-react';
+import {
+  ClipboardList,
+  Download,
+  Timer,
+  AlertTriangle,
+  MapPin,
+  ClipboardCheck,
+  Loader2,
+  Info,
+} from 'lucide-react';
 import { toastSuccess, toastError } from '../utils/alerts';
 import { exportFichaExcel } from '../utils/fichaExport';
 
 const DIMENSIONES = [
-  { id: 1, titulo: 'Eficiencia operativa', indicador: 'TPRE', icon: Timer, color: 'blue' },
-  { id: 2, titulo: 'Calidad información', indicador: 'PER', icon: AlertTriangle, color: 'red' },
-  { id: 3, titulo: 'Control y seguimiento', indicador: 'PEEA', icon: MapPin, color: 'green' },
-  { id: 4, titulo: 'Gestión información operativa', indicador: 'PIOIC', icon: ClipboardCheck, color: 'amber' },
+  {
+    id: 1,
+    titulo: 'Eficiencia operativa',
+    indicador: 'TPRE',
+    unidad: 'min',
+    icon: Timer,
+    color: 'border-blue-200 bg-blue-50 text-blue-800',
+    activo: 'border-blue-500 bg-blue-600 text-white',
+  },
+  {
+    id: 2,
+    titulo: 'Calidad de la información',
+    indicador: 'PER',
+    unidad: '%',
+    icon: AlertTriangle,
+    color: 'border-red-200 bg-red-50 text-red-800',
+    activo: 'border-red-500 bg-red-600 text-white',
+  },
+  {
+    id: 3,
+    titulo: 'Control y seguimiento',
+    indicador: 'PEEA',
+    unidad: '%',
+    icon: MapPin,
+    color: 'border-green-200 bg-green-50 text-green-800',
+    activo: 'border-green-500 bg-green-600 text-white',
+  },
+  {
+    id: 4,
+    titulo: 'Gestión info. operativa',
+    indicador: 'PIOIC',
+    unidad: '%',
+    icon: ClipboardCheck,
+    color: 'border-amber-200 bg-amber-50 text-amber-800',
+    activo: 'border-amber-500 bg-amber-600 text-white',
+  },
 ];
 
-const ALCANCES = [
-  { valor: 'MUESTRA', etiqueta: 'Muestra de investigación', ayuda: 'Solo registros reales de preprueba y posprueba' },
-  { valor: 'TODOS', etiqueta: 'Toda la operación', ayuda: 'Incluye los datos sintéticos del DataMart' },
-];
+const CLAVE_INDICADOR = { 1: 'tpre', 2: 'per', 3: 'peea', 4: 'pioic' };
 
 const ObservacionPage = () => {
+  const { isAdmin } = useAuth();
   const [indicadores, setIndicadores] = useState(null);
   const [dimensionActiva, setDimensionActiva] = useState(1);
-  const [alcance, setAlcance] = useState('MUESTRA');
+  const [alcance, setAlcance] = useState('TODOS');
   const [datos, setDatos] = useState([]);
+  const [columnas, setColumnas] = useState([]);
+  const [labels, setLabels] = useState([]);
   const [totalRegistros, setTotalRegistros] = useState(0);
   const [tituloDim, setTituloDim] = useState('');
   const [loading, setLoading] = useState(false);
@@ -32,7 +73,8 @@ const ObservacionPage = () => {
   const loadIndicadores = (modo) => {
     api
       .get('/observacion/indicadores', { params: { alcance: modo } })
-      .then((r) => setIndicadores(r.data.data));
+      .then((r) => setIndicadores(r.data.data))
+      .catch(() => {});
   };
 
   const loadDimension = (dim, modo) => {
@@ -42,6 +84,8 @@ const ObservacionPage = () => {
       .then((r) => {
         const payload = r.data.data || {};
         setDatos(payload.data || []);
+        setColumnas(payload.columnas || (payload.data?.[0] ? Object.keys(payload.data[0]) : []));
+        setLabels(payload.labels || []);
         setTotalRegistros(payload.total ?? payload.data?.length ?? 0);
         setTituloDim(payload.titulo || DIMENSIONES.find((d) => d.id === dim)?.titulo || '');
       })
@@ -72,7 +116,7 @@ const ObservacionPage = () => {
       });
       toastSuccess(
         'Ficha exportada',
-        `Dimensión ${dim} (${payload.indicador}) · últimos ${payload.filas?.length ?? 0} registros`
+        `Dimensión ${dim} (${payload.indicador}) · ${payload.filas?.length ?? 0} registros`
       );
     } catch {
       toastError('Error', 'No se pudo exportar la ficha');
@@ -82,14 +126,15 @@ const ObservacionPage = () => {
   };
 
   const dimActual = DIMENSIONES.find((d) => d.id === dimensionActiva);
-  const columnas = datos.length ? Object.keys(datos[0]) : [];
-  const labelCol = (key) => key.replace(/_/g, ' ');
+  const claveInd = CLAVE_INDICADOR[dimensionActiva];
+  const valorIndicador = indicadores?.[claveInd];
+  const labelCol = (key, idx) => labels[idx] || key.replace(/_/g, ' ');
 
   return (
     <div className="page-shell">
       <PageHeader
         title="Fichas de observación"
-        subtitle="Evidencia cuantitativa para preprueba y posprueba — Tesis 2026"
+        subtitle="Consulta y exportación de evidencia por dimensión — uso operativo diario"
         compact
         action={
           <button
@@ -103,123 +148,117 @@ const ObservacionPage = () => {
             ) : (
               <Download className="h-4 w-4" />
             )}
-            Exportar dimensión {dimensionActiva} (Excel)
+            Exportar Excel
           </button>
         }
       />
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
-        <KpiCard
-          title="TPRE (min)"
-          value={indicadores?.tpre ?? '—'}
-          subtitle="Tiempo promedio registro"
-          icon={Timer}
-          color="blue"
-        />
-        <KpiCard
-          title="PER (%)"
-          value={indicadores?.per ?? '—'}
-          subtitle="Errores en registros"
-          icon={AlertTriangle}
-          color="red"
-        />
-        <KpiCard
-          title="PEEA (%)"
-          value={indicadores?.peea ?? '—'}
-          subtitle="Envíos con estado actualizado"
-          icon={MapPin}
-          color="green"
-        />
-        <KpiCard
-          title="PIOIC (%)"
-          value={indicadores?.pioic ?? '—'}
-          subtitle="Incidencias con información completa"
-          icon={ClipboardCheck}
-          color="amber"
-        />
+      <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+        <p className="flex items-start gap-2">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-salazar-700" />
+          <span>
+            Revise y exporte las fichas de cada indicador (TPRE, PER, PEEA, PIOIC).
+            {isAdmin && (
+              <>
+                {' '}
+                El contraste preprueba/posprueba está en{' '}
+                <Link to="/medicion" className="font-medium text-salazar-800 underline">
+                  Medición de investigación
+                </Link>
+                .
+              </>
+            )}
+          </span>
+        </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {ALCANCES.map(({ valor, etiqueta, ayuda }) => (
+      {isAdmin && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-slate-500">Alcance:</span>
           <button
-            key={valor}
             type="button"
-            title={ayuda}
-            onClick={() => setAlcance(valor)}
+            onClick={() => setAlcance('MUESTRA')}
             className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-              alcance === valor
+              alcance === 'MUESTRA'
                 ? 'border-salazar-500 bg-salazar-800 text-white'
                 : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
             }`}
           >
-            {etiqueta}
+            Muestra de investigación
           </button>
-        ))}
-      </div>
-
-      {alcance === 'TODOS' ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
-          Vista operativa: incluye los datos sintéticos generados para las pruebas técnicas del
-          DataMart. <strong>No usar estos valores para el contraste de hipótesis.</strong>
-        </div>
-      ) : (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-xs text-blue-900">
-          Muestra de investigación: solo registros reales marcados como preprueba o posprueba
-          (50 + 50). El desglose por grupo está en <strong>Medición de investigación</strong>.
+          <button
+            type="button"
+            onClick={() => setAlcance('TODOS')}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+              alcance === 'TODOS'
+                ? 'border-salazar-500 bg-salazar-800 text-white'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            Toda la operación
+          </button>
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
-        <StatChip label="Dimensión activa" value={`${dimensionActiva} · ${dimActual?.indicador}`} />
-        <StatChip label="Vista previa" value={`${datos.length} filas`} accent="salazar" />
-        <StatChip label="En BD" value={totalRegistros} accent="slate" />
-        <StatChip
-          label="Alcance"
-          value={alcance === 'TODOS' ? 'Con sintéticos' : 'Solo muestra'}
-          accent={alcance === 'TODOS' ? 'amber' : 'green'}
-        />
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {DIMENSIONES.map((d) => (
-          <button
-            key={d.id}
-            type="button"
-            onClick={() => setDimensionActiva(d.id)}
-            className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
-              dimensionActiva === d.id
-                ? 'border-salazar-500 bg-salazar-800 text-white shadow-sm'
-                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            <ClipboardList className="mr-1 inline h-4 w-4" />
-            Dim. {d.id}: {d.indicador}
-          </button>
-        ))}
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        {DIMENSIONES.map((d) => {
+          const Icon = d.icon;
+          const activa = dimensionActiva === d.id;
+          const valor = indicadores?.[CLAVE_INDICADOR[d.id]];
+          return (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => setDimensionActiva(d.id)}
+              className={`rounded-xl border p-3 text-left transition ${
+                activa ? d.activo + ' shadow-sm' : d.color + ' hover:shadow-sm'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Icon className="h-4 w-4 shrink-0 opacity-90" />
+                <span className="text-xs font-semibold uppercase tracking-wide opacity-90">
+                  Dim. {d.id} · {d.indicador}
+                </span>
+              </div>
+              <p className={`mt-1 text-sm font-medium ${activa ? 'text-white/95' : ''}`}>{d.titulo}</p>
+              <p className={`mt-2 text-2xl font-bold tabular-nums ${activa ? 'text-white' : ''}`}>
+                {valor ?? '—'}
+                <span className="ml-0.5 text-sm font-normal opacity-80">{d.unidad}</span>
+              </p>
+            </button>
+          );
+        })}
       </div>
 
       <div className="table-panel">
-        <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
-          <h3 className="font-semibold text-salazar-900">
-            {tituloDim || dimActual?.titulo} — Vista previa
-          </h3>
-          <p className="text-xs text-slate-500">
-            Últimos {datos.length} registros (máx. 50) · Total en BD: {totalRegistros} · La exportación incluye los mismos {datos.length} registros mostrados
-          </p>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50 px-4 py-3">
+          <div>
+            <h3 className="font-semibold text-salazar-900">
+              {tituloDim || dimActual?.titulo}
+            </h3>
+            <p className="text-xs text-slate-500">
+              Vista previa · {datos.length} de {totalRegistros} registros · Indicador {dimActual?.indicador}:{' '}
+              <strong>{valorIndicador ?? '—'}{dimActual?.unidad === '%' ? '%' : ' min'}</strong>
+            </p>
+          </div>
+          <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200">
+            <ClipboardList className="mr-1 inline h-3 w-3" />
+            Máx. 50 filas en vista
+          </span>
         </div>
         {loading ? (
           <div className="flex h-48 items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-salazar-200 border-t-salazar-800" />
           </div>
         ) : (
-          <div className="table-panel-body">
-            <table className="w-full text-left text-xs">
-              <thead className="sticky top-0 bg-slate-50 uppercase text-slate-500">
+          <div className="table-panel-body overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left text-xs">
+              <thead className="sticky top-0 bg-slate-50 text-slate-600">
                 <tr>
-                  <th className="px-3 py-2.5">N°</th>
-                  {columnas.map((c) => (
-                    <th key={c} className="whitespace-nowrap px-3 py-2.5">
-                      {labelCol(c)}
+                  <th className="whitespace-nowrap px-3 py-2.5 font-semibold">N°</th>
+                  {columnas.map((c, i) => (
+                    <th key={c} className="whitespace-nowrap px-3 py-2.5 font-semibold">
+                      {labelCol(c, i)}
                     </th>
                   ))}
                 </tr>
@@ -228,9 +267,7 @@ const ObservacionPage = () => {
                 {datos.length === 0 && (
                   <tr>
                     <td colSpan={columnas.length + 1} className="px-4 py-10 text-center text-slate-500">
-                      {alcance === 'MUESTRA'
-                        ? 'Sin registros en la muestra. Marque envíos reales como preprueba o posprueba (npm run db:muestra) o cambie el alcance a "Toda la operación".'
-                        : 'Sin registros. Cree envíos e incidencias con área y fuente de información para poblar la ficha.'}
+                      Sin registros en esta dimensión para el alcance seleccionado.
                     </td>
                   </tr>
                 )}
@@ -238,7 +275,7 @@ const ObservacionPage = () => {
                   <tr key={i} className="border-t border-slate-50 hover:bg-slate-50/50">
                     <td className="px-3 py-2 text-slate-400">{i + 1}</td>
                     {columnas.map((c) => (
-                      <td key={c} className="max-w-[200px] truncate px-3 py-2" title={String(row[c] ?? '')}>
+                      <td key={c} className="max-w-[220px] truncate px-3 py-2" title={String(row[c] ?? '')}>
                         {String(row[c] ?? '—')}
                       </td>
                     ))}

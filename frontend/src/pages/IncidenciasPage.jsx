@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import api from '../services/api';
+import { usePresentacion } from '../context/PresentacionContext';
 import PageHeader from '../components/PageHeader';
 import StatChip from '../components/StatChip';
 import Pagination from '../components/Pagination';
@@ -7,6 +8,7 @@ import { formatDateTime } from '../utils/format';
 import { toastSuccess, toastError } from '../utils/alerts';
 import { Plus, Pencil, CheckCircle, X, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import RegistroScopeFilter from '../components/RegistroScopeFilter';
 
 const AREAS = ['Operaciones', 'Almacén', 'Transporte', 'Atención al cliente', 'Administración', 'Otro'];
 const FUENTES = ['Sistema web', 'Llamada telefónica', 'Correo electrónico', 'WhatsApp', 'Documento físico', 'Otro'];
@@ -36,10 +38,12 @@ const estadoBadgeClass = {
 };
 
 const IncidenciasPage = () => {
+  const { presentacionActiva } = usePresentacion();
   const [data, setData] = useState({ data: [], total: 0, page: 1 });
   const [page, setPage] = useState(1);
   const [estadoFilter, setEstadoFilter] = useState('');
   const [tipoFilter, setTipoFilter] = useState('');
+  const [alcance, setAlcance] = useState('todos');
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [envios, setEnvios] = useState([]);
@@ -50,7 +54,7 @@ const IncidenciasPage = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { page, limit: 10 };
+      const params = { page, limit: 10, alcance };
       if (estadoFilter) params.estado = estadoFilter;
       if (tipoFilter) params.tipo = tipoFilter;
       const { data: res } = await api.get('/incidencias', { params });
@@ -60,7 +64,7 @@ const IncidenciasPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, estadoFilter, tipoFilter]);
+  }, [page, estadoFilter, tipoFilter, alcance, presentacionActiva]);
 
   useEffect(() => {
     load();
@@ -68,7 +72,7 @@ const IncidenciasPage = () => {
 
   useEffect(() => {
     api.get('/envios', { params: { limit: 100 } }).then((r) => setEnvios(r.data.data?.data || []));
-  }, []);
+  }, [presentacionActiva]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -157,7 +161,8 @@ const IncidenciasPage = () => {
         <StatChip label="Filtro tipo" value={tipoFilter || 'Todos'} accent="slate" />
       </div>
 
-      <div className="card-compact flex flex-wrap items-center gap-3">
+      <div className="card-compact flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
         <select
           className="input-field w-auto min-w-[160px]"
           value={estadoFilter}
@@ -186,6 +191,8 @@ const IncidenciasPage = () => {
           <option value="observacion">Observación</option>
           <option value="otro">Otro</option>
         </select>
+        </div>
+        <RegistroScopeFilter value={alcance} onChange={(v) => { setAlcance(v); setPage(1); }} />
       </div>
 
       {showForm && (

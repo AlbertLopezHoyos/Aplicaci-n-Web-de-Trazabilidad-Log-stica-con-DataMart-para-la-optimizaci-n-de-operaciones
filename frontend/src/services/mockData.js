@@ -135,6 +135,72 @@ let nextIncidenciaId = 2;
 let nextErrorId = 2;
 let nextReporteId = 2;
 
+const DNI_MASCARADO = '********';
+const TELEFONO_MASCARADO = '*** *** ***';
+
+let mockPresentacionActiva = false;
+let mockMapaAlias = null;
+
+const solicitaPresentacionMock = (config) => {
+  const h = config.headers?.['X-Presentacion-Academica'] ?? config.headers?.['x-presentacion-academica'];
+  return h === '1' || h === 'true';
+};
+
+const buildMockAliasMap = () => {
+  const mapa = new Map();
+  [...clientes].sort((a, b) => a.id_cliente - b.id_cliente).forEach((c, i) => {
+    mapa.set(c.id_cliente, {
+      alias: `Cliente POS-${String(i + 1).padStart(3, '0')}`,
+      tipo_cliente: 'Muestra posprueba (demo)',
+      total_envios: envios.filter((e) => e.id_cliente === c.id_cliente).length,
+    });
+  });
+  return mapa;
+};
+
+const presentarClienteMock = (cliente) => {
+  if (!cliente || !mockMapaAlias) return cliente;
+  const meta = mockMapaAlias.get(cliente.id_cliente);
+  const alias = meta?.alias || `Cliente GEN-${String(cliente.id_cliente).padStart(3, '0')}`;
+  return {
+    id_cliente: cliente.id_cliente,
+    alias_academico: alias,
+    nombre_completo: alias,
+    razon_social: alias,
+    dni: DNI_MASCARADO,
+    telefono: TELEFONO_MASCARADO,
+    activo: true,
+    tipo_cliente: meta?.tipo_cliente || 'Operacional',
+    total_envios: meta?.total_envios ?? 0,
+    datos_anonimizados: true,
+  };
+};
+
+const anonimizarEnvioMock = (envio) => {
+  if (!envio || !mockPresentacionActiva) return envio;
+  return {
+    ...envio,
+    cliente: presentarClienteMock(envio.cliente),
+    datos_anonimizados: true,
+  };
+};
+
+const anonimizarListaEnviosMock = (resultado) => {
+  if (!mockPresentacionActiva || !resultado?.data) return resultado;
+  return { ...resultado, data: resultado.data.map(anonimizarEnvioMock) };
+};
+
+const anonimizarIncidenciaMock = (inc) => {
+  if (!mockPresentacionActiva || !inc?.envio) return inc;
+  const envioBase = envios.find((e) => e.id_envio === inc.id_envio);
+  return {
+    ...inc,
+    envio: envioBase
+      ? anonimizarEnvioMock({ ...envioBase, ...inc.envio })
+      : inc.envio,
+  };
+};
+
 const ok = (data, message = 'OK') => Promise.resolve({ data: { success: true, message, data } });
 
 const parseRequestBody = (config) => {
@@ -278,7 +344,9 @@ const buildMockReportData = (tipo) => {
           .filter((e) => e.estadoActual?.codigo === 'entregado')
           .map((e) => ({
             codigo: e.codigo_envio,
-            cliente: e.cliente?.nombre_completo || e.cliente?.razon_social,
+            cliente: mockPresentacionActiva
+              ? presentarClienteMock(e.cliente).alias_academico
+              : (e.cliente?.nombre_completo || e.cliente?.razon_social),
             registro: e.fecha_registro,
             estimada: '—',
             entrega: e.fecha_registro,
@@ -518,22 +586,44 @@ export const mockHandlers = {
     let list = [...envios];
     if (params.search) {
       const q = params.search.toLowerCase();
-      list = list.filter(
-        (e) =>
+      list = list.filter((e) => {
+        const alias = mockPresentacionActiva
+          ? presentarClienteMock(e.cliente)?.alias_academico?.toLowerCase()
+          : e.cliente?.razon_social?.toLowerCase();
+        return (
           e.codigo_envio.toLowerCase().includes(q) ||
           e.origen.toLowerCase().includes(q) ||
           e.destino.toLowerCase().includes(q) ||
-          e.cliente?.razon_social?.toLowerCase().includes(q)
-      );
+          (alias && alias.includes(q))
+        );
+      });
     }
     if (params.estado) list = list.filter((e) => String(e.id_estado_actual) === String(params.estado));
     if (params.fechaDesde) list = list.filter((e) => e.fecha_registro >= params.fechaDesde);
     if (params.fechaHasta) list = list.filter((e) => e.fecha_registro <= params.fechaHasta);
-    return ok({ data: list, total: list.length, page, limit });
+    return ok(anonimizarListaEnviosMock({ data: list, total: list.length, page, limit }));
   },
 
   'GET /catalogos/estados': () => ok(estados),
   'GET /catalogos/clientes': (config) => {
+    if (mockPresentacionActiva) {
+      const q = (config.params?.search || '').toLowerCase();
+      const limit = Math.min(Number(config.params?.limit) || (q ? 15 : 25), 100);
+      const page = Math.max(1, Number(config.params?.page) || 1);
+      let list = clientes.map((c) => presentarClienteMock(c));
+      if (q) {
+        list = list.filter(
+          (c) =>
+            c.alias_academico.toLowerCase().includes(q) ||
+            String(c.id_cliente).includes(q)
+        );
+      }
+      list.sort((a, b) => a.alias_academico.localeCompare(b.alias_academico));
+      const total = list.length;
+      const offset = (page - 1) * limit;
+      const data = list.slice(offset, offset + limit);
+      return ok({ data, total, page, limit, presentacion_academica: true });
+    }
     const q = (config.params?.search || '').toLowerCase();
     const limit = Math.min(Number(config.params?.limit) || (q ? 15 : 25), 100);
     const page = Math.max(1, Number(config.params?.page) || 1);
@@ -554,7 +644,8 @@ export const mockHandlers = {
   'GET /catalogos/clientes/check-dni': (config) => {
     const dni = String(config.params?.dni || '').replace(/\D/g, '');
     const cliente = clientes.find((c) => c.dni === dni) || null;
-    return ok({ exists: Boolean(cliente), cliente });
+    const vista = cliente && mockPresentacionActiva ? presentarClienteMock(cliente) : cliente;
+    return ok({ exists: Boolean(cliente), cliente: vista });
   },
   'GET /incidencias': (config) => {
     const params = config.params || {};
@@ -564,7 +655,7 @@ export const mockHandlers = {
     const page = Math.max(1, Number(params.page) || 1);
     const limit = Number(params.limit) || list.length;
     const offset = (page - 1) * limit;
-    const data = list.slice(offset, offset + limit);
+    const data = list.slice(offset, offset + limit).map(anonimizarIncidenciaMock);
     return ok({ data, total: list.length, page, limit });
   },
   'GET /reportes/historial': () => ok(reportesHistorial),
@@ -652,6 +743,9 @@ const matchRoute = (method, url) => {
 };
 
 export const handleMockRequest = async (config) => {
+  mockPresentacionActiva = solicitaPresentacionMock(config);
+  mockMapaAlias = mockPresentacionActiva ? buildMockAliasMap() : null;
+
   const method = (config.method || 'get').toLowerCase();
   const path = normalizeMockPath(config.url);
   const body = parseRequestBody(config);
@@ -660,7 +754,7 @@ export const handleMockRequest = async (config) => {
   if (key === 'GET_ENVIO_ID') {
     const envio = envios.find((e) => e.id_envio === Number(path.split('/')[1]));
     if (!envio) return Promise.reject({ response: { data: { message: 'No encontrado' }, status: 404 } });
-    return ok(envio);
+    return ok(anonimizarEnvioMock(envio));
   }
   if (key === 'GET_ENVIO_TIMELINE') {
     const envio = envios.find((e) => e.id_envio === Number(path.split('/')[1]));
@@ -722,7 +816,7 @@ export const handleMockRequest = async (config) => {
       }],
     };
     envios.unshift(nuevo);
-    return ok(nuevo, 'Envío registrado (demo)');
+    return ok(anonimizarEnvioMock(nuevo), 'Envío registrado (demo)');
   }
 
   if (method === 'put' && path.match(/^envios\/\d+$/)) {

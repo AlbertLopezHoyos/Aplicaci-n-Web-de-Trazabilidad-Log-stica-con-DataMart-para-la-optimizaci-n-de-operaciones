@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const { sequelize, Reporte, Envio, Incidencia, Cliente } = require('../models');
 const { QueryTypes, Op } = require('sequelize');
+const anonimizacion = require('./anonimizacion.service');
 
 const reportsDir = path.join(__dirname, '../../uploads/reportes');
 if (!fs.existsSync(reportsDir)) fs.mkdirSync(reportsDir, { recursive: true });
@@ -59,9 +60,10 @@ const diasEntre = (desde, hasta) => {
   return Math.round((b - a) / 86400000);
 };
 
-const buildReporteData = async (tipo) => {
+const buildReporteData = async (tipo, { presentacionAcademica = false } = {}) => {
   let filas = [];
   let titulo = '';
+  const mapa = presentacionAcademica ? await anonimizacion.cargarMapaAlias() : null;
 
   switch (tipo) {
     case 'envios_estado':
@@ -75,18 +77,26 @@ const buildReporteData = async (tipo) => {
     case 'tiempos':
       filas = (await Envio.findAll({
         where: { fecha_entrega_real: { [Op.ne]: null }, activo: true },
-        attributes: ['codigo_envio', 'fecha_registro', 'fecha_entrega_real', 'fecha_estimada_entrega'],
-        include: [{ model: Cliente, as: 'cliente', attributes: ['razon_social'] }],
+        attributes: ['codigo_envio', 'fecha_registro', 'fecha_entrega_real', 'fecha_estimada_entrega', 'id_cliente'],
+        include: [{ model: Cliente, as: 'cliente', attributes: ['id_cliente', 'razon_social'] }],
         limit: 500,
         order: [['fecha_entrega_real', 'DESC']],
-      })).map((e) => ({
-        codigo: e.codigo_envio,
-        cliente: e.cliente?.razon_social,
-        registro: e.fecha_registro,
-        estimada: e.fecha_estimada_entrega,
-        entrega: e.fecha_entrega_real,
-        dias: diasEntre(e.fecha_registro, e.fecha_entrega_real),
-      }));
+      })).map(async (e) => {
+        let nombreCliente = e.cliente?.razon_social;
+        if (presentacionAcademica && e.cliente) {
+          nombreCliente = mapa.get(e.cliente.id_cliente)?.alias
+            || anonimizacion.presentarCliente(e.cliente, mapa).alias_academico;
+        }
+        return {
+          codigo: e.codigo_envio,
+          cliente: nombreCliente,
+          registro: e.fecha_registro,
+          estimada: e.fecha_estimada_entrega,
+          entrega: e.fecha_entrega_real,
+          dias: diasEntre(e.fecha_registro, e.fecha_entrega_real),
+        };
+      });
+      filas = await Promise.all(filas);
       titulo = 'Reporte de tiempos de entrega';
       break;
     case 'incidencias':
@@ -125,9 +135,9 @@ const buildReporteData = async (tipo) => {
   };
 };
 
-const generar = async ({ tipo, formato, titulo, userId, area_solicitante, observaciones }) => {
+const generar = async ({ tipo, formato, titulo, userId, area_solicitante, observaciones, presentacionAcademica = false }) => {
   const horaInicio = new Date();
-  const datos = await buildReporteData(tipo);
+  const datos = await buildReporteData(tipo, { presentacionAcademica });
   if (titulo) datos.titulo = titulo;
 
   const horaFin = new Date();
@@ -159,7 +169,7 @@ const generar = async ({ tipo, formato, titulo, userId, area_solicitante, observ
   };
 };
 
-const getDatos = (tipo) => buildReporteData(tipo);
+const getDatos = (tipo, opciones = {}) => buildReporteData(tipo, opciones);
 
 const listHistorial = (userId, isAdmin) =>
   Reporte.findAll({

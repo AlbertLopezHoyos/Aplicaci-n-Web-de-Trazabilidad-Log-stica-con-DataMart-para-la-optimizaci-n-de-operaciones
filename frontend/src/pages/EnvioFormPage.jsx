@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import api from '../services/api';
+import { usePresentacion } from '../context/PresentacionContext';
 import PageHeader from '../components/PageHeader';
 import ClienteAutocomplete from '../components/ClienteAutocomplete';
 import StatChip from '../components/StatChip';
@@ -42,6 +43,7 @@ const validarEnvio = (form) => {
 
 const EnvioFormPage = () => {
   const { id } = useParams();
+  const { presentacionActiva } = usePresentacion();
   const navigate = useNavigate();
   const isEdit = Boolean(id);
   const horaInicioRef = useRef(new Date().toISOString());
@@ -80,6 +82,12 @@ const EnvioFormPage = () => {
     setNuevoCliente(emptyNuevoCliente);
     setClienteDuplicado(null);
   }, []);
+
+  useEffect(() => {
+    if (presentacionActiva && clienteMode === 'nuevo') {
+      switchToBuscar();
+    }
+  }, [presentacionActiva, clienteMode, switchToBuscar]);
 
   useEffect(() => {
     if (!isEdit) horaInicioRef.current = new Date().toISOString();
@@ -452,7 +460,7 @@ const EnvioFormPage = () => {
                   <span className="flex h-6 w-6 items-center justify-center rounded-full bg-salazar-800 text-xs font-bold text-white">1</span>
                   Cliente
                 </h3>
-                {!isEdit && (
+                {!isEdit && !presentacionActiva && (
                   <div className="flex gap-1 rounded-lg border border-slate-200 p-0.5 text-xs">
                     <button
                       type="button"
@@ -490,13 +498,15 @@ const EnvioFormPage = () => {
                   />
                   {!isEdit && !selectedCliente && (
                     <p className="text-xs text-slate-500">
-                      Búsqueda optimizada para miles de clientes: use DNI completo o nombre parcial.
+                      {presentacionActiva
+                        ? 'Busque por alias del cliente. Los datos personales están ocultos.'
+                        : 'Búsqueda optimizada para miles de clientes: use DNI completo o nombre parcial.'}
                     </p>
                   )}
                 </>
               )}
 
-              {clienteMode === 'nuevo' && !isEdit && !selectedCliente && (
+              {clienteMode === 'nuevo' && !isEdit && !selectedCliente && !presentacionActiva && (
                 <>
                   {clienteDuplicado && (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
