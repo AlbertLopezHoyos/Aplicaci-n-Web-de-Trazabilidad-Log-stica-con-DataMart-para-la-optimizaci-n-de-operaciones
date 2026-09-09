@@ -120,6 +120,7 @@ let incidencias = [
     informacion_completa: true,
     titulo: 'Retraso por obras viales',
     descripcion: 'Demora estimada 24h.',
+    observacion: null,
     estado_incidencia: 'abierta',
     fecha_reporte: '2026-05-26T11:00:00',
     envio: { codigo_envio: 'GLS-2026-00003' },
@@ -289,9 +290,11 @@ const buildFichaInformacionOperativa = () =>
     area: i.area,
     codigo_envio: i.envio?.codigo_envio || null,
     estado_incidencia: i.estado_incidencia,
+    titulo: i.titulo,
+    descripcion: i.descripcion,
     informacion_completa: i.informacion_completa ? 'Sí' : 'No',
     fuente_principal: i.fuente_principal,
-    observacion: i.descripcion,
+    observacion: i.observacion || null,
   }));
 
 const buildMockReportData = (tipo) => {
@@ -430,11 +433,13 @@ const FICHA_CONFIG = {
     indicador: 'PIOIC',
     columnas: [
       'fecha', 'codigo_incidencia', 'tipo_incidencia', 'area', 'codigo_envio',
-      'estado_incidencia', 'informacion_completa', 'fuente_principal', 'observacion',
+      'estado_incidencia', 'titulo', 'descripcion', 'informacion_completa',
+      'fuente_principal', 'observacion',
     ],
     labels: [
-      'Fecha', 'Código incidencia', 'Tipo incidencia', 'Área', 'Código envío (si aplica)',
-      'Estado incidencia', 'Información completa (Sí/No)', 'Fuente principal de información', 'Observación',
+      'Fecha', 'Código incidencia', 'Tipo incidencia', 'Área', 'Código envío',
+      'Estado incidencia', 'Título', 'Descripción', 'Información completa (Sí/No)',
+      'Fuente principal de información', 'Observación',
     ],
   },
 };

@@ -54,6 +54,8 @@ CALL sp_add_column_if_missing('incidencias', 'origen_dato',
   "ENUM('REAL','SINTETICO') NOT NULL DEFAULT 'REAL' COMMENT 'Procedencia del registro'");
 CALL sp_add_column_if_missing('incidencias', 'grupo_muestra',
   "ENUM('PREPRUEBA','POSPRUEBA','NO_MUESTRA') NOT NULL DEFAULT 'NO_MUESTRA' COMMENT 'Grupo de la muestra de investigacion'");
+CALL sp_add_column_if_missing('incidencias', 'observacion',
+  "TEXT NULL COMMENT 'Observacion de ficha Dim. 4. No interviene en PIOIC'");
 
 -- La tabla de hechos arrastra el origen para que Power BI pueda separar
 -- los datos sintéticos de prueba de los datos reales.
@@ -247,9 +249,18 @@ SELECT
   i.area,
   e.codigo_envio,
   i.estado_incidencia,
-  IF(i.informacion_completa = 1, 'Sí', 'No') AS informacion_completa,
+  i.titulo,
+  i.descripcion,
+  IF(
+    TRIM(COALESCE(i.tipo, '')) <> '' AND
+    TRIM(COALESCE(i.area, '')) <> '' AND
+    TRIM(COALESCE(i.titulo, '')) <> '' AND
+    TRIM(COALESCE(i.descripcion, '')) <> '' AND
+    TRIM(COALESCE(i.fuente_principal, '')) <> '',
+    'Sí', 'No'
+  ) AS informacion_completa,
   i.fuente_principal,
-  i.descripcion AS observacion,
+  i.observacion,
   i.origen_dato,
   i.grupo_muestra
 FROM incidencias i

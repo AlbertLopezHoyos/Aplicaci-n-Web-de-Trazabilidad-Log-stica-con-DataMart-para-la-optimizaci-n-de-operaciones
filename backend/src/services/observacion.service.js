@@ -81,12 +81,30 @@ const DIMENSIONES = {
     indicador: 'PIOIC',
     vista: 'vw_ficha_informacion_operativa',
     columnas: [
-      'fecha', 'codigo_incidencia', 'tipo_incidencia', 'area', 'codigo_envio',
-      'estado_incidencia', 'informacion_completa', 'fuente_principal', 'observacion',
+      'fecha',
+      'codigo_incidencia',
+      'tipo_incidencia',
+      'area',
+      'codigo_envio',
+      'estado_incidencia',
+      'titulo',
+      'descripcion',
+      'informacion_completa',
+      'fuente_principal',
+      'observacion',
     ],
     labels: [
-      'Fecha', 'Código incidencia', 'Tipo incidencia', 'Área', 'Código envío (si aplica)',
-      'Estado incidencia', 'Información completa (Sí/No)', 'Fuente principal de información', 'Observación',
+      'Fecha',
+      'Código incidencia',
+      'Tipo incidencia',
+      'Área',
+      'Código envío',
+      'Estado incidencia',
+      'Título',
+      'Descripción',
+      'Información completa (Sí/No)',
+      'Fuente principal de información',
+      'Observación',
     ],
   },
 };
@@ -112,15 +130,22 @@ const normalizarGrupo = (grupo) => {
  * sintéticos cargados para las pruebas técnicas del DataMart.
  * `alias` es el alias de la tabla envios o incidencias en la consulta.
  */
-const filtroMuestra = (alias, { alcance, grupo } = {}) => {
+const filtroMuestra = (alias, { alcance, grupo, enVentana = false } = {}) => {
   const modo = normalizarAlcance(alcance);
   if (modo === ALCANCE.TODOS) return { sql: '1 = 1', replacements: {} };
   const grupoNormalizado = normalizarGrupo(grupo);
   const grupos = grupoNormalizado ? [grupoNormalizado] : GRUPOS_MUESTRA_VALIDOS;
-  return {
-    sql: `${alias}.origen_dato = :origenReal AND ${alias}.grupo_muestra IN (:gruposMuestra)`,
-    replacements: { origenReal: ORIGEN_DATO.REAL, gruposMuestra: grupos },
-  };
+  const replacements = { origenReal: ORIGEN_DATO.REAL, gruposMuestra: grupos };
+  let sql = `${alias}.origen_dato = :origenReal AND ${alias}.grupo_muestra IN (:gruposMuestra)`;
+  if (enVentana && grupoNormalizado) {
+    const ventana = VENTANAS_MEDICION[grupoNormalizado];
+    if (ventana) {
+      sql += ` AND e.fecha_registro BETWEEN :ventanaDesde AND :ventanaHasta`;
+      replacements.ventanaDesde = ventana.desde;
+      replacements.ventanaHasta = ventana.hasta;
+    }
+  }
+  return { sql, replacements };
 };
 
 // -----------------------------------------------------------------------------
@@ -149,7 +174,7 @@ const sqlFicha = (dimension, filtro) => {
             FROM envios e
             LEFT JOIN usuarios u ON e.id_responsable = u.id_usuario
             WHERE e.activo = 1 AND ${filtro.sql}
-            ORDER BY e.fecha_registro DESC, e.id_envio DESC`;
+            ORDER BY e.fecha_registro ASC, e.id_envio ASC`;
   }
   if (dimension === 2) {
     return `SELECT e.codigo_envio, e.fecha_registro AS fecha, e.tipo_carga AS tipo_mercaderia,
@@ -166,7 +191,7 @@ const sqlFicha = (dimension, filtro) => {
               FROM errores_registro WHERE id_envio IS NOT NULL GROUP BY id_envio
             ) er ON er.id_envio = e.id_envio
             WHERE e.activo = 1 AND ${filtro.sql}
-            ORDER BY e.fecha_registro DESC, e.id_envio DESC`;
+            ORDER BY e.fecha_registro ASC, e.id_envio ASC`;
   }
   if (dimension === 3) {
     return `SELECT e.codigo_envio, e.fecha_registro AS fecha, e.tipo_carga AS tipo_mercaderia,
@@ -181,23 +206,23 @@ const sqlFicha = (dimension, filtro) => {
             ${SQL_ULTIMO_HISTORIAL}
             LEFT JOIN usuarios u ON ult.id_usuario = u.id_usuario
             WHERE e.activo = 1 AND ${filtro.sql}
-            ORDER BY e.fecha_registro DESC, e.id_envio DESC`;
+            ORDER BY e.fecha_registro ASC, e.id_envio ASC`;
   }
   return `SELECT DATE(i.fecha_reporte) AS fecha, i.codigo_incidencia,
                  i.tipo AS tipo_incidencia, i.area, e.codigo_envio,
-                 i.estado_incidencia,
+                 i.estado_incidencia, i.titulo, i.descripcion,
                  IF(${SQL_INCIDENCIA_COMPLETA}, 'Sí', 'No') AS informacion_completa,
-                 i.fuente_principal, i.descripcion AS observacion
+                 i.fuente_principal, i.observacion
           FROM incidencias i
           JOIN envios e ON e.id_envio = i.id_envio
           WHERE e.activo = 1 AND ${filtro.sql}
-          ORDER BY i.fecha_reporte DESC, i.id_incidencia DESC`;
+          ORDER BY e.fecha_registro ASC, i.id_incidencia ASC`;
 };
 
 const getDatosDimension = async (dimension, { limit = null, alcance, grupo } = {}) => {
   const config = DIMENSIONES[dimension];
   if (!config) throw Object.assign(new Error('Dimensión no válida'), { statusCode: 400 });
-  const filtro = filtroMuestra('e', { alcance, grupo });
+  const filtro = filtroMuestra('e', { alcance, grupo, enVentana: true });
   let sql = sqlFicha(dimension, filtro);
   const cap = limit ? Math.max(1, Math.min(Number(limit) || FICHA_MUESTRA, 500)) : null;
   if (cap) sql += ` LIMIT ${cap}`;
@@ -207,7 +232,7 @@ const getDatosDimension = async (dimension, { limit = null, alcance, grupo } = {
 const countDatosDimension = async (dimension, { alcance, grupo } = {}) => {
   const config = DIMENSIONES[dimension];
   if (!config) return 0;
-  const filtro = filtroMuestra('e', { alcance, grupo });
+  const filtro = filtroMuestra('e', { alcance, grupo, enVentana: true });
   const tabla = dimension === 4
     ? `FROM incidencias i JOIN envios e ON e.id_envio = i.id_envio WHERE e.activo = 1 AND ${filtro.sql}`
     : `FROM envios e WHERE e.activo = 1 AND ${filtro.sql}`;

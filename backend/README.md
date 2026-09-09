@@ -25,7 +25,8 @@ cp .env.example .env
 2. Ejecutar `database/scripts/02_medicion_fichas.sql` (campos fichas observación)
 3. Ejecutar `database/scripts/03_dimension4_gestion_informacion.sql` (dimensión 4, PIOIC)
 4. Ejecutar `database/scripts/07_muestra_investigacion.sql` (separación muestra / datos sintéticos y bitácora ETL)
-5. Ejecutar seeder:
+5. Ejecutar `database/scripts/08_incidencia_observacion.sql` (campo opcional `observacion` de la ficha 4; no altera PIOIC)
+6. Ejecutar seeder:
 
 ```bash
 npm run db:seed
@@ -124,7 +125,8 @@ El script solo clasifica registros existentes; nunca genera datos ni admite regi
 
 Centralizadas en `src/utils/reglasIndicadores.js`. Ahí se define, entre otras cosas, qué campos hacen
 que una incidencia se considere completa para PIOIC (`tipo`, `area`, `titulo`, `descripcion`,
-`fuente_principal`). La expresión SQL equivalente se genera desde la misma constante, de modo que
+`fuente_principal`). La ficha 4 muestra además `observacion` como campo opcional de evidencia;
+ese texto **no** entra en PIOIC. La expresión SQL equivalente se genera desde la misma constante, de modo que
 backend, fichas y reportes no puedan divergir. Ver [../docs/ALINEACION_TESIS.md](../docs/ALINEACION_TESIS.md).
 
 ## Pruebas

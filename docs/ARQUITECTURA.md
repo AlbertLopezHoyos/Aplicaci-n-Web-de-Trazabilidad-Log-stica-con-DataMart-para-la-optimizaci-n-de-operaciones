@@ -149,7 +149,9 @@ Esquema estrella descrito en detalle en [KIMBALL.md](./KIMBALL.md).
 
 `vw_ficha_eficiencia`, `vw_ficha_calidad`, `vw_ficha_control`, `vw_ficha_informacion_operativa` y
 `vw_ficha_reportes` exponen las fichas de observación con las columnas `origen_dato` y
-`grupo_muestra`, para consulta directa desde MySQL Workbench o Power BI. La API no depende de ellas:
+`grupo_muestra`, para consulta directa desde MySQL Workbench o Power BI. La vista de la dimensión 4
+expone `titulo`, `descripcion` y `observacion` por separado; PIOIC no usa `observacion`.
+La API no depende de ellas:
 `observacion.service.js` construye su propio SQL parametrizado, de modo que una base sin vistas sigue
 funcionando.
 

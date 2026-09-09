@@ -56,12 +56,14 @@ const DIMENSIONES = [
 ];
 
 const CLAVE_INDICADOR = { 1: 'tpre', 2: 'per', 3: 'peea', 4: 'pioic' };
+const ALCANCE_FICHA = 'MUESTRA';
+const GRUPO_FICHA = 'POSPRUEBA';
+const VENTANA_FICHA = { desde: '2026-09-01', hasta: '2026-09-20' };
 
 const ObservacionPage = () => {
   const { isAdmin } = useAuth();
   const [indicadores, setIndicadores] = useState(null);
   const [dimensionActiva, setDimensionActiva] = useState(1);
-  const [alcance, setAlcance] = useState('TODOS');
   const [datos, setDatos] = useState([]);
   const [columnas, setColumnas] = useState([]);
   const [labels, setLabels] = useState([]);
@@ -70,17 +72,19 @@ const ObservacionPage = () => {
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  const loadIndicadores = (modo) => {
+  const paramsFicha = { alcance: ALCANCE_FICHA, grupo: GRUPO_FICHA };
+
+  const loadIndicadores = () => {
     api
-      .get('/observacion/indicadores', { params: { alcance: modo } })
+      .get('/observacion/indicadores', { params: paramsFicha })
       .then((r) => setIndicadores(r.data.data))
       .catch(() => {});
   };
 
-  const loadDimension = (dim, modo) => {
+  const loadDimension = (dim) => {
     setLoading(true);
     api
-      .get(`/observacion/ficha/${dim}`, { params: { alcance: modo } })
+      .get(`/observacion/ficha/${dim}`, { params: paramsFicha })
       .then((r) => {
         const payload = r.data.data || {};
         setDatos(payload.data || []);
@@ -94,17 +98,17 @@ const ObservacionPage = () => {
   };
 
   useEffect(() => {
-    loadIndicadores(alcance);
-  }, [alcance]);
+    loadIndicadores();
+  }, []);
 
   useEffect(() => {
-    loadDimension(dimensionActiva, alcance);
-  }, [dimensionActiva, alcance]);
+    loadDimension(dimensionActiva);
+  }, [dimensionActiva]);
 
   const exportar = async (dim) => {
     setExporting(true);
     try {
-      const { data } = await api.get(`/observacion/ficha/${dim}/export`, { params: { alcance } });
+      const { data } = await api.get(`/observacion/ficha/${dim}/export`, { params: paramsFicha });
       const payload = data.data || {};
       await exportFichaExcel({
         titulo: payload.titulo,
@@ -134,7 +138,7 @@ const ObservacionPage = () => {
     <div className="page-shell">
       <PageHeader
         title="Fichas de observación"
-        subtitle="Consulta y exportación de evidencia por dimensión — uso operativo diario"
+        subtitle="50 envíos de posprueba · 1 al 20 de septiembre de 2026"
         compact
         action={
           <button
@@ -157,7 +161,8 @@ const ObservacionPage = () => {
         <p className="flex items-start gap-2">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-salazar-700" />
           <span>
-            Revise y exporte las fichas de cada indicador (TPRE, PER, PEEA, PIOIC).
+            Estas fichas muestran únicamente los 50 registros reales de posprueba
+            (1–20 set 2026). No se incluyen datos sintéticos del DataMart.
             {isAdmin && (
               <>
                 {' '}
@@ -172,33 +177,11 @@ const ObservacionPage = () => {
         </p>
       </div>
 
-      {isAdmin && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-slate-500">Alcance:</span>
-          <button
-            type="button"
-            onClick={() => setAlcance('MUESTRA')}
-            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-              alcance === 'MUESTRA'
-                ? 'border-salazar-500 bg-salazar-800 text-white'
-                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            Muestra de investigación
-          </button>
-          <button
-            type="button"
-            onClick={() => setAlcance('TODOS')}
-            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-              alcance === 'TODOS'
-                ? 'border-salazar-500 bg-salazar-800 text-white'
-                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            Toda la operación
-          </button>
-        </div>
-      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="rounded-full bg-salazar-50 px-3 py-1.5 text-xs font-medium text-salazar-800 ring-1 ring-salazar-200">
+          Posprueba · {VENTANA_FICHA.desde} a {VENTANA_FICHA.hasta} · máx. 50 registros
+        </span>
+      </div>
 
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         {DIMENSIONES.map((d) => {
@@ -237,13 +220,13 @@ const ObservacionPage = () => {
               {tituloDim || dimActual?.titulo}
             </h3>
             <p className="text-xs text-slate-500">
-              Vista previa · {datos.length} de {totalRegistros} registros · Indicador {dimActual?.indicador}:{' '}
+              Vista previa · {datos.length} de {totalRegistros} en posprueba (1–20 set 2026) · Indicador {dimActual?.indicador}:{' '}
               <strong>{valorIndicador ?? '—'}{dimActual?.unidad === '%' ? '%' : ' min'}</strong>
             </p>
           </div>
           <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200">
             <ClipboardList className="mr-1 inline h-3 w-3" />
-            Máx. 50 filas en vista
+            50 envíos · 1–20 set 2026
           </span>
         </div>
         {loading ? (
@@ -267,7 +250,7 @@ const ObservacionPage = () => {
                 {datos.length === 0 && (
                   <tr>
                     <td colSpan={columnas.length + 1} className="px-4 py-10 text-center text-slate-500">
-                      Sin registros en esta dimensión para el alcance seleccionado.
+                      Sin registros de posprueba en la ventana 1–20 set 2026.
                     </td>
                   </tr>
                 )}

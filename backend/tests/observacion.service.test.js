@@ -143,10 +143,27 @@ describe('criterio PIOIC en SQL', () => {
     ['tipo', 'area', 'titulo', 'descripcion', 'fuente_principal'].forEach((campo) => {
       expect(sql).toContain(`i.\`${campo}\``);
     });
+    expect(sql).not.toContain('observacion');
   });
 });
 
 describe('fichas de observación', () => {
+  it('la ficha de posprueba se limita a 50 registros dentro de la ventana 1–20 set 2026', async () => {
+    sequelize.query.mockResolvedValueOnce([]);
+    await observacionService.getDatosDimension(1, { limit: 50, grupo: 'POSPRUEBA' });
+    const sql = sqlDeLlamada(0);
+    expect(sql).toContain('origen_dato = :origenReal');
+    expect(sql).toContain('grupo_muestra IN (:gruposMuestra)');
+    expect(sql).toContain('fecha_registro BETWEEN :ventanaDesde AND :ventanaHasta');
+    expect(sql).toContain('LIMIT 50');
+    expect(replacementsDeLlamada(0)).toEqual({
+      origenReal: 'REAL',
+      gruposMuestra: ['POSPRUEBA'],
+      ventanaDesde: '2026-09-01',
+      ventanaHasta: '2026-09-20',
+    });
+  });
+
   it('la ficha de la dimensión 4 se construye sobre incidencias de la muestra', async () => {
     sequelize.query.mockResolvedValueOnce([]);
     await observacionService.getDatosDimension(4, { limit: 50 });
@@ -154,6 +171,83 @@ describe('fichas de observación', () => {
     expect(sql).toContain('FROM incidencias i');
     expect(sql).toContain('origen_dato = :origenReal');
     expect(sql).toContain('LIMIT 50');
+  });
+
+  it('la ficha 4 expone titulo, descripcion y observacion como columnas independientes', async () => {
+    const dim4 = observacionService.DIMENSIONES[4];
+    expect(dim4.columnas).toEqual([
+      'fecha',
+      'codigo_incidencia',
+      'tipo_incidencia',
+      'area',
+      'codigo_envio',
+      'estado_incidencia',
+      'titulo',
+      'descripcion',
+      'informacion_completa',
+      'fuente_principal',
+      'observacion',
+    ]);
+    expect(dim4.labels).toEqual([
+      'Fecha',
+      'Código incidencia',
+      'Tipo incidencia',
+      'Área',
+      'Código envío',
+      'Estado incidencia',
+      'Título',
+      'Descripción',
+      'Información completa (Sí/No)',
+      'Fuente principal de información',
+      'Observación',
+    ]);
+
+    sequelize.query.mockResolvedValueOnce([]);
+    await observacionService.getDatosDimension(4);
+    const sql = sqlDeLlamada(0);
+    expect(sql).toContain('i.titulo');
+    expect(sql).toContain('i.descripcion');
+    expect(sql).toContain('i.observacion');
+    expect(sql).not.toMatch(/i\.descripcion\s+AS\s+observacion/i);
+  });
+
+  it('la exportación de la ficha 4 usa las mismas columnas y no nombra descripción como observación', async () => {
+    sequelize.query
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ total: 0 }])
+      .mockResolvedValueOnce([{ ner: 0, suma_tre: 0 }])
+      .mockResolvedValueOnce([{ treg: 0, rce: 0 }])
+      .mockResolvedValueOnce([{ tee: 0, eea: 0 }])
+      .mockResolvedValueOnce([{ ntir: 0, nioc: 0 }]);
+
+    const payload = await observacionService.buildExportPayload(4);
+    expect(payload.headers.map((h) => h.key)).toEqual(observacionService.DIMENSIONES[4].columnas);
+    expect(payload.headers.map((h) => h.label)).toEqual(observacionService.DIMENSIONES[4].labels);
+    expect(payload.headers.find((h) => h.key === 'descripcion').label).toBe('Descripción');
+    expect(payload.headers.find((h) => h.key === 'observacion').label).toBe('Observación');
+  });
+
+  it('las dimensiones 1, 2 y 3 siguen consultando envíos y no cambian de columnas', async () => {
+    expect(observacionService.DIMENSIONES[1].indicador).toBe('TPRE');
+    expect(observacionService.DIMENSIONES[2].indicador).toBe('PER');
+    expect(observacionService.DIMENSIONES[3].indicador).toBe('PEEA');
+    expect(observacionService.DIMENSIONES[1].columnas).toContain('tiempo_registro_min');
+    expect(observacionService.DIMENSIONES[2].columnas).toContain('error_en_registro');
+    expect(observacionService.DIMENSIONES[3].columnas).toContain('estado_actualizado');
+    expect(observacionService.DIMENSIONES[1].columnas).not.toContain('codigo_incidencia');
+    expect(observacionService.DIMENSIONES[2].columnas).not.toContain('codigo_incidencia');
+    expect(observacionService.DIMENSIONES[3].columnas).not.toContain('codigo_incidencia');
+
+    sequelize.query.mockResolvedValue([]);
+    await observacionService.getDatosDimension(1);
+    await observacionService.getDatosDimension(2);
+    await observacionService.getDatosDimension(3);
+    expect(sqlDeLlamada(0)).toContain('FROM envios e');
+    expect(sqlDeLlamada(1)).toContain('FROM envios e');
+    expect(sqlDeLlamada(2)).toContain('FROM envios e');
+    expect(sqlDeLlamada(0)).not.toContain('FROM incidencias');
+    expect(sqlDeLlamada(1)).not.toContain('FROM incidencias');
+    expect(sqlDeLlamada(2)).not.toContain('FROM incidencias');
   });
 
   it('rechaza dimensiones fuera del rango 1-4', async () => {

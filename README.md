@@ -72,6 +72,7 @@ Ejecutar en MySQL Workbench, en este orden:
 2. `backend/database/scripts/02_medicion_fichas.sql`
 3. `backend/database/scripts/03_dimension4_gestion_informacion.sql`
 4. `backend/database/scripts/07_muestra_investigacion.sql`
+5. `backend/database/scripts/08_incidencia_observacion.sql` (ficha 4: Título, Descripción y Observación por separado; PIOIC no usa Observación)
 
 O bien, en Windows con el cliente de MySQL instalado, todo el pipeline de una vez:
 
@@ -113,7 +114,7 @@ Web: `http://localhost:5173`
 6. **Incidencias** — Errores, retrasos, severidad, estados  
 7. **Reportes** — envios_estado, tiempos, incidencias, productividad (PDF/Excel)  
 8. **Evidencias** — Multer: imágenes, PDF, comprobantes  
-9. **Fichas de evidencia** — Una ficha por dimensión (TPRE, PER, PEEA, PIOIC), exportables a Excel  
+9. **Fichas de evidencia** — Una ficha por dimensión (TPRE, PER, PEEA, PIOIC), exportables a Excel. La ficha 4 incluye Título, Descripción y Observación por separado; PIOIC solo usa los cinco campos obligatorios.  
 10. **Medición de investigación** — Preprueba y posprueba por separado (solo Administrador)  
 11. **DataMart** — Esquema estrella, ETL idempotente con bitácora, KPIs analíticos  
 

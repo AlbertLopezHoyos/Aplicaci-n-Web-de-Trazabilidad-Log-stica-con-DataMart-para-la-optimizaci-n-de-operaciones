@@ -28,6 +28,7 @@ const emptyCreateForm = {
   fuente_principal: '',
   titulo: '',
   descripcion: '',
+  observacion: '',
 };
 
 const estadoBadgeClass = {
@@ -98,6 +99,7 @@ const IncidenciasPage = () => {
       fuente_principal: inc.fuente_principal || '',
       titulo: inc.titulo,
       descripcion: inc.descripcion,
+      observacion: inc.observacion || '',
       estado_incidencia: inc.estado_incidencia,
       resolucion: inc.resolucion || '',
     });
@@ -114,6 +116,7 @@ const IncidenciasPage = () => {
       fuente_principal: inc.fuente_principal || '',
       titulo: inc.titulo,
       descripcion: inc.descripcion,
+      observacion: inc.observacion || '',
       estado_incidencia: 'resuelta',
       resolucion: '',
     });
@@ -252,7 +255,7 @@ const IncidenciasPage = () => {
           </div>
           <input
             className="input-field"
-            placeholder="Título"
+            placeholder="Título *"
             value={form.titulo}
             onChange={(e) => setForm((f) => ({ ...f, titulo: e.target.value }))}
             required
@@ -260,13 +263,21 @@ const IncidenciasPage = () => {
           <textarea
             className="input-field"
             rows={3}
-            placeholder="Observación / descripción detallada"
+            placeholder="Descripción de lo ocurrido *"
             value={form.descripcion}
             onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))}
             required
           />
+          <textarea
+            className="input-field"
+            rows={2}
+            placeholder="Observación de ficha (opcional)"
+            value={form.observacion}
+            onChange={(e) => setForm((f) => ({ ...f, observacion: e.target.value }))}
+          />
           <p className="text-xs text-slate-500">
-            Información completa (PIOIC): requiere tipo, área, fuente, título y descripción.
+            Información completa (PIOIC) se determina solo con: tipo, área, título, descripción y fuente principal.
+            La observación de la ficha es opcional y no entra en el cálculo.
           </p>
           <button type="submit" className="btn-primary">
             Registrar
@@ -344,11 +355,21 @@ const IncidenciasPage = () => {
             <textarea
               className="input-field"
               rows={2}
-              placeholder="Descripción"
+              placeholder="Descripción de lo ocurrido *"
               value={editForm.descripcion}
               onChange={(e) => setEditForm((f) => ({ ...f, descripcion: e.target.value }))}
               required
             />
+            <textarea
+              className="input-field"
+              rows={2}
+              placeholder="Observación de ficha (opcional)"
+              value={editForm.observacion}
+              onChange={(e) => setEditForm((f) => ({ ...f, observacion: e.target.value }))}
+            />
+            <p className="text-xs text-slate-500">
+              PIOIC usa solo tipo, área, título, descripción y fuente principal. La observación no determina completitud.
+            </p>
             <select
               className="input-field"
               value={editForm.estado_incidencia}

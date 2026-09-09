@@ -103,6 +103,7 @@ CREATE TABLE incidencias (
   severidad ENUM('baja','media','alta','critica') DEFAULT 'media',
   titulo VARCHAR(200) NOT NULL,
   descripcion TEXT NOT NULL,
+  observacion TEXT NULL,
   estado_incidencia ENUM('abierta','en_revision','resuelta','cerrada') DEFAULT 'abierta',
   fecha_reporte DATETIME DEFAULT CURRENT_TIMESTAMP,
   fecha_resolucion DATETIME NULL,

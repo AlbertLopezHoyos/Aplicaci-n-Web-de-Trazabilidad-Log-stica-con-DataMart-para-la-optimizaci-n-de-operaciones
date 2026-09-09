@@ -33,7 +33,7 @@ const list = async ({ page = 1, limit = 10, tipo, estado, id_envio, presentacion
 };
 
 const create = async (data, userId) => {
-  const clean = sanitizeObject(data, ['titulo', 'descripcion', 'resolucion', 'area', 'fuente_principal']);
+  const clean = sanitizeObject(data, ['titulo', 'descripcion', 'observacion', 'resolucion', 'area', 'fuente_principal']);
   const codigo_incidencia = await generarCodigoIncidencia();
   const informacion_completa = evaluarInformacionCompleta(clean);
   return Incidencia.create({
@@ -47,7 +47,7 @@ const create = async (data, userId) => {
 const update = async (id, data) => {
   const inc = await Incidencia.findByPk(id);
   if (!inc) throw Object.assign(new Error('Incidencia no encontrada'), { statusCode: 404 });
-  const clean = sanitizeObject(data, ['titulo', 'descripcion', 'resolucion', 'area', 'fuente_principal']);
+  const clean = sanitizeObject(data, ['titulo', 'descripcion', 'observacion', 'resolucion', 'area', 'fuente_principal']);
   if (clean.estado_incidencia === 'resuelta' || clean.estado_incidencia === 'cerrada') {
     clean.fecha_resolucion = clean.fecha_resolucion || new Date();
   }

@@ -19,6 +19,7 @@ const Incidencia = sequelize.define('incidencias', {
   },
   titulo: { type: DataTypes.STRING(200), allowNull: false },
   descripcion: { type: DataTypes.TEXT, allowNull: false },
+  observacion: { type: DataTypes.TEXT, allowNull: true },
   estado_incidencia: {
     type: DataTypes.ENUM('abierta', 'en_revision', 'resuelta', 'cerrada'),
     defaultValue: 'abierta',

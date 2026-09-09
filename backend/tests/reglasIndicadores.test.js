@@ -95,6 +95,17 @@ describe('PIOIC — porcentaje de incidencias con información completa', () => 
     expect(esIncidenciaCompleta({ ...incidenciaCompleta, area: '   ' })).toBe(false);
   });
 
+  it('no incluye observacion entre los campos de completitud', () => {
+    expect(CAMPOS_INCIDENCIA_COMPLETA).not.toContain('observacion');
+    expect(esIncidenciaCompleta({ ...incidenciaCompleta, observacion: '' })).toBe(true);
+    expect(esIncidenciaCompleta({ ...incidenciaCompleta, observacion: null })).toBe(true);
+    expect(esIncidenciaCompleta({
+      ...incidenciaCompleta,
+      fuente_principal: '',
+      observacion: 'Nota de ficha con los cinco campos incompletos',
+    })).toBe(false);
+  });
+
   it('informa qué campos faltan', () => {
     const faltantes = camposFaltantesIncidencia({ ...incidenciaCompleta, area: '', descripcion: null });
     expect(faltantes).toEqual(['area', 'descripcion']);

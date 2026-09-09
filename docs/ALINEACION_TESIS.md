@@ -80,6 +80,22 @@ Una incidencia se considera **completa** cuando todos estos campos de la tabla `
 
 El criterio está centralizado en `backend/src/utils/reglasIndicadores.js` (`esIncidenciaCompleta`) y la expresión SQL equivalente se **genera a partir de la misma constante** (`CAMPOS_INCIDENCIA_COMPLETA`) en `observacion.service.js`, de modo que backend, fichas y reportes no puedan divergir. La columna `incidencias.informacion_completa` se sigue guardando al crear/editar como caché de consulta, pero el indicador se recalcula siempre desde los campos.
 
+La ficha de observación de la Dimensión 4 expone **Título**, **Descripción** y **Observación** como columnas distintas. `incidencias.observacion` es un campo de ficha **opcional**; **no** forma parte de PIOIC. Un registro con los cinco campos obligatorios completos cuenta como NIOC aunque `observacion` esté vacío.
+
+| Columna de la ficha | Origen |
+|---|---|
+| Fecha | `incidencias.fecha_reporte` |
+| Código de incidencia | `incidencias.codigo_incidencia` |
+| Tipo de incidencia | `incidencias.tipo` |
+| Área | `incidencias.area` |
+| Código de envío | `envios.codigo_envio` |
+| Estado de incidencia | `incidencias.estado_incidencia` |
+| Título | `incidencias.titulo` |
+| Descripción | `incidencias.descripcion` |
+| Información completa (Sí/No) | Recalculado con la regla PIOIC (cinco campos) |
+| Fuente principal de información | `incidencias.fuente_principal` |
+| Observación | `incidencias.observacion` (opcional; no entra en PIOIC) |
+
 ---
 
 ## 2. Preprueba y posprueba

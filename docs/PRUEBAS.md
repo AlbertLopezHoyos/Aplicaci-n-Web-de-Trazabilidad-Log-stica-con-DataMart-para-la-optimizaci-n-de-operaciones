@@ -66,7 +66,9 @@ Estado: ✅ correcto · ⏳ pendiente de evidencia manual.
 | CP-20 | HU-10 / PIOIC | Incidencia con `area` vacía y `descripcion` nula | Lista de campos faltantes `['area','descripcion']` | Coincide | ✅ | — |
 | CP-21 | HU-10 / PIOIC | 12 incidencias, 9 completas | 75 %, denominador 12 (**no 50**) | 75 / 12 | ✅ | — |
 | CP-22 | HU-10 / PIOIC | 0 incidencias | 0 % sin división por cero | 0 | ✅ | — |
-| CP-23 | HU-10 / PIOIC | SQL generado para la ficha 4 | Exige los mismos cinco campos que la regla en JavaScript | Coincide | ✅ | — |
+| CP-23 | HU-10 / PIOIC | SQL generado para la ficha 4 | Exige los mismos cinco campos que la regla en JavaScript; no usa `observacion` | Coincide | ✅ | — |
+| CP-23b | HU-14 / ficha 4 | Columnas de la ficha 4 | Fecha, código, tipo, área, envío, estado, título, descripción, info. completa, fuente, observación | Coincide | ✅ | — |
+| CP-23c | HU-14 / ficha 4 | SQL de la ficha 4 | `titulo`, `descripcion` y `observacion` independientes; no alias `descripcion AS observacion` | Coincide | ✅ | — |
 
 ### 2.5 Exclusión de datos sintéticos
 

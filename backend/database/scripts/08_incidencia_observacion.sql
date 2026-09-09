@@ -1,35 +1,18 @@
 -- =============================================================================
--- MIGRACIÓN: Dimensión 4 — Gestión de la información operativa (PIOIC)
--- Indicador: % incidencias operativas con información completa
--- Ejecutar DESPUÉS de 01_schema_completo.sql y 02_medicion_fichas.sql
+-- MIGRACIÓN 08: Campo opcional `observacion` en incidencias (ficha Dimensión 4)
+-- Ejecutar DESPUÉS de 07_muestra_investigacion.sql.
+--
+-- La ficha de tesis de la Dimensión 4 exige Título, Descripción y Observación
+-- como campos distintos. PIOIC NO usa `observacion`: sigue dependiendo solo de
+-- tipo, area, titulo, descripcion y fuente_principal.
+--
+-- Idempotente. No altera registros existentes (la columna nace NULL).
 -- =============================================================================
 
 USE trazabilidad_logistica;
 
 SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-ALTER TABLE incidencias
-  ADD COLUMN codigo_incidencia VARCHAR(30) NULL AFTER id_incidencia,
-  ADD COLUMN area VARCHAR(100) NULL AFTER tipo,
-  ADD COLUMN fuente_principal VARCHAR(120) NULL AFTER area,
-  ADD COLUMN informacion_completa TINYINT(1) DEFAULT 0 AFTER fuente_principal;
-
-UPDATE incidencias
-SET codigo_incidencia = CONCAT('INC-', YEAR(COALESCE(fecha_reporte, created_at)), '-', LPAD(id_incidencia, 5, '0'))
-WHERE codigo_incidencia IS NULL OR codigo_incidencia = '';
-
-UPDATE incidencias
-SET informacion_completa = IF(
-  area IS NOT NULL AND area <> '' AND
-  fuente_principal IS NOT NULL AND fuente_principal <> '' AND
-  titulo IS NOT NULL AND titulo <> '' AND
-  descripcion IS NOT NULL AND descripcion <> '',
-  1, 0
-);
-
-DROP VIEW IF EXISTS vw_ficha_reportes;
-
--- Columna de ficha (Título / Descripción / Observación). PIOIC no la usa.
 DROP PROCEDURE IF EXISTS sp_add_column_if_missing;
 DELIMITER //
 CREATE PROCEDURE sp_add_column_if_missing(
@@ -58,6 +41,7 @@ CALL sp_add_column_if_missing(
 
 DROP PROCEDURE IF EXISTS sp_add_column_if_missing;
 
+-- Recalcula completitud con los cinco campos de PIOIC (sin observacion).
 CREATE OR REPLACE VIEW vw_ficha_informacion_operativa AS
 SELECT
   DATE(i.fecha_reporte) AS fecha,
@@ -77,9 +61,10 @@ SELECT
     'Sí', 'No'
   ) AS informacion_completa,
   i.fuente_principal,
-  i.observacion
+  i.observacion,
+  i.origen_dato,
+  i.grupo_muestra
 FROM incidencias i
-LEFT JOIN envios e ON i.id_envio = e.id_envio
-ORDER BY i.fecha_reporte DESC;
+LEFT JOIN envios e ON e.id_envio = i.id_envio;
 
-SELECT 'Migración 03_dimension4_gestion_informacion aplicada correctamente' AS mensaje;
+SELECT 'Migración 08_incidencia_observacion aplicada correctamente' AS mensaje;
