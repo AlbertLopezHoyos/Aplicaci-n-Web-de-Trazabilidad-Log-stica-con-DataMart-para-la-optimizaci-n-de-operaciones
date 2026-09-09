@@ -9,7 +9,6 @@ import {
   ClipboardCheck,
   Download,
   Loader2,
-  FlaskConical,
   Info,
   CalendarClock,
 } from 'lucide-react';
@@ -64,8 +63,7 @@ const INDICADORES = [
 ];
 
 const GRUPOS = [
-  { clave: 'preprueba', etiqueta: 'Preprueba' },
-  { clave: 'posprueba', etiqueta: 'Posprueba' },
+  { clave: 'posprueba', etiqueta: 'Posprueba (postest)' },
 ];
 
 const formatoValor = (valor, unidad) =>
@@ -165,13 +163,14 @@ const MedicionPage = () => {
   }
 
   const muestra = medicion?.muestra;
-  const ventanas = medicion?.ventanas;
+  const ventanaPos = medicion?.ventanas?.posprueba;
+  const posprueba = medicion?.posprueba;
 
   return (
     <div className="page-shell">
       <PageHeader
         title="Medición de investigación"
-        subtitle="Indicadores TPRE, PER, PEEA y PIOIC — preprueba y posprueba por separado"
+        subtitle="Postest — TPRE, PER, PEEA y PIOIC sobre 50 envíos reales (1–20 set 2026)"
         compact
       />
 
@@ -179,40 +178,38 @@ const MedicionPage = () => {
         <p className="flex items-start gap-2">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-salazar-700" />
           <span>
-            Los indicadores se calculan sobre la muestra de {muestra?.esperadoPorGrupo} registros
-            de preprueba y {muestra?.esperadoPorGrupo} de posprueba ({muestra?.esperadoTotal} en total).
+            Este módulo solo extrae los datos del <strong>postest</strong>. No registra envíos, no
+            cambia estados y no forma parte del funcionamiento operativo (envíos, seguimiento, incidencias).
+            La operación sigue en esos módulos; aquí se miden los 50 registros de posprueba.
           </span>
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <VentanaCard etiqueta="Periodo de preprueba" ventana={ventanas?.preprueba} />
-        <VentanaCard etiqueta="Periodo de posprueba" ventana={ventanas?.posprueba} />
-      </div>
+      <VentanaCard etiqueta="Periodo de posprueba (postest)" ventana={ventanaPos} />
 
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        <StatChip label="Preprueba registrada" value={`${muestra?.registradoPreprueba ?? 0} / ${muestra?.esperadoPorGrupo ?? 50}`} accent="salazar" />
-        <StatChip label="Posprueba registrada" value={`${muestra?.registradoPosprueba ?? 0} / ${muestra?.esperadoPorGrupo ?? 50}`} accent="salazar" />
-        <StatChip label="Muestra total" value={`${muestra?.registradoTotal ?? 0} / ${muestra?.esperadoTotal ?? 100}`} accent={muestra?.completa ? 'green' : 'slate'} />
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+        <StatChip
+          label="Registros de postest"
+          value={`${muestra?.registradoPosprueba ?? 0} / ${muestra?.esperadoPorGrupo ?? 50}`}
+          accent="salazar"
+        />
+        <StatChip
+          label="Dentro de ventana"
+          value={ventanaPos?.dentroDeVentana ?? 0}
+          accent={ventanaPos?.fueraDeVentana ? 'amber' : 'green'}
+        />
+        <StatChip
+          label="Fuera de ventana"
+          value={ventanaPos?.fueraDeVentana ?? 0}
+          accent={ventanaPos?.fueraDeVentana ? 'amber' : 'slate'}
+        />
       </div>
-
-      {!muestra?.completa && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <p className="flex items-start gap-2">
-            <FlaskConical className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>
-              La preprueba todavía no está cargada. Cuando la suba, los indicadores de ese periodo
-              aparecerán aquí para compararlos con la posprueba.
-            </span>
-          </p>
-        </div>
-      )}
 
       <div className="table-panel">
         <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
-          <h3 className="font-semibold text-salazar-900">Resultados por indicador</h3>
+          <h3 className="font-semibold text-salazar-900">Indicadores del postest</h3>
           <p className="text-xs text-slate-500">
-            Variable dependiente: optimización de operaciones logísticas · 4 dimensiones
+            Calculados solo sobre envíos REALES de posprueba en la ventana 1–20 set 2026
           </p>
         </div>
         <div className="table-panel-body">
@@ -221,17 +218,13 @@ const MedicionPage = () => {
               <tr>
                 <th className="px-3 py-2.5">Dimensión / Indicador</th>
                 <th className="px-3 py-2.5">Fórmula</th>
-                <th className="px-3 py-2.5 text-right">Preprueba</th>
-                <th className="px-3 py-2.5 text-right">Posprueba</th>
-                <th className="px-3 py-2.5 text-right">Variación</th>
+                <th className="px-3 py-2.5 text-right">Posprueba (postest)</th>
+                <th className="px-3 py-2.5">Detalle</th>
               </tr>
             </thead>
             <tbody>
               {INDICADORES.map(({ clave, nombre, dimension, descripcion, formula, unidad, icon: Icon, color, detalle }) => {
-                const pre = medicion?.preprueba?.[clave];
-                const pos = medicion?.posprueba?.[clave];
-                const variacion =
-                  pre === undefined || pos === undefined ? null : Math.round((pos - pre) * 100) / 100;
+                const pos = posprueba?.[clave];
                 return (
                   <tr key={clave} className="border-t border-slate-100 align-top">
                     <td className="px-3 py-3">
@@ -246,16 +239,9 @@ const MedicionPage = () => {
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 font-mono text-xs text-slate-600">{formula}</td>
                     <td className="px-3 py-3 text-right">
-                      <p className="font-bold tabular-nums text-slate-800">{formatoValor(pre, unidad)}</p>
-                      <p className="text-[11px] text-slate-400">{detalle(medicion?.preprueba?.detalle)}</p>
-                    </td>
-                    <td className="px-3 py-3 text-right">
                       <p className="font-bold tabular-nums text-slate-800">{formatoValor(pos, unidad)}</p>
-                      <p className="text-[11px] text-slate-400">{detalle(medicion?.posprueba?.detalle)}</p>
                     </td>
-                    <td className="px-3 py-3 text-right font-medium tabular-nums text-slate-600">
-                      {variacion === null ? '—' : `${variacion > 0 ? '+' : ''}${variacion}`}
-                    </td>
+                    <td className="px-3 py-3 text-xs text-slate-400">{detalle(posprueba?.detalle)}</td>
                   </tr>
                 );
               })}
@@ -265,9 +251,9 @@ const MedicionPage = () => {
       </div>
 
       <div className="card">
-        <h3 className="panel-title">Exportar fichas de observación por grupo</h3>
+        <h3 className="panel-title">Exportar fichas del postest</h3>
         <p className="mb-3 text-xs text-slate-500">
-          Cada ficha exporta únicamente los registros de la muestra del grupo seleccionado.
+          Cada Excel incluye únicamente los 50 registros de posprueba. No exporta la operación completa ni datos sintéticos.
         </p>
         <div className="grid gap-2 sm:grid-cols-2">
           {[1, 2, 3, 4].map((dim) => (

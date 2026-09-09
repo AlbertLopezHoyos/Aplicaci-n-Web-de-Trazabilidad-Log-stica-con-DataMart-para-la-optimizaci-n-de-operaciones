@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import api from '../services/api';
-import { useAuth } from '../context/AuthContext';
 import PageHeader from '../components/PageHeader';
 import {
   ClipboardList,
@@ -61,7 +59,6 @@ const GRUPO_FICHA = 'POSPRUEBA';
 const VENTANA_FICHA = { desde: '2026-09-01', hasta: '2026-09-20' };
 
 const ObservacionPage = () => {
-  const { isAdmin } = useAuth();
   const [indicadores, setIndicadores] = useState(null);
   const [dimensionActiva, setDimensionActiva] = useState(1);
   const [datos, setDatos] = useState([]);
@@ -138,7 +135,7 @@ const ObservacionPage = () => {
     <div className="page-shell">
       <PageHeader
         title="Fichas de observación"
-        subtitle="50 envíos de posprueba · 1 al 20 de septiembre de 2026"
+        subtitle="Postest — 50 envíos de posprueba · 1 al 20 de septiembre de 2026"
         compact
         action={
           <button
@@ -161,18 +158,9 @@ const ObservacionPage = () => {
         <p className="flex items-start gap-2">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-salazar-700" />
           <span>
-            Estas fichas muestran únicamente los 50 registros reales de posprueba
-            (1–20 set 2026). No se incluyen datos sintéticos del DataMart.
-            {isAdmin && (
-              <>
-                {' '}
-                El contraste preprueba/posprueba está en{' '}
-                <Link to="/medicion" className="font-medium text-salazar-800 underline">
-                  Medición de investigación
-                </Link>
-                .
-              </>
-            )}
+            Estas fichas solo extraen los 50 registros del <strong>postest</strong> (posprueba,
+            1–20 set 2026). No forman parte del funcionamiento operativo: no crean envíos ni
+            cambian estados. Envíos, seguimiento e incidencias siguen siendo la operación diaria.
           </span>
         </p>
       </div>
