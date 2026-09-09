@@ -80,12 +80,7 @@ npm run dev
 
 API: `http://localhost:5000/api`
 
-## Credenciales demo
-
-| Rol | Email | Contraseña |
-|-----|-------|------------|
-| Administrador | admin@salazarlogistica.pe | Admin123! |
-| Operador logístico | operador@salazarlogistica.pe | Operador123! |
+Las cuentas de acceso se dan de alta en el sistema (rol Administrador). No se publican contraseñas en este repositorio.
 
 ## Endpoints principales
 
@@ -106,6 +101,7 @@ API: `http://localhost:5000/api`
 | GET | /api/datamart/analytics | KPIs OTIF, lead time, incidencias |
 | POST | /api/datamart/etl/run | Ejecutar ETL (idempotente) |
 | GET | /api/datamart/etl/ejecuciones | Bitácora de ejecuciones del ETL |
+| CRUD | /api/usuarios | Gestión de usuarios (**solo Administrador**) |
 
 Por defecto los indicadores usan `alcance=MUESTRA`: solo registros con `origen_dato = 'REAL'` y
 `grupo_muestra IN ('PREPRUEBA','POSPRUEBA')`. El modo `TODOS` existe para inspección operativa,

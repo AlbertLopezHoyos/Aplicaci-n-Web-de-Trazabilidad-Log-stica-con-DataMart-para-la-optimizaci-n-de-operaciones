@@ -250,7 +250,7 @@ poder probar técnicamente el DataMart se generan **datos sintéticos** mediante
 | **Marca en base de datos** | `envios.origen_dato = 'SINTETICO'`, `grupo_muestra = 'NO_MUESTRA'`; propagado a `incidencias` y a `fact_operaciones_logisticas.origen_dato` |
 | **Usos permitidos** | Pruebas del ETL, demostración del esquema estrella, consultas analíticas, dashboards, pruebas de volumen |
 | **Usos prohibidos** | Cualquier cálculo de TPRE, PER, PEEA o PIOIC de la investigación; contraste de hipótesis |
-| **Dónde se advierte** | Cabecera del seeder, `star-schema.design.js`, pantalla DataMart, pantalla Medición de investigación, README |
+| **Dónde se documenta** | Cabecera del seeder, `star-schema.design.js`, `reglasIndicadores.js`, README técnico |
 
 Los indicadores de investigación filtran `origen_dato = 'REAL'` en las cuatro consultas, verificado
 por `backend/tests/observacion.service.test.js`.
@@ -290,7 +290,7 @@ UNION SELECT 'dim_operador', COUNT(*) FROM dim_operador;
 SELECT * FROM etl_ejecuciones ORDER BY id_ejecucion DESC LIMIT 5;
 ```
 
-La pantalla DataMart muestra el conteo en vivo y señala cuántos de esos hechos son sintéticos.
+La pantalla DataMart muestra el conteo de hechos y el detalle de miembros vigentes e históricos de cada dimensión.
 
 > **[PENDIENTE DE CONFIRMAR]** Adjuntar a la tesis la captura del conteo ejecutado sobre la base
 > definitiva de sustentación.

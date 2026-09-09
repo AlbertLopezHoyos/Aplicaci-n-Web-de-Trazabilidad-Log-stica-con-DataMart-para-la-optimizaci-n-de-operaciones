@@ -58,6 +58,10 @@ Detalle completo en [docs/ALINEACION_TESIS.md](docs/ALINEACION_TESIS.md).
 - Node.js 18+
 - MySQL 8.0+
 
+## Acceso
+
+Las cuentas se gestionan en el propio sistema (Administrador). No se publican contraseñas en el repositorio. El modo demostración está desactivado: el frontend exige backend y base de datos.
+
 ## Instalación rápida
 
 ### 1. Base de datos
@@ -99,25 +103,19 @@ npm run dev
 
 Web: `http://localhost:5173`
 
-## Credenciales demo
-
-| Rol | Email | Contraseña |
-|-----|-------|------------|
-| Administrador | admin@salazarlogistica.pe | Admin123! |
-| Operador logístico | operador@salazarlogistica.pe | Operador123! |
-
 ## Módulos implementados
 
 1. **Autenticación** — JWT, bcrypt, roles Administrador / Operador logístico  
-2. **Dashboard** — KPIs, gráficos Recharts, accesos rápidos  
-3. **Envíos** — CRUD, filtros, búsqueda, paginación  
-4. **Seguimiento** — Actualización de estados + timeline  
-5. **Incidencias** — Errores, retrasos, severidad, estados  
-6. **Reportes** — envios_estado, tiempos, incidencias, productividad (PDF/Excel)  
-7. **Evidencias** — Multer: imágenes, PDF, comprobantes  
-8. **Fichas de observación** — Una ficha por dimensión (TPRE, PER, PEEA, PIOIC), exportables a Excel  
-9. **Medición de investigación** — Preprueba y posprueba por separado (solo Administrador)  
-10. **DataMart** — Esquema estrella, ETL idempotente con bitácora, KPIs analíticos  
+2. **Usuarios** — Alta, edición y activación/desactivación (solo Administrador)  
+3. **Dashboard** — KPIs, gráficos Recharts, accesos rápidos  
+4. **Envíos** — CRUD, filtros, búsqueda, paginación, alcance (todos / solo mis registros)  
+5. **Seguimiento** — Actualización de estados + timeline  
+6. **Incidencias** — Errores, retrasos, severidad, estados  
+7. **Reportes** — envios_estado, tiempos, incidencias, productividad (PDF/Excel)  
+8. **Evidencias** — Multer: imágenes, PDF, comprobantes  
+9. **Fichas de evidencia** — Una ficha por dimensión (TPRE, PER, PEEA, PIOIC), exportables a Excel  
+10. **Medición de investigación** — Preprueba y posprueba por separado (solo Administrador)  
+11. **DataMart** — Esquema estrella, ETL idempotente con bitácora, KPIs analíticos  
 
 ## Marcado de la muestra de investigación
 

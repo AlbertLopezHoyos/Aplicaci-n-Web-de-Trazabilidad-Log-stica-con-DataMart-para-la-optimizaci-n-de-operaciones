@@ -48,10 +48,12 @@ flowchart TB
 | Enrutado | React Router (`src/routes/AppRoutes.jsx`) |
 | Estado de sesión | `AuthContext` con JWT en almacenamiento local |
 | Cliente HTTP | Axios con interceptor de token (`src/services/api.js`) |
-| Modo demostración | `VITE_DEMO_MODE=true` intercepta las llamadas y responde con `src/services/mockData.js` |
+| Identidad visual | Logos oficiales (`BrandLogo`) y paleta institucional (rojo ladrillo / grafito) |
+| Alcance de registros | Filtro «todos / solo mis registros» en envíos, seguimiento e incidencias |
 
 Protección de rutas: `PrivateRoute` exige sesión y `AdminRoute` exige rol Administrador. Son rutas
-solo para Administrador `/medicion` y `/datamart`.
+solo para Administrador `/medicion` y `/datamart`. El modo demostración (`VITE_DEMO_MODE`) permanece
+en el código por compatibilidad local y **está desactivado** en el entorno de uso.
 
 ### Páginas
 
@@ -63,7 +65,7 @@ solo para Administrador `/medicion` y `/datamart`.
 | `/seguimiento`, `/seguimiento/:id` | Trazabilidad y cambios de estado | Autenticado |
 | `/incidencias` | Registro de incidencias operativas | Autenticado |
 | `/reportes` | Reportes operativos y exportaciones | Autenticado |
-| `/observacion` | Fichas de observación por dimensión | Autenticado |
+| `/observacion` | Fichas de evidencia por dimensión | Autenticado |
 | `/medicion` | Medición de investigación (preprueba/posprueba) | **Administrador** |
 | `/datamart` | DataMart, ETL y KPIs analíticos | **Administrador** |
 
@@ -111,7 +113,8 @@ Prefijo común `/api`. Respuesta normalizada `{ success, message, data }`.
 | `/incidencias` | CRUD | Evalúa "información completa" (PIOIC) al guardar |
 | `/evidencias` | Carga de archivos | `multer` |
 | `/reportes` | Generación y exportación | |
-| `/catalogos` | Clientes, estados, usuarios | |
+| `/catalogos` | Clientes, estados, roles | |
+| `/usuarios` | CRUD de cuentas | Solo Administrador |
 | `/observacion` | Indicadores, medición, fichas 1-4 y exportación | `/medicion` solo Administrador |
 | `/datamart` | design, preview, analytics, etl/run, etl/ejecuciones | Todo solo Administrador salvo `design` |
 
@@ -168,7 +171,7 @@ sequenceDiagram
     FE->>API: POST /api/envios (Bearer JWT)
     API->>API: Valida; los fallos van a errores_registro (PER)
     API->>DB: INSERT envio + tiempo_registro_min (TPRE)
-    API->>DB: INSERT historial_estados (PEEA)
+    API->>DB: INSERT historial_estados (hito inicial, PEEA)
     API-->>FE: 201 Created
 
     O->>API: POST /api/incidencias
@@ -193,7 +196,7 @@ sequenceDiagram
 | BI | Power BI Desktop sobre MySQL local o CSV exportado | — |
 
 Variables de entorno del backend en `backend/.env` (`DB_*`, `JWT_SECRET`, `PORT`) y del frontend en
-`frontend/.env` (`VITE_API_URL`, `VITE_DEMO_MODE`). Detalle operativo en `DEPLOY.md`.
+`frontend/.env` (`VITE_API_URL`). Detalle operativo en `DEPLOY.md`.
 
 > **[PENDIENTE DE CONFIRMAR]** El entorno cloud descrito quedó fuera de servicio al expirar el
 > período de prueba de Railway. El estado vigente del despliegue debe confirmarse antes de la

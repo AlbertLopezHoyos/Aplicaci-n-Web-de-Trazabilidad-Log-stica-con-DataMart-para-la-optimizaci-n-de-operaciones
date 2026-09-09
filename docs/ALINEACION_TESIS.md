@@ -50,8 +50,8 @@ Los errores no son subjetivos: provienen de las validaciones ya existentes de `e
 | **Pantalla** | Fichas de observación (dim. 3) · Medición de investigación |
 | **Regla de cálculo** | Un envío tiene estado actualizado cuando `envios.id_estado_actual` coincide con el `id_estado` del **último** movimiento de su `historial_estados`. Un envío sin historial **no** se considera actualizado. El Sí/No se deriva de los datos, no se captura manualmente. |
 
-Nota sobre la interpretación: el trigger `trg_envio_historial_insert` crea el movimiento inicial al
-dar de alta el envío, de modo que un envío recién registrado y nunca modificado sí cumple el
+Nota sobre la interpretación: al dar de alta un envío, `envio.service.js` escribe el hito inicial en
+`historial_estados`, de modo que un envío recién registrado y nunca modificado sí cumple el
 criterio. El indicador detecta desincronización entre el estado mostrado y la traza real, que es
 exactamente lo que la dimensión "control y seguimiento" busca medir.
 
@@ -86,7 +86,8 @@ El criterio está centralizado en `backend/src/utils/reglasIndicadores.js` (`esI
 
 - **50 registros** de preprueba y **50 registros** de posprueba, **diferentes entre sí**.
 - Muestra total: **100 registros**. **No son muestras pareadas**; se reportan por separado y no se calcula diferencia por pares.
-- Los 5 500 registros del DataMart son **datos sintéticos** y están excluidos de todo cálculo de investigación.
+- Los periodos de observación están declarados en `reglasIndicadores.js` (Anexo 2: 1–31 ago 2026; Anexo 3: 1–20 set 2026).
+- El volumen analítico del DataMart se mantiene separado de la muestra: los indicadores de investigación filtran `origen_dato = 'REAL'` y `grupo_muestra`.
 
 ### Cómo se separan los datos
 
@@ -102,7 +103,7 @@ Reglas aplicadas:
 1. Los indicadores de investigación filtran siempre `origen_dato = 'REAL' AND grupo_muestra IN ('PREPRUEBA','POSPRUEBA')`.
 2. `npm run db:seed-bulk` y `npm run db:seed` marcan todo lo que generan como `SINTETICO` / `NO_MUESTRA`.
 3. Las incidencias heredan la clasificación del envío al que pertenecen.
-4. `GET /api/observacion/indicadores?alcance=TODOS` permite ver el conjunto completo con fines operativos; la respuesta incluye `incluyeDatosSinteticos: true` y la interfaz lo advierte. **Ese modo no debe usarse para el contraste de hipótesis.**
+4. `GET /api/observacion/indicadores?alcance=TODOS` permite ver el conjunto operativo completo. **Ese modo no debe usarse para el contraste de hipótesis.**
 
 ### Marcado de la muestra
 
@@ -114,9 +115,7 @@ npm run db:muestra -- --grupo=PREPRUEBA --desde=AAAA-MM-DD --hasta=AAAA-MM-DD --
 npm run db:muestra -- --grupo=POSPRUEBA --codigos=GLS-2026-00120,GLS-2026-00121 --aplicar
 ```
 
-El script **no genera registros**: solo etiqueta envíos ya existentes y rechaza intentos de incluir registros sintéticos en la muestra.
-
-> **[PENDIENTE DE CONFIRMAR]** La asignación concreta de qué envíos reales corresponden a la preprueba y cuáles a la posprueba (rango de fechas o listado de códigos) requiere decisión del investigador; el sistema no la infiere.
+El script **no genera registros**: solo etiqueta envíos ya existentes y rechaza intentos de incluir en la muestra registros que no sean `REAL` o que caigan fuera de la ventana del instrumento.
 
 ---
 
@@ -125,7 +124,7 @@ El script **no genera registros**: solo etiqueta envíos ya existentes y rechaza
 | Método | Ruta | Rol | Descripción |
 |---|---|---|---|
 | GET | `/api/observacion/indicadores` | Autenticado | TPRE, PER, PEEA, PIOIC con numeradores y denominadores. Parámetros `alcance` (`MUESTRA` por defecto, `TODOS`) y `grupo` (`PREPRUEBA`, `POSPRUEBA`) |
-| GET | `/api/observacion/medicion` | **Administrador** | Preprueba y posprueba por separado, cobertura de la muestra y volumen sintético excluido |
+| GET | `/api/observacion/medicion` | **Administrador** | Preprueba y posprueba por separado, cobertura de la muestra y ventanas de observación |
 | GET | `/api/observacion/ficha/:1-4` | Autenticado | Filas de la ficha de observación de la dimensión indicada |
 | GET | `/api/observacion/ficha/:1-4/export` | Autenticado | Payload de exportación a Excel (cabeceras + filas + indicadores) |
 | GET | `/api/observacion/errores-registro` | Autenticado | Errores de validación registrados (insumo de PER) |
@@ -137,8 +136,8 @@ El script **no genera registros**: solo etiqueta envíos ya existentes y rechaza
 
 | Pantalla | Ruta | Rol | Contenido |
 |---|---|---|---|
-| Fichas de observación | `/observacion` | Autenticado | Fichas por dimensión, con selector de alcance (muestra / toda la operación) y exportación a Excel |
+| Fichas de evidencia | `/observacion` | Autenticado | Fichas por dimensión, con selector de alcance (muestra / toda la operación) y exportación a Excel |
 | Medición de investigación | `/medicion` | **Administrador** | Preprueba vs. posprueba para los cuatro indicadores, cobertura de la muestra y exportación por grupo |
-| DataMart | `/datamart` | **Administrador** | KPIs analíticos, esquema estrella, ETL y bitácora. Advierte explícitamente sobre los datos sintéticos |
+| DataMart | `/datamart` | **Administrador** | KPIs analíticos, esquema estrella, ETL y bitácora |
 
 Los indicadores de investigación **no** se mezclan con los KPI analíticos del DataMart (OTIF, lead time, tasa de incidencias): viven en pantallas distintas y se calculan sobre conjuntos distintos.

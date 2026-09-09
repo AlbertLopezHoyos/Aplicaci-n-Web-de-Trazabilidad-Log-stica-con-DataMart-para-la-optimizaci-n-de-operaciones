@@ -1,6 +1,6 @@
 # Despliegue en la nube — Trazabilidad Logística
 
-Stack recomendado (gratis / bajo costo para demo):
+Stack recomendado (nube de bajo costo):
 
 | Componente | Servicio |
 |------------|----------|
@@ -76,7 +76,7 @@ Esto hace en orden:
 
 1. Abre https://aplicaci-n-web-de-trazabilidad-log.vercel.app
 2. Login admin → **DataMart**
-3. Debe aparecer: *“Listo para sustentación: 5,500 registros”* y KPIs (OTIF, lead time)
+3. Debe aparecer el volumen de hechos analíticos y los KPIs (OTIF, lead time)
 
 ### Comandos por separado (opcional)
 
@@ -172,7 +172,7 @@ VITE_API_URL=https://TU-API.onrender.com/api
 ## Paso 5 — Probar
 
 1. Abre la URL de Vercel
-2. Login: `admin@salazarlogistica.pe` / `Admin123!`
+2. Inicie sesión con una cuenta de Administrador dada de alta en el sistema
 3. Revisa envíos, reportes, DataMart (ETL)
 
 ---

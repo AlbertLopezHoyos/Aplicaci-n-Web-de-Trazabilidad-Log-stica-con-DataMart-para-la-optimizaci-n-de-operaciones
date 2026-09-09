@@ -56,7 +56,8 @@ funcionalidad en el repositorio.
 | HU-20 | Consultas analíticas del DataMart (OTIF, lead time, incidencias) | M | `GET /api/datamart/analytics` |
 | HU-21 | Explotación del DataMart desde Power BI | M | `database/scripts/export-powerbi-csv.js`, `setup-powerbi-user.js` |
 | HU-22 | Auditoría de operaciones sobre datos sensibles | B | `models/Auditoria.js` |
-| HU-23 | Modo demostración sin backend | B | `services/mockData.js`, `VITE_DEMO_MODE` |
+| HU-23 | Gestión de usuarios del sistema | A | `routes/usuario.routes.js`, `UserAccountMenu.jsx` |
+| HU-24 | Alcance de registros (todos / solo los míos) | A | `alcanceRegistros.js`, `RegistroScopeFilter.jsx` |
 
 ## 4. Historias de usuario con criterios de aceptación
 
@@ -152,8 +153,8 @@ Se detallan las historias directamente vinculadas a los indicadores de la invest
 
 | Sprint | Objetivo | Historias | Entregable |
 |---|---|---|---|
-| 1 | Base técnica y seguridad | HU-01, HU-02, HU-22 | Esquema de base de datos, autenticación JWT y control de acceso por rol operativos |
-| 2 | Núcleo operativo de envíos | HU-03, HU-04, HU-05, HU-06 | Gestión de clientes y CRUD de envíos con captura de tiempos de registro |
+| 1 | Base técnica y seguridad | HU-01, HU-02, HU-22, HU-23 | Esquema de base de datos, autenticación JWT, control de acceso por rol y gestión de usuarios |
+| 2 | Núcleo operativo de envíos | HU-03, HU-04, HU-05, HU-06, HU-24 | Gestión de clientes y CRUD de envíos con captura de tiempos y filtro de alcance |
 | 3 | Trazabilidad y evidencias | HU-07, HU-08, HU-09 | Cambios de estado con historial, pantalla de seguimiento y carga de evidencias |
 | 4 | Calidad e incidencias | HU-10, HU-11, HU-12 | Registro de incidencias con evaluación de completitud, captura de errores y dashboard |
 | 5 | Instrumentación de la investigación | HU-13, HU-14, HU-15, HU-16 | Reportes, fichas de observación, separación de la muestra y pantalla de medición |
@@ -186,7 +187,7 @@ Una historia se considera terminada cuando cumple **todos** estos criterios:
 
 | Sprint | Entregables verificables en el repositorio |
 |---|---|
-| 1 | `database/scripts/01_schema_completo.sql`, `src/config/`, `src/middlewares/auth.middleware.js`, `models/`, `pages/LoginPage.jsx` |
+| 1 | `database/scripts/01_schema_completo.sql`, `src/config/`, `src/middlewares/auth.middleware.js`, `models/`, `pages/LoginPage.jsx`, `routes/usuario.routes.js` |
 | 2 | `services/envio.service.js`, `repositories/envio.repository.js`, `pages/EnviosPage.jsx`, `pages/EnvioFormPage.jsx`, `pages/ClientesPage.jsx` |
 | 3 | `models/HistorialEstado.js`, `routes/evidencia.routes.js`, `middlewares/upload.middleware.js`, `pages/SeguimientoPage.jsx` |
 | 4 | `services/incidencia.service.js`, `services/errorRegistro.service.js`, `services/dashboard.service.js`, `pages/IncidenciasPage.jsx`, `pages/DashboardPage.jsx` |
