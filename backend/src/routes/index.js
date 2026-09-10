@@ -25,7 +25,12 @@ router.use('/usuarios', usuarioRoutes);
 router.use('/observacion', observacionRoutes);
 
 router.get('/health', (_req, res) =>
-  res.json({ success: true, message: 'API Trazabilidad Logística operativa', timestamp: new Date() })
+  res.json({
+    success: true,
+    message: 'API Trazabilidad Logística operativa',
+    revision: 'fichas-postest-20260910',
+    timestamp: new Date(),
+  })
 );
 
 module.exports = router;
