@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../services/api';
 import PageHeader from '../components/PageHeader';
 import {
@@ -10,6 +11,7 @@ import {
   ClipboardCheck,
   Loader2,
   Info,
+  ChevronLeft,
 } from 'lucide-react';
 import { toastSuccess, toastError } from '../utils/alerts';
 import { exportFichaExcel } from '../utils/fichaExport';
@@ -133,6 +135,13 @@ const ObservacionPage = () => {
 
   return (
     <div className="page-shell">
+      <Link
+        to="/investigacion"
+        className="inline-flex items-center gap-1 text-sm font-medium text-salazar-700 hover:underline"
+      >
+        <ChevronLeft className="h-4 w-4" />
+        Volver a Investigación
+      </Link>
       <PageHeader
         title="Fichas de observación"
         subtitle="Postest — 50 envíos de posprueba · 1 al 20 de septiembre de 2026"

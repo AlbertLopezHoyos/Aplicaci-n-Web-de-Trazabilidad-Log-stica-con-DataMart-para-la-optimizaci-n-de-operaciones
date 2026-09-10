@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../services/api';
 import PageHeader from '../components/PageHeader';
 import StatChip from '../components/StatChip';
@@ -11,6 +12,7 @@ import {
   Loader2,
   Info,
   CalendarClock,
+  ChevronLeft,
 } from 'lucide-react';
 import { toastSuccess, toastError } from '../utils/alerts';
 import { exportFichaExcel } from '../utils/fichaExport';
@@ -168,6 +170,13 @@ const MedicionPage = () => {
 
   return (
     <div className="page-shell">
+      <Link
+        to="/investigacion"
+        className="inline-flex items-center gap-1 text-sm font-medium text-salazar-700 hover:underline"
+      >
+        <ChevronLeft className="h-4 w-4" />
+        Volver a Investigación
+      </Link>
       <PageHeader
         title="Medición de investigación"
         subtitle="Postest — TPRE, PER, PEEA y PIOIC sobre 50 envíos reales (1–20 set 2026)"

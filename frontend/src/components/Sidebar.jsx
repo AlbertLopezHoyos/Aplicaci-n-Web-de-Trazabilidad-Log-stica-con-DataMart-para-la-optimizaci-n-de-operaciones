@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Package,
@@ -7,7 +7,6 @@ import {
   FileBarChart,
   Database,
   X,
-  ClipboardList,
   Users,
   FlaskConical,
 } from 'lucide-react';
@@ -21,13 +20,20 @@ const navItems = [
   { to: '/seguimiento', icon: MapPin, label: 'Seguimiento' },
   { to: '/incidencias', icon: AlertTriangle, label: 'Incidencias' },
   { to: '/reportes', icon: FileBarChart, label: 'Reportes' },
-  { to: '/observacion', icon: ClipboardList, label: 'Fichas evidencia' },
-  { to: '/medicion', icon: FlaskConical, label: 'Medición investigación', adminOnly: true },
-  { to: '/datamart', icon: Database, label: 'DataMart', adminOnly: true },
+  { to: '/datamart', icon: Database, label: 'Análisis', adminOnly: true },
+  {
+    to: '/investigacion',
+    icon: FlaskConical,
+    label: 'Investigación',
+    adminOnly: true,
+    section: 'tesis',
+    matchPaths: ['/investigacion', '/observacion', '/medicion'],
+  },
 ];
 
 const Sidebar = ({ open, onClose }) => {
   const { isAdmin } = useAuth();
+  const location = useLocation();
 
   return (
     <aside
@@ -53,23 +59,34 @@ const Sidebar = ({ open, onClose }) => {
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navItems
           .filter((item) => !item.adminOnly || isAdmin)
-          .map(({ to, icon: Icon, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              onClick={onClose}
-              className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
-                  isActive
-                    ? 'bg-salazar-700 text-white shadow-sm'
-                    : 'text-graphite-200 hover:bg-white/10 hover:text-white'
-                }`
-              }
-            >
-              <Icon className="h-5 w-5 shrink-0" />
-              {label}
-            </NavLink>
-          ))}
+          .map(({ to, icon: Icon, label, section, matchPaths }) => {
+            const activo =
+              location.pathname === to
+              || matchPaths?.some((p) => location.pathname.startsWith(p));
+            return (
+            <div key={to}>
+              {section === 'tesis' && (
+                <p className="mb-1 mt-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-graphite-400">
+                  Tesis
+                </p>
+              )}
+              <NavLink
+                to={to}
+                onClick={onClose}
+                className={() =>
+                  `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                    activo
+                      ? 'bg-salazar-700 text-white shadow-sm'
+                      : 'text-graphite-200 hover:bg-white/10 hover:text-white'
+                  }`
+                }
+              >
+                <Icon className="h-5 w-5 shrink-0" />
+                {label}
+              </NavLink>
+            </div>
+            );
+          })}
       </nav>
 
       <div className="border-t border-white/10 p-4 text-xs text-graphite-300">
