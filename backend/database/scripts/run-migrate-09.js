@@ -1,8 +1,13 @@
 /**
  * Migración 09: destinatario (nombre + DNI + teléfono) en envíos.
  * Uso: npm run db:migrate-09
+ *      npm run db:migrate-09:railway
  */
+const useRailway = process.argv.includes('--railway');
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
+if (useRailway) {
+  require('./load-railway-env');
+}
 const { sequelize } = require('../../src/models');
 
 const addColumnIfMissing = async (table, column, definition) => {
@@ -21,7 +26,7 @@ const addColumnIfMissing = async (table, column, definition) => {
 
 const run = async () => {
   await sequelize.authenticate();
-  console.log('Migración 09: destinatario en envíos');
+  console.log(`Migración 09: destinatario en envíos (${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME})`);
 
   await addColumnIfMissing(
     'envios',

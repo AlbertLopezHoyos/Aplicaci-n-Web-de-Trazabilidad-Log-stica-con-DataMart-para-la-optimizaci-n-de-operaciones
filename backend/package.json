@@ -17,6 +17,7 @@
     "db:muestra": "node database/scripts/marcar-muestra.js",
     "db:posprueba-actualizar": "node database/scripts/actualizar-posprueba-envios.js",
     "db:migrate-09": "node database/scripts/run-migrate-09.js",
+    "db:migrate-09:railway": "node database/scripts/run-migrate-09.js --railway",
     "db:usuarios-equipo": "node database/scripts/seed-usuarios-equipo.js",
     "db:export-powerbi": "node database/scripts/export-powerbi-csv.js",
     "db:export-powerbi:railway": "node database/scripts/export-powerbi-csv.js --railway",

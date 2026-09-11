@@ -28,7 +28,7 @@ router.get('/health', (_req, res) =>
   res.json({
     success: true,
     message: 'API Trazabilidad Logística operativa',
-    revision: 'fichas-postest-20260910',
+    revision: 'destinatario-migrate09-20260911',
     timestamp: new Date(),
   })
 );
