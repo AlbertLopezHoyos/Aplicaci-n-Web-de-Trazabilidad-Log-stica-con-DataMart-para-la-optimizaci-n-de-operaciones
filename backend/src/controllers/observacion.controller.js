@@ -86,6 +86,15 @@ const logErrorCliente = async (req, res, next) => {
   }
 };
 
+const aleatorizarPosprueba = async (_req, res, next) => {
+  try {
+    const resultado = await observacionService.aleatorizarPosprueba();
+    return success(res, resultado, 'Muestra posprueba aleatorizada');
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getIndicadores,
   getMedicion,
@@ -93,4 +102,5 @@ module.exports = {
   exportarFicha,
   listErrores,
   logErrorCliente,
+  aleatorizarPosprueba,
 };

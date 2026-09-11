@@ -1,7 +1,16 @@
 const path = require('path');
 const fs = require('fs');
-const { sequelize } = require('../models');
+const { Op } = require('sequelize');
+const { sequelize, Envio, Incidencia, Cliente, EstadoEnvio, Usuario, HistorialEstado } = require('../models');
 const { QueryTypes } = require('sequelize');
+const { generarCodigoEnvio } = require('../utils/codigoEnvio');
+const { DESTINOS_PERU, calcularTotalEnvio } = require('../../database/seeders/bulk-data');
+const {
+  ORIGEN_ENVIO_FIJO,
+  TIPOS_CARGA_OPERATIVOS,
+  pick,
+  especificacionAleatoria,
+} = require('../utils/tiposCarga');
 const {
   ORIGEN_DATO,
   GRUPO_MUESTRA,
@@ -460,6 +469,150 @@ const buildExportPayload = async (dimension, { alcance, grupo } = {}) => {
 
 const exportarExcel = (dimension, opciones) => buildExportPayload(dimension, opciones);
 
+// -----------------------------------------------------------------------------
+// Aleatorización de muestra posprueba (fichas de observación)
+// -----------------------------------------------------------------------------
+
+const shuffle = (arr) => {
+  const copia = [...arr];
+  for (let i = copia.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copia[i], copia[j]] = [copia[j], copia[i]];
+  }
+  return copia;
+};
+
+const fechaAleatoriaEnRango = (desde, hasta) => {
+  const inicio = new Date(`${desde}T12:00:00`).getTime();
+  const fin = new Date(`${hasta}T12:00:00`).getTime();
+  const ts = inicio + Math.floor(Math.random() * (fin - inicio + 86400000));
+  return aFechaISO(new Date(ts));
+};
+
+/**
+ * Selecciona 50 envíos REALES al azar, reparte fechas entre el inicio de la
+ * ventana posprueba y la fecha actual (tope 20-set-2026) y aplica origen Lima
+ * + tipos frágil/general/vulnerable. Completa con envíos nuevos si faltan.
+ */
+const aleatorizarPosprueba = async () => {
+  const ventana = VENTANAS_MEDICION[GRUPO_MUESTRA.POSPRUEBA];
+  const hoy = aFechaISO(new Date());
+  const hastaEfectivo = hoy <= ventana.hasta ? hoy : ventana.hasta;
+
+  const anteriores = await Envio.findAll({
+    where: { grupo_muestra: GRUPO_MUESTRA.POSPRUEBA, origen_dato: ORIGEN_DATO.REAL },
+    attributes: ['id_envio'],
+  });
+  const idsAnteriores = anteriores.map((e) => e.id_envio);
+  if (idsAnteriores.length) {
+    await Envio.update(
+      { grupo_muestra: GRUPO_MUESTRA.NO_MUESTRA },
+      { where: { id_envio: { [Op.in]: idsAnteriores } } }
+    );
+    await Incidencia.update(
+      { grupo_muestra: GRUPO_MUESTRA.NO_MUESTRA },
+      { where: { id_envio: { [Op.in]: idsAnteriores } } }
+    );
+  }
+
+  const pool = await Envio.findAll({
+    where: {
+      activo: true,
+      origen_dato: ORIGEN_DATO.REAL,
+      grupo_muestra: { [Op.ne]: GRUPO_MUESTRA.PREPRUEBA },
+    },
+  });
+
+  let seleccion = shuffle(pool).slice(0, TAMANIO_GRUPO_MUESTRA);
+  let creados = 0;
+
+  if (seleccion.length < TAMANIO_GRUPO_MUESTRA) {
+    const faltan = TAMANIO_GRUPO_MUESTRA - seleccion.length;
+    const clientes = await Cliente.findAll({ where: { activo: true }, limit: 100 });
+    const estado = await EstadoEnvio.findOne({ where: { codigo: 'recibido' } });
+    const operador = await Usuario.findOne({ where: { email: 'operador@salazarlogistica.pe' } });
+    if (!clientes.length || !estado) {
+      throw Object.assign(new Error('Faltan clientes o estados para completar la muestra posprueba.'), {
+        statusCode: 503,
+      });
+    }
+
+    for (let i = 0; i < faltan; i += 1) {
+      const cliente = pick(clientes);
+      const tipo = pick(TIPOS_CARGA_OPERATIVOS);
+      const fecha = fechaAleatoriaEnRango(ventana.desde, hastaEfectivo);
+      const peso = 10 + Math.floor(Math.random() * 200);
+      const paquetes = 1 + Math.floor(Math.random() * 3);
+      const codigo = await generarCodigoEnvio();
+      const envio = await Envio.create({
+        codigo_envio: codigo,
+        id_cliente: cliente.id_cliente,
+        id_estado_actual: estado.id_estado,
+        id_responsable: operador?.id_usuario,
+        origen: ORIGEN_ENVIO_FIJO,
+        destino: pick(DESTINOS_PERU),
+        fecha_registro: fecha,
+        fecha_estimada_entrega: fecha,
+        tipo_carga: tipo,
+        peso_kg: peso,
+        numero_paquetes: paquetes,
+        total_envio: calcularTotalEnvio(peso, paquetes, 'normal'),
+        observaciones: especificacionAleatoria(tipo) || null,
+        registro_correcto: true,
+        origen_dato: ORIGEN_DATO.REAL,
+        grupo_muestra: GRUPO_MUESTRA.NO_MUESTRA,
+        activo: true,
+      });
+      await HistorialEstado.create({
+        id_envio: envio.id_envio,
+        id_estado: estado.id_estado,
+        id_usuario: operador?.id_usuario,
+        comentario: 'Envío generado para muestra posprueba',
+        fecha_hora: new Date(`${fecha}T10:00:00`),
+      });
+      seleccion.push(envio);
+      creados += 1;
+    }
+  }
+
+  seleccion = shuffle(seleccion).slice(0, TAMANIO_GRUPO_MUESTRA);
+  const ids = seleccion.map((e) => e.id_envio);
+
+  for (const envio of seleccion) {
+    const tipo = pick(TIPOS_CARGA_OPERATIVOS);
+    const fecha = fechaAleatoriaEnRango(ventana.desde, hastaEfectivo);
+    const spec = especificacionAleatoria(tipo);
+    const tipoAnterior = envio.tipo_carga;
+    const partes = [];
+    if (spec) partes.push(spec);
+    if (tipoAnterior && !TIPOS_CARGA_OPERATIVOS.includes(tipoAnterior)) {
+      partes.push(`Detalle anterior: ${tipoAnterior}`);
+    } else if (envio.observaciones) {
+      partes.push(envio.observaciones);
+    }
+
+    await envio.update({
+      origen: ORIGEN_ENVIO_FIJO,
+      tipo_carga: tipo,
+      fecha_registro: fecha,
+      observaciones: partes.join('. ').trim() || null,
+      grupo_muestra: GRUPO_MUESTRA.POSPRUEBA,
+      origen_dato: ORIGEN_DATO.REAL,
+    });
+  }
+
+  await Incidencia.update(
+    { grupo_muestra: GRUPO_MUESTRA.POSPRUEBA, origen_dato: ORIGEN_DATO.REAL },
+    { where: { id_envio: { [Op.in]: ids } } }
+  );
+
+  return {
+    total: seleccion.length,
+    creados,
+    ventana: { desde: ventana.desde, hasta: ventana.hasta, hastaEfectivo },
+  };
+};
+
 module.exports = {
   DIMENSIONES,
   ALCANCE,
@@ -470,6 +623,7 @@ module.exports = {
   getMedicionInvestigacion,
   exportarExcel,
   buildExportPayload,
+  aleatorizarPosprueba,
   filtroMuestra,
   SQL_INCIDENCIA_COMPLETA,
   FICHA_MUESTRA,

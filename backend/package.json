@@ -15,6 +15,7 @@
     "db:phase-b": "node database/scripts/run-phase-b.js",
     "db:fix-utf8": "node database/scripts/fix-utf8-data.js",
     "db:muestra": "node database/scripts/marcar-muestra.js",
+    "db:posprueba-actualizar": "node database/scripts/actualizar-posprueba-envios.js",
     "db:usuarios-equipo": "node database/scripts/seed-usuarios-equipo.js",
     "db:export-powerbi": "node database/scripts/export-powerbi-csv.js",
     "db:railway:all": "node database/scripts/railway-pipeline.js"

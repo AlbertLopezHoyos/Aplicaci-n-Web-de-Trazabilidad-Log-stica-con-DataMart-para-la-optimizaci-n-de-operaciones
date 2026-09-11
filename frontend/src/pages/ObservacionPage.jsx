@@ -12,6 +12,7 @@ import {
   Loader2,
   Info,
   ChevronLeft,
+  Shuffle,
 } from 'lucide-react';
 import { toastSuccess, toastError } from '../utils/alerts';
 import { exportFichaExcel } from '../utils/fichaExport';
@@ -70,6 +71,7 @@ const ObservacionPage = () => {
   const [tituloDim, setTituloDim] = useState('');
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [aleatorizando, setAleatorizando] = useState(false);
 
   const paramsFicha = { alcance: ALCANCE_FICHA, grupo: GRUPO_FICHA };
 
@@ -103,6 +105,31 @@ const ObservacionPage = () => {
   useEffect(() => {
     loadDimension(dimensionActiva);
   }, [dimensionActiva]);
+
+  const aleatorizarPosprueba = async () => {
+    const ok = window.confirm(
+      '¿Aleatorizar la muestra posprueba?\n\n' +
+        'Se seleccionarán 50 envíos REALES al azar, con fechas entre el 1 set y hoy, ' +
+        'origen Lima y tipos frágil/general/vulnerable. Los 5500 sintéticos no se modifican.'
+    );
+    if (!ok) return;
+
+    setAleatorizando(true);
+    try {
+      const { data } = await api.post('/observacion/posprueba/aleatorizar');
+      const r = data.data || {};
+      toastSuccess(
+        'Muestra aleatorizada',
+        `${r.total ?? 50} registros · ventana hasta ${r.ventana?.hastaEfectivo ?? 'hoy'}`
+      );
+      loadIndicadores();
+      loadDimension(dimensionActiva);
+    } catch (err) {
+      toastError('Error', err.response?.data?.message || 'No se pudo aleatorizar la muestra');
+    } finally {
+      setAleatorizando(false);
+    }
+  };
 
   const exportar = async (dim) => {
     setExporting(true);
@@ -144,22 +171,37 @@ const ObservacionPage = () => {
       </Link>
       <PageHeader
         title="Fichas de observación"
-        subtitle="Postest — 50 envíos de posprueba · 1 al 20 de septiembre de 2026"
+        subtitle="Postest — 50 envíos de posprueba · origen Lima · tipos frágil, general o vulnerable"
         compact
         action={
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={exporting}
-            onClick={() => exportar(dimensionActiva)}
-          >
-            {exporting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="h-4 w-4" />
-            )}
-            Exportar Excel
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={aleatorizando}
+              onClick={aleatorizarPosprueba}
+            >
+              {aleatorizando ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Shuffle className="h-4 w-4" />
+              )}
+              Aleatorizar datos
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={exporting}
+              onClick={() => exportar(dimensionActiva)}
+            >
+              {exporting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              Exportar Excel
+            </button>
+          </div>
         }
       />
 
@@ -176,7 +218,7 @@ const ObservacionPage = () => {
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="rounded-full bg-salazar-50 px-3 py-1.5 text-xs font-medium text-salazar-800 ring-1 ring-salazar-200">
-          Posprueba · {VENTANA_FICHA.desde} a {VENTANA_FICHA.hasta} · máx. 50 registros
+          Posprueba · {VENTANA_FICHA.desde} a hoy (tope {VENTANA_FICHA.hasta}) · 50 registros
         </span>
       </div>
 

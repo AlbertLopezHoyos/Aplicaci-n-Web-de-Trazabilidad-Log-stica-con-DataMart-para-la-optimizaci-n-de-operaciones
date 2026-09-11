@@ -17,6 +17,12 @@ router.get('/indicadores', validadoresAlcance, validate, observacionController.g
 // Medición de investigación (preprueba vs posprueba) — solo Administrador
 router.get('/medicion', authorize('Administrador'), observacionController.getMedicion);
 
+router.post(
+  '/posprueba/aleatorizar',
+  authorize('Administrador'),
+  observacionController.aleatorizarPosprueba
+);
+
 router.get(
   '/ficha/:dimension',
   [param('dimension').isIn(['1', '2', '3', '4']), ...validadoresAlcance],

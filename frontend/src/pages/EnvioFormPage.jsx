@@ -21,6 +21,7 @@ import { labelCliente } from '../utils/cliente';
 import { calcularTotalEnvio } from '../utils/envio';
 import { descargarComprobanteEnvio } from '../utils/comprobanteEnvioPdf';
 import { formatCurrency } from '../utils/format';
+import { ORIGEN_ENVIO_FIJO, TIPOS_CARGA_OPERATIVOS } from '../utils/tiposCarga';
 
 const emptyNuevoCliente = { nombre_completo: '', dni: '', telefono: '' };
 
@@ -60,11 +61,11 @@ const EnvioFormPage = () => {
   const [envioCreado, setEnvioCreado] = useState(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [form, setForm] = useState({
-    origen: '',
+    origen: ORIGEN_ENVIO_FIJO,
     destino: '',
     fecha_registro: new Date().toISOString().split('T')[0],
     fecha_estimada_entrega: '',
-    tipo_carga: '',
+    tipo_carga: 'general',
     peso_kg: '',
     numero_paquetes: '1',
     total_envio: '',
@@ -99,11 +100,11 @@ const EnvioFormPage = () => {
         .then((r) => {
           const e = r.data.data;
           setForm({
-            origen: e.origen,
+            origen: ORIGEN_ENVIO_FIJO,
             destino: e.destino,
             fecha_registro: e.fecha_registro,
             fecha_estimada_entrega: e.fecha_estimada_entrega || '',
-            tipo_carga: e.tipo_carga,
+            tipo_carga: TIPOS_CARGA_OPERATIVOS.includes(e.tipo_carga) ? e.tipo_carga : 'general',
             peso_kg: e.peso_kg,
             numero_paquetes: e.numero_paquetes ?? 1,
             total_envio: e.total_envio ?? '',
@@ -274,6 +275,7 @@ const EnvioFormPage = () => {
 
       const payload = {
         ...form,
+        origen: ORIGEN_ENVIO_FIJO,
         id_cliente: idCliente,
         prioridad: form.prioridad || 'normal',
         peso_kg: parseFloat(form.peso_kg) || 0,
@@ -363,11 +365,11 @@ const EnvioFormPage = () => {
                   setEnvioCreado(null);
                   setSelectedCliente(null);
                   setForm({
-                    origen: '',
+                    origen: ORIGEN_ENVIO_FIJO,
                     destino: '',
                     fecha_registro: new Date().toISOString().split('T')[0],
                     fecha_estimada_entrega: '',
-                    tipo_carga: '',
+                    tipo_carga: 'general',
                     peso_kg: '',
                     numero_paquetes: '1',
                     total_envio: '',
@@ -595,8 +597,15 @@ const EnvioFormPage = () => {
               </h3>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">Origen *</label>
-                  <input name="origen" className="input-field" value={form.origen} onChange={handleChange} required placeholder="Ej. Lima, Ate" />
+                  <label className="mb-1 block text-xs font-medium text-slate-600">Origen</label>
+                  <input
+                    name="origen"
+                    className="input-field bg-slate-50 text-slate-700"
+                    value={ORIGEN_ENVIO_FIJO}
+                    readOnly
+                    disabled
+                    title="Origen fijo para operaciones desde Lima"
+                  />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-slate-600">Destino *</label>
@@ -630,7 +639,14 @@ const EnvioFormPage = () => {
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-slate-600">Tipo de carga *</label>
-                  <input name="tipo_carga" className="input-field" value={form.tipo_carga} onChange={handleChange} required placeholder="General, frágil..." />
+                  <select name="tipo_carga" className="input-field" value={form.tipo_carga} onChange={handleChange} required>
+                    <option value="">Seleccione...</option>
+                    {TIPOS_CARGA_OPERATIVOS.map((tipo) => (
+                      <option key={tipo} value={tipo}>
+                        {tipo.charAt(0).toUpperCase() + tipo.slice(1)}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-slate-600">Peso (kg)</label>
@@ -666,7 +682,14 @@ const EnvioFormPage = () => {
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-slate-600">Observaciones</label>
-                <textarea name="observaciones" rows={2} className="input-field" value={form.observaciones} onChange={handleChange} placeholder="Instrucciones especiales, referencias..." />
+                <textarea
+                  name="observaciones"
+                  rows={2}
+                  className="input-field"
+                  value={form.observaciones}
+                  onChange={handleChange}
+                  placeholder="Especificaciones de la carga (opcional): contenido, embalaje, instrucciones..."
+                />
               </div>
             </div>
 
