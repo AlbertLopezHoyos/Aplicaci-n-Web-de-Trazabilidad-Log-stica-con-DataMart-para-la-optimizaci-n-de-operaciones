@@ -226,7 +226,14 @@ const SeguimientoPage = () => {
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <p className="font-mono text-lg font-bold text-salazar-800">{envio.codigo_envio}</p>
-                  <p className="text-sm text-slate-500">{labelCliente(envio.cliente)}</p>
+                  <p className="text-sm text-slate-500">Envía: {labelCliente(envio.cliente)}</p>
+                  {envio.nombre_destinatario && (
+                    <p className="text-sm text-slate-600">
+                      Recibe: {envio.nombre_destinatario}
+                      {envio.dni_destinatario ? ` · DNI ${envio.dni_destinatario}` : ''}
+                      {envio.telefono_destinatario ? ` · ${envio.telefono_destinatario}` : ''}
+                    </p>
+                  )}
                   <p className="mt-2 flex items-center gap-1 text-sm text-slate-600">
                     <MapPin className="h-4 w-4" />
                     {envio.origen} → {envio.destino}

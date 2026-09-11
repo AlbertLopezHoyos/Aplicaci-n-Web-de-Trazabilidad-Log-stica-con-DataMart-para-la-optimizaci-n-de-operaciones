@@ -55,6 +55,9 @@ const run = async () => {
         tipo_carga: s.tipo,
         peso_kg: s.peso,
         total_envio: Math.round((35 + s.peso * 2.2 + 8) * 100) / 100,
+        nombre_destinatario: `Destinatario ${s.destino}`,
+        dni_destinatario: String(10000000 + (samples.indexOf(s) * 7919) % 89999999).padStart(8, '0').slice(0, 8),
+        telefono_destinatario: `9${String(10000000 + (samples.indexOf(s) * 3571) % 89999999).padStart(8, '0').slice(0, 8)}`,
         observaciones: 'Envío de demostración - Tesis 2026',
         // Datos de demostración: no forman parte de la muestra de investigación.
         origen_dato: 'SINTETICO',

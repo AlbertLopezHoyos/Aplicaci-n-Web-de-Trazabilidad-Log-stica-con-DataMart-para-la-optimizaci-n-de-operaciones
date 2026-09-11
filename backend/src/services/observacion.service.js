@@ -4,6 +4,7 @@ const { Op } = require('sequelize');
 const { sequelize, Envio, Incidencia, Cliente, EstadoEnvio, Usuario, HistorialEstado } = require('../models');
 const { QueryTypes } = require('sequelize');
 const { generarCodigoEnvio } = require('../utils/codigoEnvio');
+const { generarDestinatarioAleatorio } = require('../utils/destinatario');
 const { DESTINOS_PERU, calcularTotalEnvio } = require('../../database/seeders/bulk-data');
 const {
   ORIGEN_ENVIO_FIJO,
@@ -544,6 +545,7 @@ const aleatorizarPosprueba = async () => {
       const peso = 10 + Math.floor(Math.random() * 200);
       const paquetes = 1 + Math.floor(Math.random() * 3);
       const codigo = await generarCodigoEnvio();
+      const destinatario = generarDestinatarioAleatorio(Date.now() + i);
       const envio = await Envio.create({
         codigo_envio: codigo,
         id_cliente: cliente.id_cliente,
@@ -558,6 +560,7 @@ const aleatorizarPosprueba = async () => {
         numero_paquetes: paquetes,
         total_envio: calcularTotalEnvio(peso, paquetes, 'normal'),
         observaciones: especificacionAleatoria(tipo) || null,
+        ...destinatario,
         registro_correcto: true,
         origen_dato: ORIGEN_DATO.REAL,
         grupo_muestra: GRUPO_MUESTRA.NO_MUESTRA,

@@ -6,6 +6,12 @@ const validateConRegistroErrores = require('../middlewares/validate.middleware')
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { TIPOS_CARGA_OPERATIVOS } = require('../utils/tiposCarga');
 
+const validadoresDestinatario = [
+  body('nombre_destinatario').notEmpty().withMessage('Nombre del destinatario requerido'),
+  body('dni_destinatario').matches(/^\d{8}$/).withMessage('DNI del destinatario debe tener 8 dígitos'),
+  body('telefono_destinatario').notEmpty().isLength({ min: 7, max: 20 }).withMessage('Teléfono del destinatario requerido'),
+];
+
 const router = express.Router();
 
 router.use(authenticate);
@@ -20,6 +26,7 @@ router.post(
     body('origen').notEmpty().withMessage('Origen requerido'),
     body('destino').notEmpty().withMessage('Destino requerido'),
     body('tipo_carga').isIn(TIPOS_CARGA_OPERATIVOS).withMessage('Tipo de carga inválido'),
+    ...validadoresDestinatario,
     body('numero_paquetes').optional().isInt({ min: 1 }).withMessage('Número de paquetes inválido'),
     body('peso_kg').optional().isFloat({ min: 0 }).withMessage('Peso inválido'),
     body('hora_inicio_registro').optional().isISO8601().withMessage('Hora inicio inválida'),
@@ -31,6 +38,9 @@ router.put(
   '/:id',
   [
     body('tipo_carga').optional().isIn(TIPOS_CARGA_OPERATIVOS).withMessage('Tipo de carga inválido'),
+    body('nombre_destinatario').optional().notEmpty().withMessage('Nombre del destinatario requerido'),
+    body('dni_destinatario').optional().matches(/^\d{8}$/).withMessage('DNI del destinatario inválido'),
+    body('telefono_destinatario').optional().isLength({ min: 7, max: 20 }).withMessage('Teléfono del destinatario inválido'),
     body('numero_paquetes').optional().isInt({ min: 1 }),
     body('peso_kg').optional().isFloat({ min: 0 }),
   ],

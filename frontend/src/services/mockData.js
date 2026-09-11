@@ -34,6 +34,9 @@ let envios = [
     tiempo_registro_min: 4.5,
     registro_correcto: true,
     observaciones: 'Registro demo',
+    nombre_destinatario: 'Pedro Huamán Quispe',
+    dni_destinatario: '45678901',
+    telefono_destinatario: '987654321',
     cliente: clientes[0],
     estadoActual: estados[2],
     responsable,
@@ -59,6 +62,9 @@ let envios = [
     hora_fin_registro: '2026-05-25T10:17:20',
     tiempo_registro_min: 2.33,
     registro_correcto: true,
+    nombre_destinatario: 'Lucía Mendoza Ríos',
+    dni_destinatario: '70123456',
+    telefono_destinatario: '912345678',
     cliente: clientes[1],
     estadoActual: estados[1],
     responsable,
@@ -81,6 +87,9 @@ let envios = [
     hora_fin_registro: '2026-05-24T08:38:00',
     tiempo_registro_min: 8,
     registro_correcto: false,
+    nombre_destinatario: 'Jorge Medina Ponce',
+    dni_destinatario: '47892345',
+    telefono_destinatario: '923456789',
     cliente: clientes[2],
     estadoActual: estados[3],
     responsable,
@@ -794,6 +803,11 @@ export const handleMockRequest = async (config) => {
   if (mockHandlers[handlerKey]) return mockHandlers[handlerKey](config);
 
   if (method === 'post' && path === 'envios') {
+    if (!body.nombre_destinatario?.trim() || !/^\d{8}$/.test(String(body.dni_destinatario || '').replace(/\D/g, '')) || !body.telefono_destinatario?.trim()) {
+      return Promise.reject({
+        response: { status: 400, data: { message: 'Nombre, DNI y teléfono del destinatario son obligatorios' } },
+      });
+    }
     const estado = estados.find((s) => s.codigo === 'recibido');
     const inicio = body.hora_inicio_registro ? new Date(body.hora_inicio_registro) : new Date(Date.now() - 180000);
     const fin = new Date();

@@ -26,6 +26,7 @@ const {
   FUENTES,
   TIPOS_INC,
   NOMBRES_CLIENTES,
+  dniFromIndex,
   calcularTotalEnvio,
   pick,
   randomInt,
@@ -75,6 +76,7 @@ const buildEnvioRow = (seq, estadoMap, clientes, operadorId) => {
   const peso = randomInt(5, 2500);
   const paquetes = randomInt(1, 40);
   const prioridad = pick(['baja', 'normal', 'normal', 'normal', 'alta', 'urgente']);
+  const destIdx = randomInt(0, NOMBRES_CLIENTES.length - 1);
 
   return {
     codigo_envio: padCodigo(year, seq),
@@ -93,6 +95,9 @@ const buildEnvioRow = (seq, estadoMap, clientes, operadorId) => {
     tiempo_registro_min: tiempoReg,
     registro_correcto: Math.random() > 0.08,
     observaciones: 'Dato sintético — carga masiva DataMart Tesis 2026',
+    nombre_destinatario: NOMBRES_CLIENTES[destIdx],
+    dni_destinatario: dniFromIndex(seq),
+    telefono_destinatario: `9${String(10000000 + randomInt(0, 89999999)).slice(0, 8)}`,
     prioridad,
     activo: 1,
     origen_dato: ORIGEN_DATO.SINTETICO,

@@ -42,7 +42,7 @@ export async function descargarComprobanteEnvio(envio) {
   doc.setTextColor(...BRAND.primary);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
-  doc.text('Datos del cliente', 14, y);
+  doc.text('Quien envía', 14, y);
   y += 6;
 
   const cliente = envio.cliente || {};
@@ -56,6 +56,26 @@ export async function descargarComprobanteEnvio(envio) {
       ['Nombre', nombreCliente(cliente)],
       ['DNI', docCliente(cliente)],
       ['Teléfono', telefonoCliente(cliente)],
+    ],
+  });
+  y = doc.lastAutoTable.finalY + 10;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(...BRAND.primary);
+  doc.text('Quien recibe', 14, y);
+  y += 6;
+
+  autoTable(doc, {
+    startY: y,
+    margin: { left: 14, right: 14 },
+    theme: 'plain',
+    styles: { fontSize: 10, cellPadding: 2.5 },
+    columnStyles: { 0: { fontStyle: 'bold', cellWidth: 42, textColor: BRAND.muted } },
+    body: [
+      ['Nombre', envio.nombre_destinatario || '—'],
+      ['DNI', envio.dni_destinatario || '—'],
+      ['Teléfono', envio.telefono_destinatario || '—'],
     ],
   });
   y = doc.lastAutoTable.finalY + 10;

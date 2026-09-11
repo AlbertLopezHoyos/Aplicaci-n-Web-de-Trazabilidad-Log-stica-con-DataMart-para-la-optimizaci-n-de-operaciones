@@ -22,6 +22,7 @@ import { calcularTotalEnvio } from '../utils/envio';
 import { descargarComprobanteEnvio } from '../utils/comprobanteEnvioPdf';
 import { formatCurrency } from '../utils/format';
 import { ORIGEN_ENVIO_FIJO, TIPOS_CARGA_OPERATIVOS } from '../utils/tiposCarga';
+import { validarDestinatario, sanitizarDestinatario } from '../utils/destinatario';
 
 const emptyNuevoCliente = { nombre_completo: '', dni: '', telefono: '' };
 
@@ -71,6 +72,9 @@ const EnvioFormPage = () => {
     total_envio: '',
     observaciones: '',
     prioridad: 'normal',
+    nombre_destinatario: '',
+    dni_destinatario: '',
+    telefono_destinatario: '',
   });
 
   const selectCliente = useCallback((cliente) => {
@@ -110,6 +114,9 @@ const EnvioFormPage = () => {
             total_envio: e.total_envio ?? '',
             observaciones: e.observaciones || '',
             prioridad: e.prioridad || 'normal',
+            nombre_destinatario: e.nombre_destinatario || '',
+            dni_destinatario: e.dni_destinatario || '',
+            telefono_destinatario: e.telefono_destinatario || '',
           });
           if (e.cliente) {
             selectCliente({
@@ -130,7 +137,8 @@ const EnvioFormPage = () => {
   };
 
   const pasoClienteOk = Boolean(selectedCliente) || (clienteMode === 'nuevo' && nuevoCliente.nombre_completo && nuevoCliente.dni.length === 8);
-  const pasoEnvioOk = form.origen && form.destino && form.tipo_carga;
+  const pasoDestinatarioOk = !validarDestinatario(form);
+  const pasoEnvioOk = form.origen && form.destino && form.tipo_carga && pasoDestinatarioOk;
 
   const resumen = useMemo(
     () => ({
@@ -143,7 +151,8 @@ const EnvioFormPage = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((f) => ({ ...f, [name]: value }));
+    const next = name === 'dni_destinatario' ? value.replace(/\D/g, '').slice(0, 8) : value;
+    setForm((f) => ({ ...f, [name]: next }));
   };
 
   const handleNuevoClienteChange = (e) => {
@@ -251,6 +260,8 @@ const EnvioFormPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const errores = validarEnvio(form);
+    const errDestinatario = validarDestinatario(form);
+    if (errDestinatario) errores.push({ campo: 'destinatario', msg: errDestinatario });
     if (errores.length) {
       await registrarErroresCliente(errores);
       toastError('Datos inválidos', errores.map((x) => x.msg).join('. '));
@@ -275,6 +286,7 @@ const EnvioFormPage = () => {
 
       const payload = {
         ...form,
+        ...sanitizarDestinatario(form),
         origen: ORIGEN_ENVIO_FIJO,
         id_cliente: idCliente,
         prioridad: form.prioridad || 'normal',
@@ -375,6 +387,9 @@ const EnvioFormPage = () => {
                     total_envio: '',
                     observaciones: '',
                     prioridad: 'normal',
+                    nombre_destinatario: '',
+                    dni_destinatario: '',
+                    telefono_destinatario: '',
                   });
                   horaInicioRef.current = new Date().toISOString();
                 }}
@@ -411,7 +426,7 @@ const EnvioFormPage = () => {
         subtitle={
           isEdit
             ? 'Modifique los datos logísticos del envío'
-            : 'Identifique al cliente y complete los datos operativos del envío'
+            : 'Identifique quien envía, quien recibe y complete los datos del envío'
         }
         compact
         action={
@@ -432,8 +447,8 @@ const EnvioFormPage = () => {
       )}
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
-        <StatChip label="Paso 1 · Cliente" value={pasoClienteOk ? 'Listo' : 'Pendiente'} accent={pasoClienteOk ? 'green' : 'amber'} />
-        <StatChip label="Paso 2 · Envío" value={pasoEnvioOk ? 'Listo' : 'Pendiente'} accent={pasoEnvioOk ? 'green' : 'slate'} />
+        <StatChip label="Paso 1 · Quien envía" value={pasoClienteOk ? 'Listo' : 'Pendiente'} accent={pasoClienteOk ? 'green' : 'amber'} />
+        <StatChip label="Paso 2 · Envío y destinatario" value={pasoEnvioOk ? 'Listo' : 'Pendiente'} accent={pasoEnvioOk ? 'green' : 'slate'} />
         <StatChip label="Total" value={form.total_envio !== '' ? formatCurrency(form.total_envio) : 'Pendiente'} accent="salazar" />
       </div>
 
@@ -460,7 +475,7 @@ const EnvioFormPage = () => {
               <div className="flex items-center justify-between gap-2">
                 <h3 className="panel-title mb-0 flex items-center gap-2">
                   <span className="flex h-6 w-6 items-center justify-center rounded-full bg-salazar-800 text-xs font-bold text-white">1</span>
-                  Cliente
+                  Quien envía
                 </h3>
                 {!isEdit && !presentacionActiva && (
                   <div className="flex gap-1 rounded-lg border border-slate-200 p-0.5 text-xs">
@@ -565,9 +580,15 @@ const EnvioFormPage = () => {
               <h3 className="panel-title mb-0">Resumen</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between gap-2">
-                  <span className="text-slate-500">Cliente</span>
+                  <span className="text-slate-500">Envía</span>
                   <span className="truncate text-right font-medium text-slate-800">
                     {selectedCliente ? labelCliente(selectedCliente) : clienteMode === 'nuevo' && nuevoCliente.nombre_completo ? nuevoCliente.nombre_completo : '—'}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-slate-500">Recibe</span>
+                  <span className="truncate text-right font-medium text-slate-800">
+                    {form.nombre_destinatario?.trim() || '—'}
                   </span>
                 </div>
                 <div className="flex justify-between gap-2">
@@ -593,6 +614,52 @@ const EnvioFormPage = () => {
             <div className="card space-y-3">
               <h3 className="panel-title flex items-center gap-2">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-salazar-800 text-xs font-bold text-white">2</span>
+                Quien recibe
+              </h3>
+              <p className="text-xs text-slate-500">
+                Persona que recibirá el envío en destino. Los tres campos son obligatorios.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="sm:col-span-1">
+                  <label className="mb-1 block text-xs font-medium text-slate-600">Nombre completo *</label>
+                  <input
+                    name="nombre_destinatario"
+                    className="input-field"
+                    value={form.nombre_destinatario}
+                    onChange={handleChange}
+                    placeholder="Nombre de quien recibe"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">DNI *</label>
+                  <input
+                    name="dni_destinatario"
+                    className="input-field"
+                    value={form.dni_destinatario}
+                    onChange={handleChange}
+                    placeholder="8 dígitos"
+                    maxLength={8}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">Teléfono *</label>
+                  <input
+                    name="telefono_destinatario"
+                    className="input-field"
+                    value={form.telefono_destinatario}
+                    onChange={handleChange}
+                    placeholder="Ej. 987654321"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="card space-y-3">
+              <h3 className="panel-title flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-salazar-800 text-xs font-bold text-white">3</span>
                 Datos del envío
               </h3>
               <div className="grid gap-3 sm:grid-cols-2">

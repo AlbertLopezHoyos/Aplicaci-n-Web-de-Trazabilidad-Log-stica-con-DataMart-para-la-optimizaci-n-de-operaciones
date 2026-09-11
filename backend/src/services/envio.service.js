@@ -3,14 +3,29 @@ const envioRepo = require('../repositories/envio.repository');
 const { generarCodigoEnvio } = require('../utils/codigoEnvio');
 const { sanitizeObject } = require('../utils/sanitize');
 const { ORIGEN_ENVIO_FIJO, esTipoCargaValido } = require('../utils/tiposCarga');
+const { validarDestinatario } = require('../utils/destinatario');
 const anonimizacion = require('./anonimizacion.service');
 
-const normalizarEnvioOperativo = (clean) => {
+const CAMPOS_TEXTO_ENVIO = [
+  'origen', 'destino', 'tipo_carga', 'observaciones',
+  'nombre_destinatario', 'dni_destinatario', 'telefono_destinatario',
+];
+
+const normalizarEnvioOperativo = (clean, { exigirDestinatario = true } = {}) => {
   clean.origen = ORIGEN_ENVIO_FIJO;
   if (clean.tipo_carga !== undefined && clean.tipo_carga !== '' && !esTipoCargaValido(clean.tipo_carga)) {
     throw Object.assign(new Error('Tipo de carga inválido. Use: frágil, general o vulnerable.'), {
       statusCode: 400,
     });
+  }
+  if (exigirDestinatario) {
+    Object.assign(clean, validarDestinatario(clean));
+  } else if (
+    clean.nombre_destinatario !== undefined
+    || clean.dni_destinatario !== undefined
+    || clean.telefono_destinatario !== undefined
+  ) {
+    Object.assign(clean, validarDestinatario(clean));
   }
   return clean;
 };
@@ -40,7 +55,7 @@ const getById = async (id, { presentacionAcademica = false } = {}) => {
 };
 
 const create = async (data, userId, opciones = {}) => {
-  const clean = normalizarEnvioOperativo(sanitizeObject(data, ['origen', 'destino', 'tipo_carga', 'observaciones']));
+  const clean = normalizarEnvioOperativo(sanitizeObject(data, CAMPOS_TEXTO_ENVIO));
   const codigo = await generarCodigoEnvio();
   const estadoInicial = await EstadoEnvio.findOne({ where: { codigo: 'recibido' } });
   if (!estadoInicial) {
@@ -100,7 +115,10 @@ const create = async (data, userId, opciones = {}) => {
 const update = async (id, data, userId, opciones = {}) => {
   const envio = await Envio.findByPk(id);
   if (!envio || !envio.activo) throw Object.assign(new Error('Envío no encontrado'), { statusCode: 404 });
-  const clean = normalizarEnvioOperativo(sanitizeObject(data, ['origen', 'destino', 'tipo_carga', 'observaciones']));
+  const clean = normalizarEnvioOperativo(
+    sanitizeObject(data, CAMPOS_TEXTO_ENVIO),
+    { exigirDestinatario: false }
+  );
   if (clean.numero_paquetes !== undefined) clean.numero_paquetes = parseInt(clean.numero_paquetes, 10) || 1;
   if (clean.total_envio !== undefined) {
     const total = parseFloat(clean.total_envio);
