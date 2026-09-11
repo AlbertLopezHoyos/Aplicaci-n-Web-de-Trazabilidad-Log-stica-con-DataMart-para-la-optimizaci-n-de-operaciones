@@ -19,6 +19,11 @@
     "db:migrate-09": "node database/scripts/run-migrate-09.js",
     "db:usuarios-equipo": "node database/scripts/seed-usuarios-equipo.js",
     "db:export-powerbi": "node database/scripts/export-powerbi-csv.js",
+    "db:export-powerbi:railway": "node database/scripts/export-powerbi-csv.js --railway",
+    "db:powerbi-setup": "node database/scripts/setup-powerbi-remote.js",
+    "db:powerbi-setup:railway": "node database/scripts/setup-powerbi-remote.js --railway",
+    "db:powerbi-test": "node database/scripts/test-powerbi-auth.js",
+    "db:powerbi-test:railway": "node database/scripts/test-powerbi-auth.js --railway",
     "db:railway:all": "node database/scripts/railway-pipeline.js"
   },
   "keywords": [

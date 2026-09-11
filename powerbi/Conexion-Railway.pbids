@@ -1,0 +1,19 @@
+{
+  "version": "1.0",
+  "connections": [
+    {
+      "details": {
+        "protocol": "mysql",
+        "address": {
+          "server": "tokaido.proxy.rlwy.net:18507",
+          "database": "railway"
+        },
+        "authentication": null,
+        "query": null,
+        "command": null
+      },
+      "options": {},
+      "mode": "Import"
+    }
+  ]
+}

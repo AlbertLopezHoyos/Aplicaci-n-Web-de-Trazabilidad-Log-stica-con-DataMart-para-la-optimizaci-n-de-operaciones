@@ -1,8 +1,14 @@
 /**
  * Exporta tablas DataMart a CSV para Power BI (sin conector MySQL)
  * Uso: npm run db:export-powerbi
+ *      npm run db:export-powerbi:railway
  */
-require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
+const useRailway = process.argv.includes('--railway');
+const backendRoot = require('path').join(__dirname, '../..');
+require('dotenv').config({ path: require('path').join(backendRoot, '.env') });
+if (useRailway) {
+  require('./load-railway-env');
+}
 const fs = require('fs');
 const path = require('path');
 const sequelize = require('../../src/config/database');

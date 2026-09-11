@@ -1,0 +1,59 @@
+// Medidas DAX — DataMart Grupo Logístico Salazar
+// Tabla de hechos: pbi_fact_operaciones (ajuste el nombre si Power BI renombró la tabla)
+
+Total envíos =
+COUNTROWS ( pbi_fact_operaciones )
+
+Envíos entregados =
+CALCULATE (
+    COUNTROWS ( pbi_fact_operaciones ),
+    pbi_dim_estado[codigo] = "entregado"
+)
+
+OTIF % =
+DIVIDE (
+    CALCULATE (
+        COUNTROWS ( pbi_fact_operaciones ),
+        pbi_fact_operaciones[entregado_a_tiempo] = 1
+    ),
+    CALCULATE (
+        COUNTROWS ( pbi_fact_operaciones ),
+        pbi_dim_estado[es_final] = 1
+    )
+)
+
+Peso promedio kg =
+AVERAGE ( pbi_fact_operaciones[peso_kg] )
+
+Días tránsito promedio =
+AVERAGE ( pbi_fact_operaciones[dias_transito] )
+
+Tasa con incidencias =
+DIVIDE (
+    CALCULATE (
+        COUNTROWS ( pbi_fact_operaciones ),
+        pbi_fact_operaciones[cantidad_incidencias] > 0
+    ),
+    COUNTROWS ( pbi_fact_operaciones )
+)
+
+Tasa retraso =
+DIVIDE (
+    CALCULATE (
+        COUNTROWS ( pbi_fact_operaciones ),
+        pbi_fact_operaciones[tuvo_retraso] = 1
+    ),
+    COUNTROWS ( pbi_fact_operaciones )
+)
+
+Solo datos reales =
+CALCULATE (
+    COUNTROWS ( pbi_fact_operaciones ),
+    pbi_fact_operaciones[origen_dato] = "REAL"
+)
+
+Solo datos sintéticos =
+CALCULATE (
+    COUNTROWS ( pbi_fact_operaciones ),
+    pbi_fact_operaciones[origen_dato] = "SINTETICO"
+)

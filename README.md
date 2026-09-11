@@ -168,8 +168,11 @@ Documentación técnica de la tesis en [`docs/`](docs/):
 | [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) | Frontend, backend, API REST, MySQL, OLTP, DataMart y flujo de información |
 | [docs/SCRUM.md](docs/SCRUM.md) | Visión, Product Backlog, historias, criterios de aceptación, sprints y DoD |
 | [docs/PRUEBAS.md](docs/PRUEBAS.md) | Casos de prueba, resultados y evidencias pendientes |
+| [docs/POWERBI.md](docs/POWERBI.md) | Conexión remota de Power BI Desktop al MySQL (Railway) y modelo estrella |
 
 Otros:
+
+- [powerbi/](powerbi/) — plantilla `.pbids`, medidas DAX de ejemplo  
 
 - [backend/README.md](backend/README.md)  
 - [frontend/README.md](frontend/README.md)  
