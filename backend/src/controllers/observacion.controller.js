@@ -30,10 +30,11 @@ const getDimension = async (req, res, next) => {
   try {
     const dimension = parseInt(req.params.dimension, 10);
     const opciones = opcionesDesdeQuery(req);
+    const limite = req.query.limit || observacionService.limiteFichaGrupo(opciones.grupo);
     const [data, total] = await Promise.all([
       observacionService.getDatosDimension(dimension, {
         ...opciones,
-        limit: req.query.limit || observacionService.FICHA_MUESTRA,
+        limit: limite,
       }),
       observacionService.countDatosDimension(dimension, opciones),
     ]);
@@ -48,7 +49,7 @@ const getDimension = async (req, res, next) => {
       grupo: opciones.grupo || null,
       data,
       total,
-      limite: observacionService.FICHA_MUESTRA,
+      limite,
     });
   } catch (err) {
     next(err);

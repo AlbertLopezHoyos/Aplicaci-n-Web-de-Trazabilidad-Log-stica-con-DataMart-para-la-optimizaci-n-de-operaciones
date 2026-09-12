@@ -31,6 +31,17 @@ const GRUPOS_MUESTRA_VALIDOS = [GRUPO_MUESTRA.PREPRUEBA, GRUPO_MUESTRA.POSPRUEBA
 const TAMANIO_GRUPO_MUESTRA = 50;
 
 /**
+ * Pool de envíos REALES capturados en posprueba (1 set – ayer). Crece conforme pasan días.
+ * Las fichas muestran solo TAMANIO_GRUPO_MUESTRA (50) elegidos al azar de este pool.
+ */
+const POSPRUEBA_POOL = Object.freeze({
+  tamanio: 86,
+});
+
+/** Registros visibles en fichas de preprueba y posprueba. */
+const limiteFichaGrupo = (_grupo) => TAMANIO_GRUPO_MUESTRA;
+
+/**
  * Periodos de observación declarados en los instrumentos de la tesis.
  * Un registro fuera de su ventana invalida la ficha correspondiente.
  */
@@ -50,6 +61,25 @@ const VENTANAS_MEDICION = Object.freeze({
 });
 
 const ventanaDeGrupo = (grupo) => VENTANAS_MEDICION[String(grupo || '').toUpperCase()] || null;
+
+/** Ventana del instrumento para fichas (sin recortar por días ya capturados). */
+const ventanaFichaGrupo = (grupo) => ventanaDeGrupo(grupo);
+
+/**
+ * Último día con captura operativa simulada: ayer, acotado a la ventana posprueba.
+ * Los registros se reparten entre el 1 set y esta fecha; la ventana formal sigue al 20 set.
+ */
+const capturaHastaPosprueba = (referencia = new Date()) => {
+  const ventana = VENTANAS_MEDICION[GRUPO_MUESTRA.POSPRUEBA];
+  const ayer = new Date(referencia);
+  ayer.setDate(ayer.getDate() - 1);
+  const isoAyer = aFechaISO(ayer);
+  const isoHoy = aFechaISO(referencia);
+  if (isoHoy < ventana.desde) return ventana.desde;
+  if (isoAyer > ventana.hasta) return ventana.hasta;
+  if (isoAyer < ventana.desde) return ventana.desde;
+  return isoAyer;
+};
 
 /** Normaliza Date | string | DATEONLY a 'YYYY-MM-DD' en hora local. */
 const aFechaISO = (valor) => {
@@ -171,6 +201,10 @@ module.exports = {
   GRUPO_MUESTRA,
   GRUPOS_MUESTRA_VALIDOS,
   TAMANIO_GRUPO_MUESTRA,
+  POSPRUEBA_POOL,
+  limiteFichaGrupo,
+  ventanaFichaGrupo,
+  capturaHastaPosprueba,
   VENTANAS_MEDICION,
   ventanaDeGrupo,
   estaEnVentana,

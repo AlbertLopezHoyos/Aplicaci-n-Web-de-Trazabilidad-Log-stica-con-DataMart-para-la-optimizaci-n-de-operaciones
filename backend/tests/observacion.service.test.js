@@ -148,13 +148,14 @@ describe('criterio PIOIC en SQL', () => {
 });
 
 describe('fichas de observación', () => {
-  it('la ficha de posprueba se limita a 50 registros dentro de la ventana 1–20 set 2026', async () => {
+  it('la ficha de posprueba se limita a 50 registros y orden aleatorio (1–20 set 2026)', async () => {
     sequelize.query.mockResolvedValueOnce([]);
     await observacionService.getDatosDimension(1, { limit: 50, grupo: 'POSPRUEBA' });
     const sql = sqlDeLlamada(0);
     expect(sql).toContain('origen_dato = :origenReal');
     expect(sql).toContain('grupo_muestra IN (:gruposMuestra)');
     expect(sql).toContain('fecha_registro BETWEEN :ventanaDesde AND :ventanaHasta');
+    expect(sql).toContain('ORDER BY RAND()');
     expect(sql).toContain('LIMIT 50');
     expect(replacementsDeLlamada(0)).toEqual({
       origenReal: 'REAL',

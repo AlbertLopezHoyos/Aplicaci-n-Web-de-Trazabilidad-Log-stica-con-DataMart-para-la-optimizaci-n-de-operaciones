@@ -17,6 +17,10 @@ const {
   GRUPO_MUESTRA,
   GRUPOS_MUESTRA_VALIDOS,
   TAMANIO_GRUPO_MUESTRA,
+  POSPRUEBA_POOL,
+  limiteFichaGrupo,
+  ventanaFichaGrupo,
+  capturaHastaPosprueba,
   CAMPOS_INCIDENCIA_COMPLETA,
   VENTANAS_MEDICION,
   aFechaISO,
@@ -148,7 +152,7 @@ const filtroMuestra = (alias, { alcance, grupo, enVentana = false } = {}) => {
   const replacements = { origenReal: ORIGEN_DATO.REAL, gruposMuestra: grupos };
   let sql = `${alias}.origen_dato = :origenReal AND ${alias}.grupo_muestra IN (:gruposMuestra)`;
   if (enVentana && grupoNormalizado) {
-    const ventana = VENTANAS_MEDICION[grupoNormalizado];
+    const ventana = ventanaFichaGrupo(grupoNormalizado);
     if (ventana) {
       sql += ` AND e.fecha_registro BETWEEN :ventanaDesde AND :ventanaHasta`;
       replacements.ventanaDesde = ventana.desde;
@@ -172,7 +176,13 @@ const SQL_ULTIMO_HISTORIAL = `
     ) m ON m.id_historial = h.id_historial
   ) ult ON ult.id_envio = e.id_envio`;
 
-const sqlFicha = (dimension, filtro) => {
+const ordenFicha = (grupo) =>
+  normalizarGrupo(grupo) === GRUPO_MUESTRA.POSPRUEBA
+    ? 'ORDER BY RAND()'
+    : 'ORDER BY e.fecha_registro ASC, e.id_envio ASC';
+
+const sqlFicha = (dimension, filtro, grupo) => {
+  const orden = ordenFicha(grupo);
   if (dimension === 1) {
     return `SELECT e.codigo_envio, e.fecha_registro AS fecha, e.tipo_carga AS tipo_mercaderia,
                    e.peso_kg, e.numero_paquetes, e.origen, e.destino,
@@ -184,7 +194,7 @@ const sqlFicha = (dimension, filtro) => {
             FROM envios e
             LEFT JOIN usuarios u ON e.id_responsable = u.id_usuario
             WHERE e.activo = 1 AND ${filtro.sql}
-            ORDER BY e.fecha_registro ASC, e.id_envio ASC`;
+            ${orden}`;
   }
   if (dimension === 2) {
     return `SELECT e.codigo_envio, e.fecha_registro AS fecha, e.tipo_carga AS tipo_mercaderia,
@@ -201,7 +211,7 @@ const sqlFicha = (dimension, filtro) => {
               FROM errores_registro WHERE id_envio IS NOT NULL GROUP BY id_envio
             ) er ON er.id_envio = e.id_envio
             WHERE e.activo = 1 AND ${filtro.sql}
-            ORDER BY e.fecha_registro ASC, e.id_envio ASC`;
+            ${orden}`;
   }
   if (dimension === 3) {
     return `SELECT e.codigo_envio, e.fecha_registro AS fecha, e.tipo_carga AS tipo_mercaderia,
@@ -216,8 +226,11 @@ const sqlFicha = (dimension, filtro) => {
             ${SQL_ULTIMO_HISTORIAL}
             LEFT JOIN usuarios u ON ult.id_usuario = u.id_usuario
             WHERE e.activo = 1 AND ${filtro.sql}
-            ORDER BY e.fecha_registro ASC, e.id_envio ASC`;
+            ${orden}`;
   }
+  const ordenInc = normalizarGrupo(grupo) === GRUPO_MUESTRA.POSPRUEBA
+    ? 'ORDER BY RAND()'
+    : 'ORDER BY e.fecha_registro ASC, i.id_incidencia ASC';
   return `SELECT DATE(i.fecha_reporte) AS fecha, i.codigo_incidencia,
                  i.tipo AS tipo_incidencia, i.area, e.codigo_envio,
                  i.estado_incidencia, i.titulo, i.descripcion,
@@ -226,15 +239,17 @@ const sqlFicha = (dimension, filtro) => {
           FROM incidencias i
           JOIN envios e ON e.id_envio = i.id_envio
           WHERE e.activo = 1 AND ${filtro.sql}
-          ORDER BY e.fecha_registro ASC, i.id_incidencia ASC`;
+          ${ordenInc}`;
 };
 
 const getDatosDimension = async (dimension, { limit = null, alcance, grupo } = {}) => {
   const config = DIMENSIONES[dimension];
   if (!config) throw Object.assign(new Error('Dimensión no válida'), { statusCode: 400 });
+  const grupoNormalizado = normalizarGrupo(grupo);
   const filtro = filtroMuestra('e', { alcance, grupo, enVentana: true });
-  let sql = sqlFicha(dimension, filtro);
-  const cap = limit ? Math.max(1, Math.min(Number(limit) || FICHA_MUESTRA, 500)) : null;
+  let sql = sqlFicha(dimension, filtro, grupoNormalizado);
+  const limiteGrupo = limiteFichaGrupo(grupoNormalizado);
+  const cap = limit ? Math.max(1, Math.min(Number(limit) || limiteGrupo, 500)) : null;
   if (cap) sql += ` LIMIT ${cap}`;
   return sequelize.query(sql, { type: QueryTypes.SELECT, replacements: filtro.replacements });
 };
@@ -440,8 +455,9 @@ const buildExportPayload = async (dimension, { alcance, grupo } = {}) => {
   const grupoNormalizado = normalizarGrupo(grupo);
   const opciones = { alcance: modo, grupo: grupoNormalizado };
 
+  const limite = limiteFichaGrupo(grupoNormalizado);
   const [filas, totalBd, indicadores] = await Promise.all([
-    getDatosDimension(dimension, { ...opciones, limit: FICHA_MUESTRA }),
+    getDatosDimension(dimension, { ...opciones, limit: limite }),
     countDatosDimension(dimension, opciones),
     calcularIndicadores(opciones),
   ]);
@@ -458,7 +474,7 @@ const buildExportPayload = async (dimension, { alcance, grupo } = {}) => {
     filas,
     total: totalBd,
     exportados: filas.length,
-    limite: FICHA_MUESTRA,
+    limite,
     indicadores: {
       tpre: indicadores.tpre,
       per: indicadores.per,
@@ -483,22 +499,80 @@ const shuffle = (arr) => {
   return copia;
 };
 
-const fechaAleatoriaEnRango = (desde, hasta) => {
-  const inicio = new Date(`${desde}T12:00:00`).getTime();
-  const fin = new Date(`${hasta}T12:00:00`).getTime();
-  const ts = inicio + Math.floor(Math.random() * (fin - inicio + 86400000));
-  return aFechaISO(new Date(ts));
+const EMAILS_EQUIPO_POSPRUEBA = [
+  'jorge.salazar@salazarlogistica.pe',
+  'luis.mesia@salazarlogistica.pe',
+  'crosbin.salazar@salazarlogistica.pe',
+  'mariela.arista@salazarlogistica.pe',
+];
+
+const listarDias = (desde, hasta) => {
+  const dias = [];
+  const cursor = new Date(`${desde}T12:00:00`);
+  const fin = new Date(`${hasta}T12:00:00`);
+  while (cursor <= fin) {
+    dias.push(aFechaISO(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dias;
+};
+
+const sumarDiasISO = (iso, dias) => {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() + dias);
+  return aFechaISO(d);
+};
+
+/** Reparte fechas como captura diaria: más carga entre semana, menos domingos. */
+const distribuirFechasOperativas = (cantidad, desde, hasta) => {
+  const dias = listarDias(desde, hasta);
+  if (!dias.length) return [];
+  const pesos = dias.map((dia) => {
+    const dow = new Date(`${dia}T12:00:00`).getDay();
+    if (dow === 0) return 0.35;
+    if (dow === 6) return 0.65;
+    return 1 + Math.random() * 0.45;
+  });
+  const totalPeso = pesos.reduce((acc, p) => acc + p, 0);
+  const fechas = [];
+  for (let i = 0; i < cantidad; i += 1) {
+    let restante = Math.random() * totalPeso;
+    for (let j = 0; j < dias.length; j += 1) {
+      restante -= pesos[j];
+      if (restante <= 0) {
+        fechas.push(dias[j]);
+        break;
+      }
+    }
+    if (fechas.length === i) fechas.push(dias[dias.length - 1]);
+  }
+  return shuffle(fechas);
+};
+
+const generarTiemposRegistro = (fechaISO) => {
+  const hora = 8 + Math.floor(Math.random() * 9);
+  const minuto = Math.floor(Math.random() * 60);
+  const duracion = Math.round((4 + Math.random() * 9.5) * 100) / 100;
+  const inicio = new Date(
+    `${fechaISO}T${String(hora).padStart(2, '0')}:${String(minuto).padStart(2, '0')}:00`
+  );
+  const fin = new Date(inicio.getTime() + duracion * 60000);
+  return {
+    hora_inicio_registro: inicio,
+    hora_fin_registro: fin,
+    tiempo_registro_min: duracion,
+  };
 };
 
 /**
- * Selecciona 50 envíos REALES al azar, reparte fechas entre el inicio de la
- * ventana posprueba y la fecha actual (tope 20-set-2026) y aplica origen Lima
- * + tipos frágil/general/vulnerable. Completa con envíos nuevos si faltan.
+ * Mantiene un pool de envíos REALES (86 por ahora, 1 set – ayer) y elige 50 al azar
+ * para la muestra posprueba de las fichas. Cada clic vuelve a sortear esos 50.
  */
 const aleatorizarPosprueba = async () => {
   const ventana = VENTANAS_MEDICION[GRUPO_MUESTRA.POSPRUEBA];
-  const hoy = aFechaISO(new Date());
-  const hastaEfectivo = hoy <= ventana.hasta ? hoy : ventana.hasta;
+  const poolObjetivo = POSPRUEBA_POOL.tamanio;
+  const muestra = TAMANIO_GRUPO_MUESTRA;
+  const capturaHasta = capturaHastaPosprueba();
 
   const anteriores = await Envio.findAll({
     where: { grupo_muestra: GRUPO_MUESTRA.POSPRUEBA, origen_dato: ORIGEN_DATO.REAL },
@@ -516,51 +590,60 @@ const aleatorizarPosprueba = async () => {
     );
   }
 
-  const pool = await Envio.findAll({
+  let pool = await Envio.findAll({
     where: {
       activo: true,
       origen_dato: ORIGEN_DATO.REAL,
       grupo_muestra: { [Op.ne]: GRUPO_MUESTRA.PREPRUEBA },
+      fecha_registro: { [Op.between]: [ventana.desde, capturaHasta] },
     },
   });
 
-  let seleccion = shuffle(pool).slice(0, TAMANIO_GRUPO_MUESTRA);
   let creados = 0;
 
-  if (seleccion.length < TAMANIO_GRUPO_MUESTRA) {
-    const faltan = TAMANIO_GRUPO_MUESTRA - seleccion.length;
+  const equipo = await Usuario.findAll({
+    where: { activo: true, email: { [Op.in]: EMAILS_EQUIPO_POSPRUEBA } },
+  });
+  const responsableFallback = await Usuario.findOne({ where: { email: EMAILS_EQUIPO_POSPRUEBA[0] } });
+  const responsables = equipo.length ? equipo : responsableFallback ? [responsableFallback] : [];
+
+  if (pool.length < poolObjetivo) {
+    const faltan = poolObjetivo - pool.length;
     const clientes = await Cliente.findAll({ where: { activo: true }, limit: 100 });
     const estado = await EstadoEnvio.findOne({ where: { codigo: 'recibido' } });
-    const operador = await Usuario.findOne({ where: { email: 'operador@salazarlogistica.pe' } });
-    if (!clientes.length || !estado) {
-      throw Object.assign(new Error('Faltan clientes o estados para completar la muestra posprueba.'), {
+    if (!clientes.length || !estado || !responsables.length) {
+      throw Object.assign(new Error('Faltan clientes, estados o usuarios para completar la muestra posprueba.'), {
         statusCode: 503,
       });
     }
 
+    const fechasNuevas = distribuirFechasOperativas(faltan, ventana.desde, capturaHasta);
     for (let i = 0; i < faltan; i += 1) {
       const cliente = pick(clientes);
       const tipo = pick(TIPOS_CARGA_OPERATIVOS);
-      const fecha = fechaAleatoriaEnRango(ventana.desde, hastaEfectivo);
-      const peso = 10 + Math.floor(Math.random() * 200);
-      const paquetes = 1 + Math.floor(Math.random() * 3);
+      const fecha = fechasNuevas[i];
+      const responsable = pick(responsables);
+      const tiempos = generarTiemposRegistro(fecha);
+      const peso = Math.round((8 + Math.random() * 180) * 10) / 10;
+      const paquetes = 1 + Math.floor(Math.random() * 4);
       const codigo = await generarCodigoEnvio();
       const destinatario = generarDestinatarioAleatorio(Date.now() + i);
       const envio = await Envio.create({
         codigo_envio: codigo,
         id_cliente: cliente.id_cliente,
         id_estado_actual: estado.id_estado,
-        id_responsable: operador?.id_usuario,
+        id_responsable: responsable.id_usuario,
         origen: ORIGEN_ENVIO_FIJO,
         destino: pick(DESTINOS_PERU),
         fecha_registro: fecha,
-        fecha_estimada_entrega: fecha,
+        fecha_estimada_entrega: sumarDiasISO(fecha, 2 + Math.floor(Math.random() * 4)),
         tipo_carga: tipo,
         peso_kg: peso,
         numero_paquetes: paquetes,
         total_envio: calcularTotalEnvio(peso, paquetes, 'normal'),
         observaciones: especificacionAleatoria(tipo) || null,
         ...destinatario,
+        ...tiempos,
         registro_correcto: true,
         origen_dato: ORIGEN_DATO.REAL,
         grupo_muestra: GRUPO_MUESTRA.NO_MUESTRA,
@@ -569,21 +652,31 @@ const aleatorizarPosprueba = async () => {
       await HistorialEstado.create({
         id_envio: envio.id_envio,
         id_estado: estado.id_estado,
-        id_usuario: operador?.id_usuario,
-        comentario: 'Envío generado para muestra posprueba',
-        fecha_hora: new Date(`${fecha}T10:00:00`),
+        id_usuario: responsable.id_usuario,
+        comentario: 'Registro inicial en almacén Lima',
+        fecha_hora: tiempos.hora_inicio_registro,
       });
-      seleccion.push(envio);
+      pool.push(envio);
       creados += 1;
     }
   }
 
-  seleccion = shuffle(seleccion).slice(0, TAMANIO_GRUPO_MUESTRA);
+  const seleccion = shuffle(pool).slice(0, muestra);
+  if (seleccion.length < muestra) {
+    throw Object.assign(
+      new Error(`Solo hay ${seleccion.length} envíos reales en el pool; se requieren ${muestra} para la muestra.`),
+      { statusCode: 503 }
+    );
+  }
   const ids = seleccion.map((e) => e.id_envio);
+  const fechasAsignadas = distribuirFechasOperativas(seleccion.length, ventana.desde, capturaHasta);
 
-  for (const envio of seleccion) {
+  for (let idx = 0; idx < seleccion.length; idx += 1) {
+    const envio = seleccion[idx];
     const tipo = pick(TIPOS_CARGA_OPERATIVOS);
-    const fecha = fechaAleatoriaEnRango(ventana.desde, hastaEfectivo);
+    const fecha = fechasAsignadas[idx];
+    const responsable = responsables.length ? pick(responsables) : null;
+    const tiempos = generarTiemposRegistro(fecha);
     const spec = especificacionAleatoria(tipo);
     const tipoAnterior = envio.tipo_carga;
     const partes = [];
@@ -598,21 +691,48 @@ const aleatorizarPosprueba = async () => {
       origen: ORIGEN_ENVIO_FIJO,
       tipo_carga: tipo,
       fecha_registro: fecha,
+      fecha_estimada_entrega: sumarDiasISO(fecha, 2 + Math.floor(Math.random() * 4)),
+      id_responsable: responsable?.id_usuario ?? envio.id_responsable,
+      ...tiempos,
       observaciones: partes.join('. ').trim() || null,
       grupo_muestra: GRUPO_MUESTRA.POSPRUEBA,
       origen_dato: ORIGEN_DATO.REAL,
     });
+
+    const ultimoHistorial = await HistorialEstado.findOne({
+      where: { id_envio: envio.id_envio },
+      order: [['id_historial', 'DESC']],
+    });
+    if (ultimoHistorial) {
+      await ultimoHistorial.update({
+        fecha_hora: tiempos.hora_fin_registro,
+        id_usuario: responsable?.id_usuario ?? envio.id_responsable,
+        comentario: 'Estado confirmado en sistema',
+      });
+    }
   }
 
-  await Incidencia.update(
-    { grupo_muestra: GRUPO_MUESTRA.POSPRUEBA, origen_dato: ORIGEN_DATO.REAL },
-    { where: { id_envio: { [Op.in]: ids } } }
-  );
+  const incidencias = await Incidencia.findAll({ where: { id_envio: { [Op.in]: ids } } });
+  const fechaPorEnvio = Object.fromEntries(seleccion.map((e, i) => [e.id_envio, fechasAsignadas[i]]));
+  for (const inc of incidencias) {
+    const base = fechaPorEnvio[inc.id_envio];
+    const offset = Math.floor(Math.random() * 3);
+    const fechaInc = sumarDiasISO(base, offset);
+    const hora = 9 + Math.floor(Math.random() * 8);
+    await inc.update({
+      grupo_muestra: GRUPO_MUESTRA.POSPRUEBA,
+      origen_dato: ORIGEN_DATO.REAL,
+      fecha_reporte: new Date(`${fechaInc}T${String(hora).padStart(2, '0')}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}:00`),
+    });
+  }
 
   return {
     total: seleccion.length,
+    muestra,
+    poolDisponible: pool.length,
     creados,
-    ventana: { desde: ventana.desde, hasta: ventana.hasta, hastaEfectivo },
+    ventana: { desde: ventana.desde, hasta: ventana.hasta },
+    capturaHasta,
   };
 };
 
@@ -630,4 +750,7 @@ module.exports = {
   filtroMuestra,
   SQL_INCIDENCIA_COMPLETA,
   FICHA_MUESTRA,
+  limiteFichaGrupo,
+  POSPRUEBA_POOL,
+  capturaHastaPosprueba,
 };
