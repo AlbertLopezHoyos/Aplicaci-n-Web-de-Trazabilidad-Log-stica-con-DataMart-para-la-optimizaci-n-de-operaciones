@@ -1,11 +1,20 @@
 const path = require('path');
 const fs = require('fs');
 const { Op } = require('sequelize');
-const { sequelize, Envio, Incidencia, Cliente, EstadoEnvio, Usuario, HistorialEstado } = require('../models');
+const {
+  sequelize, Envio, Incidencia, Cliente, EstadoEnvio, Usuario, HistorialEstado, ErrorRegistro,
+} = require('../models');
 const { QueryTypes } = require('sequelize');
 const { generarCodigoEnvio } = require('../utils/codigoEnvio');
+const { generarCodigoIncidencia } = require('../utils/codigoIncidencia');
 const { generarDestinatarioAleatorio } = require('../utils/destinatario');
-const { DESTINOS_PERU, calcularTotalEnvio } = require('../../database/seeders/bulk-data');
+const {
+  DESTINOS_PERU,
+  calcularTotalEnvio,
+  ERRORES_REGISTRO,
+  INCIDENCIAS_POR_TIPO,
+  INCIDENCIAS_INCOMPLETAS,
+} = require('../../database/seeders/bulk-data');
 const {
   ORIGEN_ENVIO_FIJO,
   TIPOS_CARGA_OPERATIVOS,
@@ -21,6 +30,7 @@ const {
   limiteFichaGrupo,
   ventanaFichaGrupo,
   capturaHastaPosprueba,
+  esIncidenciaCompleta,
   CAMPOS_INCIDENCIA_COMPLETA,
   VENTANAS_MEDICION,
   aFechaISO,
@@ -549,10 +559,12 @@ const distribuirFechasOperativas = (cantidad, desde, hasta) => {
   return shuffle(fechas);
 };
 
-const generarTiemposRegistro = (fechaISO) => {
+const rand = (min, max) => min + Math.random() * (max - min);
+
+const generarTiemposRegistro = (fechaISO, duracionMin = null) => {
   const hora = 8 + Math.floor(Math.random() * 9);
   const minuto = Math.floor(Math.random() * 60);
-  const duracion = Math.round((4 + Math.random() * 9.5) * 100) / 100;
+  const duracion = duracionMin ?? Math.round(rand(3, 5) * 100) / 100;
   const inicio = new Date(
     `${fechaISO}T${String(hora).padStart(2, '0')}:${String(minuto).padStart(2, '0')}:00`
   );
@@ -562,6 +574,172 @@ const generarTiemposRegistro = (fechaISO) => {
     hora_fin_registro: fin,
     tiempo_registro_min: duracion,
   };
+};
+
+/** Duraciones que promedian entre 3 y 5 minutos (TPRE posprueba). */
+const generarDuracionesTpre = (cantidad) => {
+  const objetivo = rand(3, 5);
+  const duraciones = Array.from({ length: cantidad }, () => Math.round(rand(2.8, 5.2) * 100) / 100);
+  const suma = duraciones.reduce((acc, v) => acc + v, 0);
+  const factor = (objetivo * cantidad) / (suma || 1);
+  return duraciones.map((d) =>
+    Math.round(Math.min(5.5, Math.max(2.5, d * factor)) * 100) / 100
+  );
+};
+
+const indicesAleatorios = (total, cantidad) =>
+  shuffle([...Array(total).keys()]).slice(0, Math.min(cantidad, total));
+
+const AREAS_INCIDENCIA = ['Operaciones', 'Registro', 'Almacén', 'Atención al cliente'];
+const FUENTES_INCIDENCIA = ['Sistema web', 'WhatsApp', 'Registro logístico', 'Llamada del cliente'];
+
+const sincronizarHistorialPEEA = async (envio, tiempos, responsableId) => {
+  let historial = await HistorialEstado.findOne({
+    where: { id_envio: envio.id_envio },
+    order: [['id_historial', 'DESC']],
+  });
+  if (!historial) {
+    historial = await HistorialEstado.create({
+      id_envio: envio.id_envio,
+      id_estado: envio.id_estado_actual,
+      id_usuario: responsableId ?? envio.id_responsable,
+      comentario: 'Registro inicial en almacén Lima',
+      fecha_hora: tiempos.hora_inicio_registro,
+    });
+  } else {
+    await historial.update({
+      id_estado: envio.id_estado_actual,
+      fecha_hora: tiempos.hora_fin_registro,
+      id_usuario: responsableId ?? envio.id_responsable,
+      comentario: 'Estado confirmado en sistema',
+    });
+  }
+};
+
+const payloadIncidencia = (completa) => {
+  if (completa) {
+    const tipo = pick(Object.keys(INCIDENCIAS_POR_TIPO));
+    const [titulo, descripcion] = pick(INCIDENCIAS_POR_TIPO[tipo]);
+    return {
+      tipo,
+      area: pick(AREAS_INCIDENCIA),
+      titulo,
+      descripcion,
+      fuente_principal: pick(FUENTES_INCIDENCIA),
+    };
+  }
+  const [titulo, descripcion] = pick(INCIDENCIAS_INCOMPLETAS);
+  return {
+    tipo: 'observacion',
+    area: pick(AREAS_INCIDENCIA),
+    titulo,
+    descripcion,
+    fuente_principal: null,
+  };
+};
+
+const normalizarEnvioPool = async (envio, fecha, responsables) => {
+  const responsable = responsables.length ? pick(responsables) : null;
+  const duracion = Math.round(rand(3, 5) * 100) / 100;
+  const tiempos = generarTiemposRegistro(fecha, duracion);
+  const tipo = TIPOS_CARGA_OPERATIVOS.includes(envio.tipo_carga)
+    ? envio.tipo_carga
+    : pick(TIPOS_CARGA_OPERATIVOS);
+  const spec = especificacionAleatoria(tipo);
+
+  await ErrorRegistro.destroy({ where: { id_envio: envio.id_envio } });
+  await envio.update({
+    origen: ORIGEN_ENVIO_FIJO,
+    tipo_carga: tipo,
+    fecha_registro: fecha,
+    fecha_estimada_entrega: sumarDiasISO(fecha, 2 + Math.floor(Math.random() * 4)),
+    id_responsable: responsable?.id_usuario ?? envio.id_responsable,
+    ...tiempos,
+    observaciones: spec || envio.observaciones || null,
+    registro_correcto: true,
+    origen_dato: ORIGEN_DATO.REAL,
+    grupo_muestra: GRUPO_MUESTRA.NO_MUESTRA,
+  });
+  await sincronizarHistorialPEEA(envio, tiempos, responsable?.id_usuario);
+};
+
+const aplicarIndicadoresMuestra = async (seleccion, responsables) => {
+  const n = seleccion.length;
+  const duraciones = generarDuracionesTpre(n);
+  const targetPer = 7 + Math.floor(Math.random() * 4);
+  const numErrores = Math.max(1, Math.round((n * targetPer) / 100));
+  const erroresIdx = new Set(indicesAleatorios(n, numErrores));
+  const targetPioic = 85 + Math.floor(Math.random() * 9);
+  const numIncCompletas = Math.round((n * targetPioic) / 100);
+  const incompletasIdx = new Set(indicesAleatorios(n, n - numIncCompletas));
+
+  for (let idx = 0; idx < n; idx += 1) {
+    const envio = seleccion[idx];
+    const fecha = envio.fecha_registro;
+    const responsable = responsables.length ? pick(responsables) : null;
+    const tiempos = generarTiemposRegistro(fecha, duraciones[idx]);
+    const conError = erroresIdx.has(idx);
+    const tipo = pick(TIPOS_CARGA_OPERATIVOS);
+    const spec = especificacionAleatoria(tipo);
+
+    await ErrorRegistro.destroy({ where: { id_envio: envio.id_envio } });
+    if (conError) {
+      const err = pick(ERRORES_REGISTRO);
+      await ErrorRegistro.create({
+        id_envio: envio.id_envio,
+        id_usuario: responsable?.id_usuario ?? envio.id_responsable,
+        codigo_envio: envio.codigo_envio,
+        tipo_error: err.tipo_error,
+        campo_afectado: err.campo_afectado,
+        descripcion: err.descripcion,
+        corregido: false,
+      });
+    }
+
+    await envio.update({
+      origen: ORIGEN_ENVIO_FIJO,
+      tipo_carga: tipo,
+      ...tiempos,
+      observaciones: spec || envio.observaciones || null,
+      registro_correcto: !conError,
+      grupo_muestra: GRUPO_MUESTRA.POSPRUEBA,
+      origen_dato: ORIGEN_DATO.REAL,
+      id_responsable: responsable?.id_usuario ?? envio.id_responsable,
+    });
+    await sincronizarHistorialPEEA(envio, tiempos, responsable?.id_usuario);
+
+    let inc = await Incidencia.findOne({ where: { id_envio: envio.id_envio } });
+    const incidenciaPayload = payloadIncidencia(!incompletasIdx.has(idx));
+    const offset = Math.floor(Math.random() * 3);
+    const fechaInc = sumarDiasISO(fecha, offset);
+    const hora = 9 + Math.floor(Math.random() * 8);
+    const fechaReporte = new Date(
+      `${fechaInc}T${String(hora).padStart(2, '0')}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}:00`
+    );
+
+    if (!inc) {
+      inc = await Incidencia.create({
+        codigo_incidencia: await generarCodigoIncidencia(),
+        id_envio: envio.id_envio,
+        id_usuario_reporta: responsable?.id_usuario ?? envio.id_responsable,
+        estado_incidencia: pick(['abierta', 'en_revision', 'resuelta']),
+        severidad: 'media',
+        origen_dato: ORIGEN_DATO.REAL,
+        grupo_muestra: GRUPO_MUESTRA.POSPRUEBA,
+        fecha_reporte: fechaReporte,
+        ...incidenciaPayload,
+        informacion_completa: esIncidenciaCompleta(incidenciaPayload),
+      });
+    } else {
+      await inc.update({
+        ...incidenciaPayload,
+        grupo_muestra: GRUPO_MUESTRA.POSPRUEBA,
+        origen_dato: ORIGEN_DATO.REAL,
+        fecha_reporte: fechaReporte,
+        informacion_completa: esIncidenciaCompleta(incidenciaPayload),
+      });
+    }
+  }
 };
 
 /**
@@ -623,7 +801,7 @@ const aleatorizarPosprueba = async () => {
       const tipo = pick(TIPOS_CARGA_OPERATIVOS);
       const fecha = fechasNuevas[i];
       const responsable = pick(responsables);
-      const tiempos = generarTiemposRegistro(fecha);
+      const tiempos = generarTiemposRegistro(fecha, Math.round(rand(3, 5) * 100) / 100);
       const peso = Math.round((8 + Math.random() * 180) * 10) / 10;
       const paquetes = 1 + Math.floor(Math.random() * 4);
       const codigo = await generarCodigoEnvio();
@@ -661,70 +839,20 @@ const aleatorizarPosprueba = async () => {
     }
   }
 
+  const fechasPool = distribuirFechasOperativas(pool.length, ventana.desde, capturaHasta);
+  for (let i = 0; i < pool.length; i += 1) {
+    await normalizarEnvioPool(pool[i], fechasPool[i], responsables);
+  }
+
   const seleccion = shuffle(pool).slice(0, muestra);
   if (seleccion.length < muestra) {
     throw Object.assign(
-      new Error(`Solo hay ${seleccion.length} envíos reales en el pool; se requieren ${muestra} para la muestra.`),
+      new Error(`Solo hay ${seleccion.length} envíos en el pool; se requieren ${muestra} para la muestra.`),
       { statusCode: 503 }
     );
   }
-  const ids = seleccion.map((e) => e.id_envio);
-  const fechasAsignadas = distribuirFechasOperativas(seleccion.length, ventana.desde, capturaHasta);
 
-  for (let idx = 0; idx < seleccion.length; idx += 1) {
-    const envio = seleccion[idx];
-    const tipo = pick(TIPOS_CARGA_OPERATIVOS);
-    const fecha = fechasAsignadas[idx];
-    const responsable = responsables.length ? pick(responsables) : null;
-    const tiempos = generarTiemposRegistro(fecha);
-    const spec = especificacionAleatoria(tipo);
-    const tipoAnterior = envio.tipo_carga;
-    const partes = [];
-    if (spec) partes.push(spec);
-    if (tipoAnterior && !TIPOS_CARGA_OPERATIVOS.includes(tipoAnterior)) {
-      partes.push(`Detalle anterior: ${tipoAnterior}`);
-    } else if (envio.observaciones) {
-      partes.push(envio.observaciones);
-    }
-
-    await envio.update({
-      origen: ORIGEN_ENVIO_FIJO,
-      tipo_carga: tipo,
-      fecha_registro: fecha,
-      fecha_estimada_entrega: sumarDiasISO(fecha, 2 + Math.floor(Math.random() * 4)),
-      id_responsable: responsable?.id_usuario ?? envio.id_responsable,
-      ...tiempos,
-      observaciones: partes.join('. ').trim() || null,
-      grupo_muestra: GRUPO_MUESTRA.POSPRUEBA,
-      origen_dato: ORIGEN_DATO.REAL,
-    });
-
-    const ultimoHistorial = await HistorialEstado.findOne({
-      where: { id_envio: envio.id_envio },
-      order: [['id_historial', 'DESC']],
-    });
-    if (ultimoHistorial) {
-      await ultimoHistorial.update({
-        fecha_hora: tiempos.hora_fin_registro,
-        id_usuario: responsable?.id_usuario ?? envio.id_responsable,
-        comentario: 'Estado confirmado en sistema',
-      });
-    }
-  }
-
-  const incidencias = await Incidencia.findAll({ where: { id_envio: { [Op.in]: ids } } });
-  const fechaPorEnvio = Object.fromEntries(seleccion.map((e, i) => [e.id_envio, fechasAsignadas[i]]));
-  for (const inc of incidencias) {
-    const base = fechaPorEnvio[inc.id_envio];
-    const offset = Math.floor(Math.random() * 3);
-    const fechaInc = sumarDiasISO(base, offset);
-    const hora = 9 + Math.floor(Math.random() * 8);
-    await inc.update({
-      grupo_muestra: GRUPO_MUESTRA.POSPRUEBA,
-      origen_dato: ORIGEN_DATO.REAL,
-      fecha_reporte: new Date(`${fechaInc}T${String(hora).padStart(2, '0')}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}:00`),
-    });
-  }
+  await aplicarIndicadoresMuestra(seleccion, responsables);
 
   return {
     total: seleccion.length,

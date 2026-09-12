@@ -110,11 +110,10 @@ const ObservacionPage = () => {
   const aleatorizarPosprueba = async () => {
     setAleatorizando(true);
     try {
-      const { data } = await api.post('/observacion/posprueba/aleatorizar');
-      const r = data.data || {};
+      await api.post('/observacion/posprueba/aleatorizar');
       toastSuccess(
-        'Muestra aleatorizada',
-        `${r.total ?? POSPRUEBA_MUESTRA} de ${r.poolDisponible ?? '—'} registros reales · ventana ${VENTANA_POSPRUEBA.desde} a ${VENTANA_POSPRUEBA.hasta}`
+        'Registros aleatorizados',
+        'mostrando registros aleatorios desde el 01-09-2026 hasta el 20-09-2026'
       );
       loadIndicadores();
       loadDimension(dimensionActiva);
