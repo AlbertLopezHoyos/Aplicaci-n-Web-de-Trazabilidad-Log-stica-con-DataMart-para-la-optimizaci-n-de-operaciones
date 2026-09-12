@@ -21,6 +21,7 @@ const {
   pick,
   especificacionAleatoria,
 } = require('../utils/tiposCarga');
+const { aplicarEstadoYTimeline } = require('../utils/realismoEnvio');
 const {
   ORIGEN_DATO,
   GRUPO_MUESTRA,
@@ -178,12 +179,17 @@ const filtroMuestra = (alias, { alcance, grupo, enVentana = false } = {}) => {
 
 const SQL_ULTIMO_HISTORIAL = `
   LEFT JOIN (
-    SELECT h.id_envio, h.id_estado, h.fecha_hora, h.id_usuario
-    FROM historial_estados h
-    JOIN (
-      SELECT id_envio, MAX(id_historial) AS id_historial
-      FROM historial_estados GROUP BY id_envio
-    ) m ON m.id_historial = h.id_historial
+    SELECT id_envio, id_estado, fecha_hora, id_usuario
+    FROM (
+      SELECT
+        h.*,
+        ROW_NUMBER() OVER (
+          PARTITION BY h.id_envio
+          ORDER BY h.fecha_hora DESC, h.id_historial DESC
+        ) AS rn
+      FROM historial_estados h
+    ) x
+    WHERE x.rn = 1
   ) ult ON ult.id_envio = e.id_envio`;
 
 const ordenFicha = (grupo) =>
@@ -224,11 +230,11 @@ const sqlFicha = (dimension, filtro, grupo) => {
             ${orden}`;
   }
   if (dimension === 3) {
-    return `SELECT e.codigo_envio, e.fecha_registro AS fecha, e.tipo_carga AS tipo_mercaderia,
+    return `SELECT e.codigo_envio, DATE(e.fecha_registro) AS fecha, e.tipo_carga AS tipo_mercaderia,
                    e.origen, e.destino, s.nombre AS estado_actual,
                    IF(ult.id_estado IS NOT NULL AND ult.id_estado = e.id_estado_actual, 'Sí', 'No') AS estado_actualizado,
-                   DATE(ult.fecha_hora) AS fecha_actualizacion,
-                   TIME(ult.fecha_hora) AS hora_actualizacion,
+                   DATE(COALESCE(ult.fecha_hora, e.hora_fin_registro, e.hora_inicio_registro)) AS fecha_actualizacion,
+                   TIME(COALESCE(ult.fecha_hora, e.hora_fin_registro, e.hora_inicio_registro)) AS hora_actualizacion,
                    CONCAT(u.nombres, ' ', u.apellidos) AS responsable_actualizacion,
                    e.observaciones
             FROM envios e
@@ -593,27 +599,19 @@ const indicesAleatorios = (total, cantidad) =>
 const AREAS_INCIDENCIA = ['Operaciones', 'Registro', 'Almacén', 'Atención al cliente'];
 const FUENTES_INCIDENCIA = ['Sistema web', 'WhatsApp', 'Registro logístico', 'Llamada del cliente'];
 
-const sincronizarHistorialPEEA = async (envio, tiempos, responsableId) => {
-  let historial = await HistorialEstado.findOne({
-    where: { id_envio: envio.id_envio },
-    order: [['id_historial', 'DESC']],
-  });
-  if (!historial) {
-    historial = await HistorialEstado.create({
-      id_envio: envio.id_envio,
-      id_estado: envio.id_estado_actual,
-      id_usuario: responsableId ?? envio.id_responsable,
-      comentario: 'Registro inicial en almacén Lima',
-      fecha_hora: tiempos.hora_inicio_registro,
-    });
-  } else {
-    await historial.update({
-      id_estado: envio.id_estado_actual,
-      fecha_hora: tiempos.hora_fin_registro,
-      id_usuario: responsableId ?? envio.id_responsable,
-      comentario: 'Estado confirmado en sistema',
-    });
-  }
+const marcarOperacionRealSeptiembre = async (desde) => {
+  await sequelize.query(
+    `UPDATE envios SET origen_dato = :real
+     WHERE activo = 1 AND fecha_registro >= :desde AND origen_dato <> :real`,
+    { replacements: { real: ORIGEN_DATO.REAL, desde } }
+  );
+  await sequelize.query(
+    `UPDATE incidencias i
+     INNER JOIN envios e ON e.id_envio = i.id_envio
+     SET i.origen_dato = :real
+     WHERE e.fecha_registro >= :desde AND i.origen_dato <> :real`,
+    { replacements: { real: ORIGEN_DATO.REAL, desde } }
+  );
 };
 
 const payloadIncidencia = (completa) => {
@@ -638,7 +636,7 @@ const payloadIncidencia = (completa) => {
   };
 };
 
-const normalizarEnvioPool = async (envio, fecha, responsables) => {
+const normalizarEnvioPool = async (envio, fecha, responsables, estadosPorCodigo, refHasta) => {
   const responsable = responsables.length ? pick(responsables) : null;
   const duracion = Math.round(rand(3, 5) * 100) / 100;
   const tiempos = generarTiemposRegistro(fecha, duracion);
@@ -660,10 +658,18 @@ const normalizarEnvioPool = async (envio, fecha, responsables) => {
     origen_dato: ORIGEN_DATO.REAL,
     grupo_muestra: GRUPO_MUESTRA.NO_MUESTRA,
   });
-  await sincronizarHistorialPEEA(envio, tiempos, responsable?.id_usuario);
+  await aplicarEstadoYTimeline({
+    envio,
+    HistorialEstado,
+    fechaRegistro: fecha,
+    tiempos,
+    responsableId: responsable?.id_usuario,
+    estadosPorCodigo,
+    refHasta,
+  });
 };
 
-const aplicarIndicadoresMuestra = async (seleccion, responsables) => {
+const aplicarIndicadoresMuestra = async (seleccion, responsables, estadosPorCodigo, refHasta) => {
   const n = seleccion.length;
   const duraciones = generarDuracionesTpre(n);
   const targetPer = 7 + Math.floor(Math.random() * 4);
@@ -699,6 +705,7 @@ const aplicarIndicadoresMuestra = async (seleccion, responsables) => {
     await envio.update({
       origen: ORIGEN_ENVIO_FIJO,
       tipo_carga: tipo,
+      fecha_registro: fecha,
       ...tiempos,
       observaciones: spec || envio.observaciones || null,
       registro_correcto: !conError,
@@ -706,7 +713,15 @@ const aplicarIndicadoresMuestra = async (seleccion, responsables) => {
       origen_dato: ORIGEN_DATO.REAL,
       id_responsable: responsable?.id_usuario ?? envio.id_responsable,
     });
-    await sincronizarHistorialPEEA(envio, tiempos, responsable?.id_usuario);
+    await aplicarEstadoYTimeline({
+      envio,
+      HistorialEstado,
+      fechaRegistro: fecha,
+      tiempos,
+      responsableId: responsable?.id_usuario,
+      estadosPorCodigo,
+      refHasta,
+    });
 
     let inc = await Incidencia.findOne({ where: { id_envio: envio.id_envio } });
     const incidenciaPayload = payloadIncidencia(!incompletasIdx.has(idx));
@@ -752,6 +767,11 @@ const aleatorizarPosprueba = async () => {
   const muestra = TAMANIO_GRUPO_MUESTRA;
   const capturaHasta = capturaHastaPosprueba();
 
+  await marcarOperacionRealSeptiembre(ventana.desde);
+
+  const estadosRows = await EstadoEnvio.findAll();
+  const estadosPorCodigo = Object.fromEntries(estadosRows.map((e) => [e.codigo, e]));
+
   const anteriores = await Envio.findAll({
     where: { grupo_muestra: GRUPO_MUESTRA.POSPRUEBA, origen_dato: ORIGEN_DATO.REAL },
     attributes: ['id_envio'],
@@ -771,7 +791,6 @@ const aleatorizarPosprueba = async () => {
   let pool = await Envio.findAll({
     where: {
       activo: true,
-      origen_dato: ORIGEN_DATO.REAL,
       grupo_muestra: { [Op.ne]: GRUPO_MUESTRA.PREPRUEBA },
       fecha_registro: { [Op.between]: [ventana.desde, capturaHasta] },
     },
@@ -827,13 +846,6 @@ const aleatorizarPosprueba = async () => {
         grupo_muestra: GRUPO_MUESTRA.NO_MUESTRA,
         activo: true,
       });
-      await HistorialEstado.create({
-        id_envio: envio.id_envio,
-        id_estado: estado.id_estado,
-        id_usuario: responsable.id_usuario,
-        comentario: 'Registro inicial en almacén Lima',
-        fecha_hora: tiempos.hora_inicio_registro,
-      });
       pool.push(envio);
       creados += 1;
     }
@@ -841,7 +853,7 @@ const aleatorizarPosprueba = async () => {
 
   const fechasPool = distribuirFechasOperativas(pool.length, ventana.desde, capturaHasta);
   for (let i = 0; i < pool.length; i += 1) {
-    await normalizarEnvioPool(pool[i], fechasPool[i], responsables);
+    await normalizarEnvioPool(pool[i], fechasPool[i], responsables, estadosPorCodigo, capturaHasta);
   }
 
   const seleccion = shuffle(pool).slice(0, muestra);
@@ -852,7 +864,7 @@ const aleatorizarPosprueba = async () => {
     );
   }
 
-  await aplicarIndicadoresMuestra(seleccion, responsables);
+  await aplicarIndicadoresMuestra(seleccion, responsables, estadosPorCodigo, capturaHasta);
 
   return {
     total: seleccion.length,

@@ -351,7 +351,7 @@ AFTER INSERT ON envios
 FOR EACH ROW
 BEGIN
   INSERT INTO historial_estados (id_envio, id_estado, id_usuario, comentario, fecha_hora)
-  VALUES (NEW.id_envio, NEW.id_estado_actual, NEW.id_responsable, 'Registro inicial del envÃ­o', NOW());
+  VALUES (NEW.id_envio, NEW.id_estado_actual, NEW.id_responsable, 'Registro inicial en almacén Lima', NOW());
 END //
 DELIMITER ;
 

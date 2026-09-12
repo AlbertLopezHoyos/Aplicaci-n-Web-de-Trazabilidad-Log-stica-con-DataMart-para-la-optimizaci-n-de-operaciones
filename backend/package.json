@@ -14,6 +14,8 @@
     "db:etl": "node database/scripts/run-etl.js",
     "db:phase-b": "node database/scripts/run-phase-b.js",
     "db:fix-utf8": "node database/scripts/fix-utf8-data.js",
+    "db:realismo-septiembre": "node database/scripts/fix-realismo-septiembre.js",
+    "db:realismo-septiembre:railway": "node database/scripts/fix-realismo-septiembre.js --railway",
     "db:muestra": "node database/scripts/marcar-muestra.js",
     "db:posprueba-actualizar": "node database/scripts/actualizar-posprueba-envios.js",
     "db:migrate-09": "node database/scripts/run-migrate-09.js",

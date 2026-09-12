@@ -89,6 +89,18 @@ const fixRoles = async () => {
   return fixed;
 };
 
+const fixHistorialComentarios = async () => {
+  await sequelize.query("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
+  const [, meta] = await sequelize.query(
+    `UPDATE historial_estados
+     SET comentario = 'Registro inicial en almacén Lima'
+     WHERE comentario LIKE 'Registro inicial del %'
+        OR comentario LIKE '%env├%'
+        OR comentario LIKE '%envÃ%'`
+  );
+  return meta?.affectedRows || 0;
+};
+
 const fixEstados = async () => {
   let fixed = 0;
   for (const est of ESTADOS_CORRECTOS) {
@@ -167,6 +179,9 @@ const run = async () => {
 
   const estados = await fixEstados();
   console.log(`✓ Estados corregidos: ${estados}`);
+
+  const historial = await fixHistorialComentarios();
+  console.log(`✓ Comentarios timeline corregidos: ${historial}`);
 
   const origen = await fixEnvioColumn('origen', ORIGENES_LIMA);
   const destino = await fixEnvioColumn('destino', DESTINOS_PERU);

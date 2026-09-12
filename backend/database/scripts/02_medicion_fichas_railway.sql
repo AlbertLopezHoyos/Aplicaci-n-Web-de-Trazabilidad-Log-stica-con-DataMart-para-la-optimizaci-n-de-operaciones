@@ -68,7 +68,7 @@ SELECT
   e.numero_paquetes,
   IF(e.registro_correcto = 1 AND NOT EXISTS (
     SELECT 1 FROM errores_registro er WHERE er.id_envio = e.id_envio
-  ), 'No', 'SÃ­') AS error_en_registro,
+  ), 'No', 'Sí') AS error_en_registro,
   COALESCE(
     (SELECT er.tipo_error FROM errores_registro er WHERE er.id_envio = e.id_envio ORDER BY er.created_at DESC LIMIT 1),
     IF(e.registro_correcto = 0, 'validacion', NULL)
@@ -85,23 +85,33 @@ ORDER BY e.created_at DESC;
 CREATE OR REPLACE VIEW vw_ficha_control AS
 SELECT
   e.codigo_envio,
-  e.fecha_registro AS fecha,
+  DATE(e.fecha_registro) AS fecha,
   e.tipo_carga AS tipo_mercaderia,
   e.origen,
   e.destino,
   s.nombre AS estado_actual,
-  IF(COUNT(h.id_historial) > 1 OR s.codigo NOT IN ('recibido'), 'SÃ­', 'No') AS estado_actualizado,
-  DATE(MAX(h.fecha_hora)) AS fecha_actualizacion,
-  TIME(MAX(h.fecha_hora)) AS hora_actualizacion,
+  IF(ult.id_estado IS NOT NULL AND ult.id_estado = e.id_estado_actual, 'Sí', 'No') AS estado_actualizado,
+  DATE(COALESCE(ult.fecha_hora, e.hora_fin_registro, e.hora_inicio_registro)) AS fecha_actualizacion,
+  TIME(COALESCE(ult.fecha_hora, e.hora_fin_registro, e.hora_inicio_registro)) AS hora_actualizacion,
   CONCAT(u.nombres, ' ', u.apellidos) AS responsable_actualizacion,
   e.observaciones
 FROM envios e
 JOIN estados_envio s ON e.id_estado_actual = s.id_estado
-LEFT JOIN historial_estados h ON h.id_envio = e.id_envio
-LEFT JOIN usuarios u ON h.id_usuario = u.id_usuario
+LEFT JOIN (
+  SELECT id_envio, id_estado, fecha_hora, id_usuario
+  FROM (
+    SELECT
+      h.*,
+      ROW_NUMBER() OVER (
+        PARTITION BY h.id_envio
+        ORDER BY h.fecha_hora DESC, h.id_historial DESC
+      ) AS rn
+    FROM historial_estados h
+  ) x
+  WHERE x.rn = 1
+) ult ON ult.id_envio = e.id_envio
+LEFT JOIN usuarios u ON ult.id_usuario = u.id_usuario
 WHERE e.activo = 1
-GROUP BY e.id_envio, e.codigo_envio, e.fecha_registro, e.tipo_carga, e.origen, e.destino,
-         s.nombre, s.codigo, u.nombres, u.apellidos, e.observaciones
 ORDER BY e.created_at DESC;
 
 CREATE OR REPLACE VIEW vw_ficha_reportes AS

@@ -215,14 +215,14 @@ WHERE e.activo = 1;
 CREATE OR REPLACE VIEW vw_ficha_control AS
 SELECT
   e.codigo_envio,
-  e.fecha_registro AS fecha,
+  DATE(e.fecha_registro) AS fecha,
   e.tipo_carga AS tipo_mercaderia,
   e.origen,
   e.destino,
   s.nombre AS estado_actual,
   IF(ult.id_estado IS NOT NULL AND ult.id_estado = e.id_estado_actual, 'Sí', 'No') AS estado_actualizado,
-  DATE(ult.fecha_hora) AS fecha_actualizacion,
-  TIME(ult.fecha_hora) AS hora_actualizacion,
+  DATE(COALESCE(ult.fecha_hora, e.hora_fin_registro, e.hora_inicio_registro)) AS fecha_actualizacion,
+  TIME(COALESCE(ult.fecha_hora, e.hora_fin_registro, e.hora_inicio_registro)) AS hora_actualizacion,
   CONCAT(u.nombres, ' ', u.apellidos) AS responsable_actualizacion,
   e.observaciones,
   e.origen_dato,
@@ -230,13 +230,17 @@ SELECT
 FROM envios e
 JOIN estados_envio s ON e.id_estado_actual = s.id_estado
 LEFT JOIN (
-  SELECT h1.id_envio, h1.id_estado, h1.fecha_hora, h1.id_usuario
-  FROM historial_estados h1
-  JOIN (
-    SELECT id_envio, MAX(id_historial) AS id_historial
-    FROM historial_estados
-    GROUP BY id_envio
-  ) hm ON hm.id_historial = h1.id_historial
+  SELECT id_envio, id_estado, fecha_hora, id_usuario
+  FROM (
+    SELECT
+      h.*,
+      ROW_NUMBER() OVER (
+        PARTITION BY h.id_envio
+        ORDER BY h.fecha_hora DESC, h.id_historial DESC
+      ) AS rn
+    FROM historial_estados h
+  ) x
+  WHERE x.rn = 1
 ) ult ON ult.id_envio = e.id_envio
 LEFT JOIN usuarios u ON ult.id_usuario = u.id_usuario
 WHERE e.activo = 1;

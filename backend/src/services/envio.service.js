@@ -6,6 +6,14 @@ const { ORIGEN_ENVIO_FIJO, esTipoCargaValido } = require('../utils/tiposCarga');
 const { validarDestinatario } = require('../utils/destinatario');
 const anonimizacion = require('./anonimizacion.service');
 
+const normalizarComentarioTimeline = (comentario) => {
+  const texto = String(comentario || '');
+  if (!texto) return texto;
+  if (/^Registro inicial del /i.test(texto)) return 'Registro inicial en almacén Lima';
+  if (/(envÃ|env├|env�)/i.test(texto)) return 'Registro inicial en almacén Lima';
+  return texto;
+};
+
 const CAMPOS_TEXTO_ENVIO = [
   'origen', 'destino', 'tipo_carga', 'observaciones',
   'nombre_destinatario', 'dni_destinatario', 'telefono_destinatario',
@@ -87,15 +95,7 @@ const create = async (data, userId, opciones = {}) => {
     registro_correcto: true,
   });
 
-  // Hito inicial de trazabilidad: sin él el envío nace sin historial y PEEA
-  // lo contaría como no actualizado hasta el primer cambio de estado.
-  await HistorialEstado.create({
-    id_envio: envio.id_envio,
-    id_estado: envio.id_estado_actual,
-    id_usuario: userId,
-    comentario: 'Envío registrado en el sistema',
-    fecha_hora: tiempos.hora_fin_registro || new Date(),
-  });
+  // El trigger trg_envio_historial_insert crea el hito inicial de trazabilidad.
 
   await Auditoria.create({
     id_usuario: userId,
@@ -180,7 +180,14 @@ const actualizarEstado = async (id, { id_estado, ubicacion, comentario }, userId
 const getTimeline = async (id) => {
   const envio = await envioRepo.findById(id);
   if (!envio || !envio.activo) throw Object.assign(new Error('Envío no encontrado'), { statusCode: 404 });
-  return envio.historial || [];
+  const historial = envio.historial || [];
+  return historial.map((h) => {
+    const item = typeof h?.toJSON === 'function' ? h.toJSON() : h;
+    return {
+      ...item,
+      comentario: normalizarComentarioTimeline(item?.comentario),
+    };
+  });
 };
 
 module.exports = { list, getById, create, update, remove, actualizarEstado, getTimeline };

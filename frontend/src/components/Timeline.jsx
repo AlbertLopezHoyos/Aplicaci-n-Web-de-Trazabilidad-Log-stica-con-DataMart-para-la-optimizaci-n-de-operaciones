@@ -1,5 +1,6 @@
 import { formatDateTime } from '../utils/format';
 import { CheckCircle2, Circle } from 'lucide-react';
+import { fixMojibake } from '../utils/textEncoding';
 
 const Timeline = ({ items = [] }) => {
   if (!items.length) {
@@ -34,7 +35,7 @@ const Timeline = ({ items = [] }) => {
                   className="text-sm font-semibold"
                   style={{ color }}
                 >
-                  {estado.nombre || 'Estado'}
+                  {fixMojibake(estado.nombre) || 'Estado'}
                 </span>
                 <span className="text-xs text-slate-500">{formatDateTime(item.fecha_hora)}</span>
               </div>
@@ -42,7 +43,7 @@ const Timeline = ({ items = [] }) => {
                 <p className="mt-1 text-xs text-slate-600">📍 {item.ubicacion}</p>
               )}
               {item.comentario && (
-                <p className="mt-2 text-sm text-slate-600">{item.comentario}</p>
+                <p className="mt-2 text-sm text-slate-600">{fixMojibake(item.comentario)}</p>
               )}
               {item.usuario && (
                 <p className="mt-1 text-xs text-slate-400">
