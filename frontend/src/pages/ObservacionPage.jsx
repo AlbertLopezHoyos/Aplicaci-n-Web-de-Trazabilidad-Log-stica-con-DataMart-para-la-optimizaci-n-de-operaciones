@@ -118,7 +118,13 @@ const ObservacionPage = () => {
       loadIndicadores();
       loadDimension(dimensionActiva);
     } catch (err) {
-      toastError('Error', err.response?.data?.message || 'No se pudo aleatorizar la muestra');
+      const cortado = err.code === 'ECONNABORTED' || err.response?.status === 504 || err.response?.status === 502;
+      toastError(
+        'Error',
+        cortado
+          ? 'La nube cortó la espera. Recargue y vuelva a intentar; el sorteo ahora es más corto.'
+          : (err.response?.data?.message || 'No se pudo aleatorizar la muestra')
+      );
     } finally {
       setAleatorizando(false);
     }

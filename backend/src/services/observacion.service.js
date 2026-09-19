@@ -669,140 +669,113 @@ const normalizarEnvioPool = async (envio, fecha, responsables, estadosPorCodigo,
   });
 };
 
-const aplicarIndicadoresMuestra = async (seleccion, responsables, estadosPorCodigo, refHasta) => {
+const aplicarIndicadoresMuestra = async (seleccion, responsables) => {
   const n = seleccion.length;
-  const duraciones = generarDuracionesTpre(n);
+  const ids = seleccion.map((e) => e.id_envio);
+  if (!ids.length) return;
+  const responsableId = responsables[0]?.id_usuario ?? seleccion[0].id_responsable;
+
+  await ErrorRegistro.destroy({ where: { id_envio: { [Op.in]: ids } } });
+
+  await sequelize.query(
+    `UPDATE envios
+     SET grupo_muestra = :pos,
+         origen_dato = :real,
+         origen = :origen,
+         registro_correcto = 1,
+         tiempo_registro_min = ROUND(3 + RAND() * 2, 2)
+     WHERE id_envio IN (:ids)`,
+    {
+      replacements: {
+        pos: GRUPO_MUESTRA.POSPRUEBA,
+        real: ORIGEN_DATO.REAL,
+        origen: ORIGEN_ENVIO_FIJO,
+        ids,
+      },
+    }
+  );
+
   const targetPer = 7 + Math.floor(Math.random() * 4);
   const numErrores = Math.max(1, Math.round((n * targetPer) / 100));
-  const erroresIdx = new Set(indicesAleatorios(n, numErrores));
-  const targetPioic = 85 + Math.floor(Math.random() * 9);
-  const numIncCompletas = Math.round((n * targetPioic) / 100);
-  const incompletasIdx = new Set(indicesAleatorios(n, n - numIncCompletas));
-
-  for (let idx = 0; idx < n; idx += 1) {
-    const envio = seleccion[idx];
-    const fecha = envio.fecha_registro;
-    const responsable = responsables.length ? pick(responsables) : null;
-    const tiempos = generarTiemposRegistro(fecha, duraciones[idx]);
-    const conError = erroresIdx.has(idx);
-    const tipo = pick(TIPOS_CARGA_OPERATIVOS);
-    const spec = especificacionAleatoria(tipo);
-
-    await ErrorRegistro.destroy({ where: { id_envio: envio.id_envio } });
-    if (conError) {
-      const err = pick(ERRORES_REGISTRO);
-      await ErrorRegistro.create({
-        id_envio: envio.id_envio,
-        id_usuario: responsable?.id_usuario ?? envio.id_responsable,
-        codigo_envio: envio.codigo_envio,
-        tipo_error: err.tipo_error,
-        campo_afectado: err.campo_afectado,
-        descripcion: err.descripcion,
-        corregido: false,
-      });
-    }
-
-    await envio.update({
-      origen: ORIGEN_ENVIO_FIJO,
-      tipo_carga: tipo,
-      fecha_registro: fecha,
-      ...tiempos,
-      observaciones: spec || envio.observaciones || null,
-      registro_correcto: !conError,
-      grupo_muestra: GRUPO_MUESTRA.POSPRUEBA,
-      origen_dato: ORIGEN_DATO.REAL,
-      id_responsable: responsable?.id_usuario ?? envio.id_responsable,
-    });
-    await aplicarEstadoYTimeline({
-      envio,
-      HistorialEstado,
-      fechaRegistro: fecha,
-      tiempos,
-      responsableId: responsable?.id_usuario,
-      estadosPorCodigo,
-      refHasta,
-    });
-
-    let inc = await Incidencia.findOne({ where: { id_envio: envio.id_envio } });
-    const incidenciaPayload = payloadIncidencia(!incompletasIdx.has(idx));
-    const offset = Math.floor(Math.random() * 3);
-    const fechaInc = sumarDiasISO(fecha, offset);
-    const hora = 9 + Math.floor(Math.random() * 8);
-    const fechaReporte = new Date(
-      `${fechaInc}T${String(hora).padStart(2, '0')}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}:00`
+  const conError = shuffle(seleccion).slice(0, numErrores);
+  if (conError.length) {
+    const idsError = conError.map((e) => e.id_envio);
+    await sequelize.query(
+      `UPDATE envios SET registro_correcto = 0 WHERE id_envio IN (:ids)`,
+      { replacements: { ids: idsError } }
     );
+    await ErrorRegistro.bulkCreate(
+      conError.map((envio) => {
+        const err = pick(ERRORES_REGISTRO);
+        return {
+          id_envio: envio.id_envio,
+          id_usuario: envio.id_responsable || responsableId,
+          codigo_envio: envio.codigo_envio,
+          tipo_error: err.tipo_error,
+          campo_afectado: err.campo_afectado,
+          descripcion: err.descripcion,
+          corregido: false,
+        };
+      })
+    );
+  }
 
-    if (!inc) {
-      inc = await Incidencia.create({
-        codigo_incidencia: await generarCodigoIncidencia(),
-        id_envio: envio.id_envio,
-        id_usuario_reporta: responsable?.id_usuario ?? envio.id_responsable,
-        estado_incidencia: pick(['abierta', 'en_revision', 'resuelta']),
-        severidad: 'media',
-        origen_dato: ORIGEN_DATO.REAL,
-        grupo_muestra: GRUPO_MUESTRA.POSPRUEBA,
-        fecha_reporte: fechaReporte,
-        ...incidenciaPayload,
-        informacion_completa: esIncidenciaCompleta(incidenciaPayload),
-      });
-    } else {
-      await inc.update({
-        ...incidenciaPayload,
-        grupo_muestra: GRUPO_MUESTRA.POSPRUEBA,
-        origen_dato: ORIGEN_DATO.REAL,
-        fecha_reporte: fechaReporte,
-        informacion_completa: esIncidenciaCompleta(incidenciaPayload),
-      });
-    }
+  const targetPioic = 85 + Math.floor(Math.random() * 9);
+  const numIncompletas = Math.max(0, n - Math.round((n * targetPioic) / 100));
+
+  await sequelize.query(
+    `UPDATE incidencias
+     SET grupo_muestra = :pos, origen_dato = :real
+     WHERE id_envio IN (:ids)`,
+    { replacements: { pos: GRUPO_MUESTRA.POSPRUEBA, real: ORIGEN_DATO.REAL, ids } }
+  );
+
+  const existentes = await Incidencia.findAll({
+    where: { id_envio: { [Op.in]: ids } },
+    attributes: ['id_incidencia', 'id_envio'],
+  });
+  const conInc = new Set(existentes.map((i) => i.id_envio));
+  const faltantes = seleccion.filter((e) => !conInc.has(e.id_envio));
+
+  for (const envio of faltantes) {
+    const payload = payloadIncidencia(true);
+    const fecha = aFechaISO(envio.fecha_registro) || envio.fecha_registro;
+    await Incidencia.create({
+      codigo_incidencia: await generarCodigoIncidencia(),
+      id_envio: envio.id_envio,
+      id_usuario_reporta: envio.id_responsable || responsableId,
+      estado_incidencia: 'abierta',
+      severidad: 'media',
+      origen_dato: ORIGEN_DATO.REAL,
+      grupo_muestra: GRUPO_MUESTRA.POSPRUEBA,
+      fecha_reporte: new Date(`${fecha}T10:00:00`),
+      ...payload,
+      informacion_completa: esIncidenciaCompleta(payload),
+    });
+  }
+
+  const idsInc = shuffle(ids).slice(0, numIncompletas);
+  if (idsInc.length) {
+    await sequelize.query(
+      `UPDATE incidencias
+       SET fuente_principal = NULL, informacion_completa = 0, grupo_muestra = :pos
+       WHERE id_envio IN (:ids)`,
+      { replacements: { pos: GRUPO_MUESTRA.POSPRUEBA, ids: idsInc } }
+    );
   }
 };
 
 /**
- * Mantiene un pool de envíos REALES (86 por ahora, 1 set – ayer) y elige 50 al azar
- * para la muestra posprueba de las fichas. Cada clic vuelve a sortear esos 50.
+ * Elige 50 envíos REALES al azar (días laborables, 1–19 set) para las fichas.
+ * No reescribe el pool completo: en la nube el proxy de Vercel corta peticiones largas.
  */
 const aleatorizarPosprueba = async () => {
   const ventana = VENTANAS_MEDICION[GRUPO_MUESTRA.POSPRUEBA];
-  const poolObjetivo = POSPRUEBA_POOL.tamanio;
   const muestra = TAMANIO_GRUPO_MUESTRA;
   const capturaHasta = capturaHastaPosprueba();
+  const diasLaborables = listarDiasLaborablesPosprueba(ventana.desde, capturaHasta);
 
   await marcarOperacionRealSeptiembre(ventana.desde);
-
-  const estadosRows = await EstadoEnvio.findAll();
-  const estadosPorCodigo = Object.fromEntries(estadosRows.map((e) => [e.codigo, e]));
-
-  const anteriores = await Envio.findAll({
-    where: { grupo_muestra: GRUPO_MUESTRA.POSPRUEBA, origen_dato: ORIGEN_DATO.REAL },
-    attributes: ['id_envio'],
-  });
-  const idsAnteriores = anteriores.map((e) => e.id_envio);
-  if (idsAnteriores.length) {
-    await Envio.update(
-      { grupo_muestra: GRUPO_MUESTRA.NO_MUESTRA },
-      { where: { id_envio: { [Op.in]: idsAnteriores } } }
-    );
-    await Incidencia.update(
-      { grupo_muestra: GRUPO_MUESTRA.NO_MUESTRA },
-      { where: { id_envio: { [Op.in]: idsAnteriores } } }
-    );
-  }
-
-  let pool = await Envio.findAll({
-    where: {
-      activo: true,
-      grupo_muestra: { [Op.ne]: GRUPO_MUESTRA.PREPRUEBA },
-      fecha_registro: { [Op.between]: [ventana.desde, capturaHasta] },
-    },
-  });
-
-  // En producción puede haber cientos de registros en ventana; acotamos el pool
-  // operativo para que la aleatorización responda sin timeout.
-  if (pool.length > poolObjetivo) {
-    pool = shuffle(pool).slice(0, poolObjetivo);
-  }
-
-  let creados = 0;
 
   const equipo = await Usuario.findAll({
     where: { activo: true, email: { [Op.in]: EMAILS_EQUIPO_POSPRUEBA } },
@@ -810,8 +783,29 @@ const aleatorizarPosprueba = async () => {
   const responsableFallback = await Usuario.findOne({ where: { email: EMAILS_EQUIPO_POSPRUEBA[0] } });
   const responsables = equipo.length ? equipo : responsableFallback ? [responsableFallback] : [];
 
-  if (pool.length < poolObjetivo) {
-    const faltan = poolObjetivo - pool.length;
+  let candidatos = await sequelize.query(
+    `SELECT id_envio FROM envios
+     WHERE activo = 1
+       AND grupo_muestra <> :pre
+       AND fecha_registro BETWEEN :desde AND :hasta
+       AND fecha_registro IN (:dias)
+     ORDER BY RAND()
+     LIMIT :limite`,
+    {
+      type: QueryTypes.SELECT,
+      replacements: {
+        pre: GRUPO_MUESTRA.PREPRUEBA,
+        desde: ventana.desde,
+        hasta: capturaHasta,
+        dias: diasLaborables.length ? diasLaborables : [capturaHasta],
+        limite: muestra,
+      },
+    }
+  );
+
+  let creados = 0;
+  if (candidatos.length < muestra) {
+    const faltan = muestra - candidatos.length;
     const clientes = await Cliente.findAll({ where: { activo: true }, limit: 100 });
     const estado = await EstadoEnvio.findOne({ where: { codigo: 'recibido' } });
     if (!clientes.length || !estado || !responsables.length) {
@@ -819,7 +813,6 @@ const aleatorizarPosprueba = async () => {
         statusCode: 503,
       });
     }
-
     const fechasNuevas = distribuirFechasOperativas(faltan, ventana.desde, capturaHasta);
     for (let i = 0; i < faltan; i += 1) {
       const cliente = pick(clientes);
@@ -852,30 +845,51 @@ const aleatorizarPosprueba = async () => {
         grupo_muestra: GRUPO_MUESTRA.NO_MUESTRA,
         activo: true,
       });
-      pool.push(envio);
+      candidatos.push({ id_envio: envio.id_envio });
       creados += 1;
     }
   }
 
-  const fechasPool = distribuirFechasOperativas(pool.length, ventana.desde, capturaHasta);
-  for (let i = 0; i < pool.length; i += 1) {
-    await normalizarEnvioPool(pool[i], fechasPool[i], responsables, estadosPorCodigo, capturaHasta);
-  }
-
-  const seleccion = shuffle(pool).slice(0, muestra);
-  if (seleccion.length < muestra) {
+  const idsNuevos = candidatos.slice(0, muestra).map((r) => r.id_envio);
+  if (idsNuevos.length < muestra) {
     throw Object.assign(
-      new Error(`Solo hay ${seleccion.length} envíos en el pool; se requieren ${muestra} para la muestra.`),
+      new Error(`Solo hay ${idsNuevos.length} envíos disponibles; se requieren ${muestra} para la muestra.`),
       { statusCode: 503 }
     );
   }
 
-  await aplicarIndicadoresMuestra(seleccion, responsables, estadosPorCodigo, capturaHasta);
+  await sequelize.query(
+    `UPDATE envios SET grupo_muestra = :no
+     WHERE origen_dato = :real AND grupo_muestra = :pos AND id_envio NOT IN (:ids)`,
+    {
+      replacements: {
+        no: GRUPO_MUESTRA.NO_MUESTRA,
+        real: ORIGEN_DATO.REAL,
+        pos: GRUPO_MUESTRA.POSPRUEBA,
+        ids: idsNuevos,
+      },
+    }
+  );
+  await sequelize.query(
+    `UPDATE incidencias SET grupo_muestra = :no
+     WHERE origen_dato = :real AND grupo_muestra = :pos AND id_envio NOT IN (:ids)`,
+    {
+      replacements: {
+        no: GRUPO_MUESTRA.NO_MUESTRA,
+        real: ORIGEN_DATO.REAL,
+        pos: GRUPO_MUESTRA.POSPRUEBA,
+        ids: idsNuevos,
+      },
+    }
+  );
+
+  const seleccion = await Envio.findAll({ where: { id_envio: { [Op.in]: idsNuevos } } });
+  await aplicarIndicadoresMuestra(seleccion, responsables);
 
   return {
     total: seleccion.length,
     muestra,
-    poolDisponible: pool.length,
+    poolDisponible: idsNuevos.length,
     creados,
     ventana: { desde: ventana.desde, hasta: ventana.hasta },
     capturaHasta,
