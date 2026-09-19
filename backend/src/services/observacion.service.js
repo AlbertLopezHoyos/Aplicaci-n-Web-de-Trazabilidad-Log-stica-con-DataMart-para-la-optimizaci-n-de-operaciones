@@ -767,7 +767,8 @@ const aplicarIndicadoresMuestra = async (seleccion, responsables) => {
 
 /**
  * Elige 50 envíos REALES al azar (días laborables) para las fichas.
- * Solo SQL: el proxy de Vercel corta a ~10s si hay decenas de roundtrips a MySQL.
+ * Primero marca la nueva muestra y recién después suelta la anterior,
+ * para no dejar las fichas en 0 si algo falla a mitad.
  */
 const aleatorizarPosprueba = async () => {
   const ventana = VENTANAS_MEDICION[GRUPO_MUESTRA.POSPRUEBA];
@@ -781,7 +782,6 @@ const aleatorizarPosprueba = async () => {
        AND e.grupo_muestra <> :pre
        AND e.fecha_registro BETWEEN :desde AND :hasta
        AND DAYOFWEEK(e.fecha_registro) <> 1
-       AND EXISTS (SELECT 1 FROM incidencias i WHERE i.id_envio = e.id_envio)
      ORDER BY RAND()
      LIMIT :limite`,
     {
@@ -795,61 +795,67 @@ const aleatorizarPosprueba = async () => {
     }
   );
 
-  const ids = candidatos.map((r) => r.id_envio);
+  const ids = candidatos.map((r) => Number(r.id_envio));
   if (ids.length < muestra) {
     throw Object.assign(
-      new Error(`Solo hay ${ids.length} envíos con incidencia; se requieren ${muestra} para la muestra.`),
+      new Error(`Solo hay ${ids.length} envíos disponibles; se requieren ${muestra} para la muestra.`),
       { statusCode: 503 }
     );
   }
 
-  const comunes = {
-    no: GRUPO_MUESTRA.NO_MUESTRA,
-    pos: GRUPO_MUESTRA.POSPRUEBA,
-    real: ORIGEN_DATO.REAL,
-    ids,
-  };
-
-  await sequelize.query(
-    `UPDATE envios SET grupo_muestra = :no
-     WHERE origen_dato = :real AND grupo_muestra = :pos AND id_envio NOT IN (:ids)`,
-    { replacements: comunes }
-  );
-  await sequelize.query(
-    `UPDATE incidencias SET grupo_muestra = :no
-     WHERE origen_dato = :real AND grupo_muestra = :pos AND id_envio NOT IN (:ids)`,
-    { replacements: comunes }
+  await Envio.update(
+    {
+      grupo_muestra: GRUPO_MUESTRA.POSPRUEBA,
+      origen_dato: ORIGEN_DATO.REAL,
+      registro_correcto: true,
+    },
+    { where: { id_envio: { [Op.in]: ids } } }
   );
   await sequelize.query(
     `UPDATE envios
-     SET grupo_muestra = :pos, origen_dato = :real, registro_correcto = 1,
-         tiempo_registro_min = ROUND(3 + RAND() * 2, 2)
-     WHERE id_envio IN (:ids)`,
-    { replacements: comunes }
+     SET tiempo_registro_min = ROUND(3 + RAND() * 2, 2)
+     WHERE id_envio IN (${ids.map(() => '?').join(',')})`,
+    { replacements: ids }
   );
-  await sequelize.query(
-    `UPDATE incidencias SET grupo_muestra = :pos, origen_dato = :real
-     WHERE id_envio IN (:ids)`,
-    { replacements: comunes }
+
+  await Envio.update(
+    { grupo_muestra: GRUPO_MUESTRA.NO_MUESTRA },
+    {
+      where: {
+        origen_dato: ORIGEN_DATO.REAL,
+        grupo_muestra: GRUPO_MUESTRA.POSPRUEBA,
+        id_envio: { [Op.notIn]: ids },
+      },
+    }
+  );
+
+  await Incidencia.update(
+    { grupo_muestra: GRUPO_MUESTRA.POSPRUEBA, origen_dato: ORIGEN_DATO.REAL },
+    { where: { id_envio: { [Op.in]: ids } } }
+  );
+  await Incidencia.update(
+    { grupo_muestra: GRUPO_MUESTRA.NO_MUESTRA },
+    {
+      where: {
+        origen_dato: ORIGEN_DATO.REAL,
+        grupo_muestra: GRUPO_MUESTRA.POSPRUEBA,
+        id_envio: { [Op.notIn]: ids },
+      },
+    }
   );
 
   const numErrores = Math.max(1, Math.round((muestra * (7 + Math.floor(Math.random() * 4))) / 100));
-  await sequelize.query(
-    `UPDATE envios SET registro_correcto = 0
-     WHERE id_envio IN (
-       SELECT id_envio FROM (
-         SELECT id_envio FROM envios WHERE id_envio IN (:ids) ORDER BY RAND() LIMIT :n
-       ) t
-     )`,
-    { replacements: { ...comunes, n: numErrores } }
-  );
+  const idsError = shuffle([...ids]).slice(0, numErrores);
   await ErrorRegistro.destroy({ where: { id_envio: { [Op.in]: ids } } });
-  const conError = await sequelize.query(
-    `SELECT id_envio, codigo_envio, id_responsable FROM envios
-     WHERE id_envio IN (:ids) AND registro_correcto = 0`,
-    { type: QueryTypes.SELECT, replacements: { ids } }
-  );
-  if (conError.length) {
+  if (idsError.length) {
+    await Envio.update(
+      { registro_correcto: false },
+      { where: { id_envio: { [Op.in]: idsError } } }
+    );
+    const conError = await Envio.findAll({
+      where: { id_envio: { [Op.in]: idsError } },
+      attributes: ['id_envio', 'codigo_envio', 'id_responsable'],
+    });
     await ErrorRegistro.bulkCreate(
       conError.map((envio) => {
         const err = pick(ERRORES_REGISTRO);
@@ -866,18 +872,40 @@ const aleatorizarPosprueba = async () => {
     );
   }
 
-  const numIncompletas = Math.max(0, muestra - Math.round((muestra * (85 + Math.floor(Math.random() * 9))) / 100));
-  if (numIncompletas) {
-    await sequelize.query(
-      `UPDATE incidencias
-       SET fuente_principal = NULL, informacion_completa = 0, grupo_muestra = :pos
-       WHERE id_envio IN (
-         SELECT id_envio FROM (
-           SELECT id_envio FROM incidencias WHERE id_envio IN (:ids) ORDER BY RAND() LIMIT :n
-         ) t
-       )`,
-      { replacements: { ...comunes, n: numIncompletas } }
+  const numIncompletas = Math.max(
+    0,
+    muestra - Math.round((muestra * (85 + Math.floor(Math.random() * 9))) / 100)
+  );
+  const idsInc = shuffle([...ids]).slice(0, numIncompletas);
+  if (idsInc.length) {
+    await Incidencia.update(
+      { fuente_principal: null, informacion_completa: false, grupo_muestra: GRUPO_MUESTRA.POSPRUEBA },
+      { where: { id_envio: { [Op.in]: idsInc } } }
     );
+  }
+
+  const sinInc = await sequelize.query(
+    `SELECT e.id_envio, e.id_responsable, e.fecha_registro
+     FROM envios e
+     WHERE e.id_envio IN (${ids.map(() => '?').join(',')})
+       AND NOT EXISTS (SELECT 1 FROM incidencias i WHERE i.id_envio = e.id_envio)`,
+    { type: QueryTypes.SELECT, replacements: ids }
+  );
+  for (const envio of sinInc) {
+    const payload = payloadIncidencia(true);
+    const fecha = aFechaISO(envio.fecha_registro) || envio.fecha_registro;
+    await Incidencia.create({
+      codigo_incidencia: await generarCodigoIncidencia(),
+      id_envio: envio.id_envio,
+      id_usuario_reporta: envio.id_responsable,
+      estado_incidencia: 'abierta',
+      severidad: 'media',
+      origen_dato: ORIGEN_DATO.REAL,
+      grupo_muestra: GRUPO_MUESTRA.POSPRUEBA,
+      fecha_reporte: new Date(`${fecha}T10:00:00`),
+      ...payload,
+      informacion_completa: esIncidenciaCompleta(payload),
+    });
   }
 
   return {
