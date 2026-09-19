@@ -16,7 +16,7 @@ import { confirmAction, toastSuccess, toastError } from '../utils/alerts';
 const EnviosPage = () => {
   const { isAdmin } = useAuth();
   const { presentacionActiva } = usePresentacion();
-  const [envios, setEnvios] = useState({ data: [], total: 0, page: 1, limit: 10 });
+  const [envios, setEnvios] = useState({ data: [], total: 0, page: 1, limit: 10, meta: {} });
   const [estados, setEstados] = useState([]);
   const [filters, setFilters] = useState({ search: '', estado: '', fechaDesde: '', fechaHasta: '', page: 1, alcance: 'todos' });
   const [searchInput, setSearchInput] = useState('');
@@ -92,7 +92,11 @@ const EnviosPage = () => {
         <StatChip label="Total registros" value={envios.total ?? 0} />
         <StatChip label="Página actual" value={`${envios.page ?? 1} / ${Math.max(1, Math.ceil((envios.total || 0) / (envios.limit || 10)))}`} accent="slate" />
         <StatChip label="Mostrando" value={envios.data?.length ?? 0} accent="salazar" />
-        <StatChip label="Estado filtro" value={filters.estado ? estados.find((s) => String(s.id_estado) === filters.estado)?.nombre || '—' : 'Todos'} accent="amber" />
+        <StatChip
+          label="Última fecha (filtro actual)"
+          value={envios.meta?.maxFechaRegistro ? formatDate(envios.meta.maxFechaRegistro) : '—'}
+          accent="amber"
+        />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">

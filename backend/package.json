@@ -16,6 +16,8 @@
     "db:fix-utf8": "node database/scripts/fix-utf8-data.js",
     "db:realismo-septiembre": "node database/scripts/fix-realismo-septiembre.js",
     "db:realismo-septiembre:railway": "node database/scripts/fix-realismo-septiembre.js --railway",
+    "db:agregar-captura-posprueba": "node database/scripts/agregar-captura-posprueba.js",
+    "db:agregar-captura-posprueba:railway": "node database/scripts/agregar-captura-posprueba.js --railway --hasta=2026-09-19",
     "db:muestra": "node database/scripts/marcar-muestra.js",
     "db:posprueba-actualizar": "node database/scripts/actualizar-posprueba-envios.js",
     "db:migrate-09": "node database/scripts/run-migrate-09.js",

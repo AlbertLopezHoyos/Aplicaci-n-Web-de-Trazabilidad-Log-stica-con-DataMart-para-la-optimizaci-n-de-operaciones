@@ -54,16 +54,26 @@ const findAllPaginated = async ({
   }
 
   const offset = (page - 1) * limit;
-  const { count, rows } = await Envio.findAndCountAll({
-    where,
-    include: includeDefault,
-    order: [['created_at', 'DESC']],
+  const baseWhere = { ...where };
+  const [{ count, rows }, maxFechaRegistro] = await Promise.all([
+    Envio.findAndCountAll({
+      where,
+      include: includeDefault,
+      order: [['fecha_registro', 'DESC'], ['id_envio', 'DESC']],
+      limit: parseInt(limit, 10),
+      offset,
+      distinct: true,
+      subQuery: false,
+    }),
+    Envio.max('fecha_registro', { where: { activo: true, ...baseWhere } }),
+  ]);
+  return {
+    total: count,
+    page: parseInt(page, 10),
     limit: parseInt(limit, 10),
-    offset,
-    distinct: true,
-    subQuery: false,
-  });
-  return { total: count, page: parseInt(page, 10), limit: parseInt(limit, 10), data: rows };
+    data: rows,
+    meta: { maxFechaRegistro },
+  };
 };
 
 const findById = (id) =>

@@ -31,6 +31,7 @@ const {
   limiteFichaGrupo,
   ventanaFichaGrupo,
   capturaHastaPosprueba,
+  listarDiasLaborablesPosprueba,
   esIncidenciaCompleta,
   CAMPOS_INCIDENCIA_COMPLETA,
   VENTANAS_MEDICION,
@@ -539,13 +540,12 @@ const sumarDiasISO = (iso, dias) => {
   return aFechaISO(d);
 };
 
-/** Reparte fechas como captura diaria: más carga entre semana, menos domingos. */
+/** Reparte fechas en días laborables posprueba (sin domingos). */
 const distribuirFechasOperativas = (cantidad, desde, hasta) => {
-  const dias = listarDias(desde, hasta);
+  const dias = listarDiasLaborablesPosprueba(desde, hasta);
   if (!dias.length) return [];
   const pesos = dias.map((dia) => {
     const dow = new Date(`${dia}T12:00:00`).getDay();
-    if (dow === 0) return 0.35;
     if (dow === 6) return 0.65;
     return 1 + Math.random() * 0.45;
   });

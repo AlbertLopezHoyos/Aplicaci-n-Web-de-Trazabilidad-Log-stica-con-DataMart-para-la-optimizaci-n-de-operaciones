@@ -113,7 +113,7 @@ const ObservacionPage = () => {
       await api.post('/observacion/posprueba/aleatorizar');
       toastSuccess(
         'Registros aleatorizados',
-        'mostrando registros aleatorios desde el 01-09-2026 hasta el 20-09-2026'
+        'mostrando registros aleatorios posprueba (01-09-2026 al 19-09-2026, sin domingos)'
       );
       loadIndicadores();
       loadDimension(dimensionActiva);

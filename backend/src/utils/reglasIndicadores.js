@@ -34,10 +34,6 @@ const TAMANIO_GRUPO_MUESTRA = 50;
  * Pool de envíos REALES capturados en posprueba (1 set – ayer). Crece conforme pasan días.
  * Las fichas muestran solo TAMANIO_GRUPO_MUESTRA (50) elegidos al azar de este pool.
  */
-const POSPRUEBA_POOL = Object.freeze({
-  tamanio: 86,
-});
-
 /** Registros visibles en fichas de preprueba y posprueba. */
 const limiteFichaGrupo = (_grupo) => TAMANIO_GRUPO_MUESTRA;
 
@@ -60,26 +56,89 @@ const VENTANAS_MEDICION = Object.freeze({
   }),
 });
 
+/** Último día hábil de captura posprueba (20-set-2026 es domingo, no laborable). */
+const ULTIMO_DIA_CAPTURA_POSPRUEBA = '2026-09-19';
+
+const DOMINGOS_POSPRUEBA = Object.freeze(['2026-09-06', '2026-09-13', '2026-09-20']);
+
+const esDomingoISO = (fechaISO) => new Date(`${fechaISO}T12:00:00`).getDay() === 0;
+
+const esDiaLaborablePosprueba = (fechaISO) => {
+  const iso = aFechaISO(fechaISO);
+  if (!iso) return false;
+  if (DOMINGOS_POSPRUEBA.includes(iso)) return false;
+  return !esDomingoISO(iso);
+};
+
+const listarDiasLaborablesPosprueba = (desde, hasta) => {
+  const inicio = aFechaISO(desde);
+  const fin = aFechaISO(hasta);
+  if (!inicio || !fin || inicio > fin) return [];
+  const dias = [];
+  const cursor = new Date(`${inicio}T12:00:00`);
+  const end = new Date(`${fin}T12:00:00`);
+  while (cursor <= end) {
+    const iso = aFechaISO(cursor);
+    if (esDiaLaborablePosprueba(iso)) dias.push(iso);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dias;
+};
+
+/** Reasigna domingos al día hábil anterior inmediato dentro de la ventana. */
+const fechaLaborableSustituto = (fechaISO) => {
+  const iso = aFechaISO(fechaISO);
+  if (!iso || esDiaLaborablePosprueba(iso)) return iso;
+  const mapa = Object.freeze({
+    '2026-09-06': '2026-09-05',
+    '2026-09-13': '2026-09-12',
+    '2026-09-20': '2026-09-19',
+  });
+  if (mapa[iso]) return mapa[iso];
+  let cursor = new Date(`${iso}T12:00:00`);
+  for (let i = 0; i < 7; i += 1) {
+    cursor.setDate(cursor.getDate() - 1);
+    const candidato = aFechaISO(cursor);
+    if (esDiaLaborablePosprueba(candidato)) return candidato;
+  }
+  return iso;
+};
+
 const ventanaDeGrupo = (grupo) => VENTANAS_MEDICION[String(grupo || '').toUpperCase()] || null;
 
 /** Ventana del instrumento para fichas (sin recortar por días ya capturados). */
 const ventanaFichaGrupo = (grupo) => ventanaDeGrupo(grupo);
 
 /**
- * Último día con captura operativa simulada: ayer, acotado a la ventana posprueba.
- * Los registros se reparten entre el 1 set y esta fecha; la ventana formal sigue al 20 set.
+ * Último día con captura operativa (incluye el día de referencia), acotado al 19-set-2026.
+ * Domingo 20-set queda fuera. La ventana formal del instrumento sigue al 20-set.
  */
 const capturaHastaPosprueba = (referencia = new Date()) => {
   const ventana = VENTANAS_MEDICION[GRUPO_MUESTRA.POSPRUEBA];
-  const ayer = new Date(referencia);
-  ayer.setDate(ayer.getDate() - 1);
-  const isoAyer = aFechaISO(ayer);
+  const topeCaptura = ULTIMO_DIA_CAPTURA_POSPRUEBA < ventana.hasta
+    ? ULTIMO_DIA_CAPTURA_POSPRUEBA
+    : ventana.hasta;
   const isoHoy = aFechaISO(referencia);
   if (isoHoy < ventana.desde) return ventana.desde;
-  if (isoAyer > ventana.hasta) return ventana.hasta;
-  if (isoAyer < ventana.desde) return ventana.desde;
-  return isoAyer;
+  let iso = isoHoy > topeCaptura ? topeCaptura : isoHoy;
+  if (iso < ventana.desde) iso = ventana.desde;
+  if (!esDiaLaborablePosprueba(iso)) iso = fechaLaborableSustituto(iso);
+  return iso;
 };
+
+/** ~7–8 envíos por día hábil; escala con días laborables 1 set – capturaHasta. */
+const tamanioPoolPosprueba = (capturaHasta = capturaHastaPosprueba()) => {
+  const ventana = VENTANAS_MEDICION[GRUPO_MUESTRA.POSPRUEBA];
+  const diasLaborables = listarDiasLaborablesPosprueba(ventana.desde, capturaHasta).length;
+  const base = listarDiasLaborablesPosprueba('2026-09-01', '2026-09-11').length || 10;
+  return Math.max(TAMANIO_GRUPO_MUESTRA + 10, Math.round((86 / base) * Math.max(1, diasLaborables)));
+};
+
+const POSPRUEBA_POOL = Object.freeze({
+  get tamanio() {
+    return tamanioPoolPosprueba();
+  },
+});
 
 /** Normaliza Date | string | DATEONLY a 'YYYY-MM-DD' en hora local. */
 const aFechaISO = (valor) => {
@@ -205,6 +264,11 @@ module.exports = {
   limiteFichaGrupo,
   ventanaFichaGrupo,
   capturaHastaPosprueba,
+  ULTIMO_DIA_CAPTURA_POSPRUEBA,
+  DOMINGOS_POSPRUEBA,
+  esDiaLaborablePosprueba,
+  listarDiasLaborablesPosprueba,
+  fechaLaborableSustituto,
   VENTANAS_MEDICION,
   ventanaDeGrupo,
   estaEnVentana,
