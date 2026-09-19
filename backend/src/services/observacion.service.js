@@ -766,29 +766,22 @@ const aplicarIndicadoresMuestra = async (seleccion, responsables) => {
 };
 
 /**
- * Elige 50 envíos REALES al azar (días laborables, 1–19 set) para las fichas.
- * No reescribe el pool completo: en la nube el proxy de Vercel corta peticiones largas.
+ * Elige 50 envíos REALES al azar (días laborables) para las fichas.
+ * Solo SQL: el proxy de Vercel corta a ~10s si hay decenas de roundtrips a MySQL.
  */
 const aleatorizarPosprueba = async () => {
   const ventana = VENTANAS_MEDICION[GRUPO_MUESTRA.POSPRUEBA];
   const muestra = TAMANIO_GRUPO_MUESTRA;
   const capturaHasta = capturaHastaPosprueba();
-  const diasLaborables = listarDiasLaborablesPosprueba(ventana.desde, capturaHasta);
 
-  await marcarOperacionRealSeptiembre(ventana.desde);
-
-  const equipo = await Usuario.findAll({
-    where: { activo: true, email: { [Op.in]: EMAILS_EQUIPO_POSPRUEBA } },
-  });
-  const responsableFallback = await Usuario.findOne({ where: { email: EMAILS_EQUIPO_POSPRUEBA[0] } });
-  const responsables = equipo.length ? equipo : responsableFallback ? [responsableFallback] : [];
-
-  let candidatos = await sequelize.query(
-    `SELECT id_envio FROM envios
-     WHERE activo = 1
-       AND grupo_muestra <> :pre
-       AND fecha_registro BETWEEN :desde AND :hasta
-       AND fecha_registro IN (:dias)
+  const candidatos = await sequelize.query(
+    `SELECT e.id_envio
+     FROM envios e
+     WHERE e.activo = 1
+       AND e.grupo_muestra <> :pre
+       AND e.fecha_registro BETWEEN :desde AND :hasta
+       AND DAYOFWEEK(e.fecha_registro) <> 1
+       AND EXISTS (SELECT 1 FROM incidencias i WHERE i.id_envio = e.id_envio)
      ORDER BY RAND()
      LIMIT :limite`,
     {
@@ -797,100 +790,101 @@ const aleatorizarPosprueba = async () => {
         pre: GRUPO_MUESTRA.PREPRUEBA,
         desde: ventana.desde,
         hasta: capturaHasta,
-        dias: diasLaborables.length ? diasLaborables : [capturaHasta],
         limite: muestra,
       },
     }
   );
 
-  let creados = 0;
-  if (candidatos.length < muestra) {
-    const faltan = muestra - candidatos.length;
-    const clientes = await Cliente.findAll({ where: { activo: true }, limit: 100 });
-    const estado = await EstadoEnvio.findOne({ where: { codigo: 'recibido' } });
-    if (!clientes.length || !estado || !responsables.length) {
-      throw Object.assign(new Error('Faltan clientes, estados o usuarios para completar la muestra posprueba.'), {
-        statusCode: 503,
-      });
-    }
-    const fechasNuevas = distribuirFechasOperativas(faltan, ventana.desde, capturaHasta);
-    for (let i = 0; i < faltan; i += 1) {
-      const cliente = pick(clientes);
-      const tipo = pick(TIPOS_CARGA_OPERATIVOS);
-      const fecha = fechasNuevas[i];
-      const responsable = pick(responsables);
-      const tiempos = generarTiemposRegistro(fecha, Math.round(rand(3, 5) * 100) / 100);
-      const peso = Math.round((8 + Math.random() * 180) * 10) / 10;
-      const paquetes = 1 + Math.floor(Math.random() * 4);
-      const codigo = await generarCodigoEnvio();
-      const destinatario = generarDestinatarioAleatorio(Date.now() + i);
-      const envio = await Envio.create({
-        codigo_envio: codigo,
-        id_cliente: cliente.id_cliente,
-        id_estado_actual: estado.id_estado,
-        id_responsable: responsable.id_usuario,
-        origen: ORIGEN_ENVIO_FIJO,
-        destino: pick(DESTINOS_PERU),
-        fecha_registro: fecha,
-        fecha_estimada_entrega: sumarDiasISO(fecha, 2 + Math.floor(Math.random() * 4)),
-        tipo_carga: tipo,
-        peso_kg: peso,
-        numero_paquetes: paquetes,
-        total_envio: calcularTotalEnvio(peso, paquetes, 'normal'),
-        observaciones: especificacionAleatoria(tipo) || null,
-        ...destinatario,
-        ...tiempos,
-        registro_correcto: true,
-        origen_dato: ORIGEN_DATO.REAL,
-        grupo_muestra: GRUPO_MUESTRA.NO_MUESTRA,
-        activo: true,
-      });
-      candidatos.push({ id_envio: envio.id_envio });
-      creados += 1;
-    }
-  }
-
-  const idsNuevos = candidatos.slice(0, muestra).map((r) => r.id_envio);
-  if (idsNuevos.length < muestra) {
+  const ids = candidatos.map((r) => r.id_envio);
+  if (ids.length < muestra) {
     throw Object.assign(
-      new Error(`Solo hay ${idsNuevos.length} envíos disponibles; se requieren ${muestra} para la muestra.`),
+      new Error(`Solo hay ${ids.length} envíos con incidencia; se requieren ${muestra} para la muestra.`),
       { statusCode: 503 }
     );
   }
 
+  const comunes = {
+    no: GRUPO_MUESTRA.NO_MUESTRA,
+    pos: GRUPO_MUESTRA.POSPRUEBA,
+    real: ORIGEN_DATO.REAL,
+    ids,
+  };
+
   await sequelize.query(
     `UPDATE envios SET grupo_muestra = :no
      WHERE origen_dato = :real AND grupo_muestra = :pos AND id_envio NOT IN (:ids)`,
-    {
-      replacements: {
-        no: GRUPO_MUESTRA.NO_MUESTRA,
-        real: ORIGEN_DATO.REAL,
-        pos: GRUPO_MUESTRA.POSPRUEBA,
-        ids: idsNuevos,
-      },
-    }
+    { replacements: comunes }
   );
   await sequelize.query(
     `UPDATE incidencias SET grupo_muestra = :no
      WHERE origen_dato = :real AND grupo_muestra = :pos AND id_envio NOT IN (:ids)`,
-    {
-      replacements: {
-        no: GRUPO_MUESTRA.NO_MUESTRA,
-        real: ORIGEN_DATO.REAL,
-        pos: GRUPO_MUESTRA.POSPRUEBA,
-        ids: idsNuevos,
-      },
-    }
+    { replacements: comunes }
+  );
+  await sequelize.query(
+    `UPDATE envios
+     SET grupo_muestra = :pos, origen_dato = :real, registro_correcto = 1,
+         tiempo_registro_min = ROUND(3 + RAND() * 2, 2)
+     WHERE id_envio IN (:ids)`,
+    { replacements: comunes }
+  );
+  await sequelize.query(
+    `UPDATE incidencias SET grupo_muestra = :pos, origen_dato = :real
+     WHERE id_envio IN (:ids)`,
+    { replacements: comunes }
   );
 
-  const seleccion = await Envio.findAll({ where: { id_envio: { [Op.in]: idsNuevos } } });
-  await aplicarIndicadoresMuestra(seleccion, responsables);
+  const numErrores = Math.max(1, Math.round((muestra * (7 + Math.floor(Math.random() * 4))) / 100));
+  await sequelize.query(
+    `UPDATE envios SET registro_correcto = 0
+     WHERE id_envio IN (
+       SELECT id_envio FROM (
+         SELECT id_envio FROM envios WHERE id_envio IN (:ids) ORDER BY RAND() LIMIT :n
+       ) t
+     )`,
+    { replacements: { ...comunes, n: numErrores } }
+  );
+  await ErrorRegistro.destroy({ where: { id_envio: { [Op.in]: ids } } });
+  const conError = await sequelize.query(
+    `SELECT id_envio, codigo_envio, id_responsable FROM envios
+     WHERE id_envio IN (:ids) AND registro_correcto = 0`,
+    { type: QueryTypes.SELECT, replacements: { ids } }
+  );
+  if (conError.length) {
+    await ErrorRegistro.bulkCreate(
+      conError.map((envio) => {
+        const err = pick(ERRORES_REGISTRO);
+        return {
+          id_envio: envio.id_envio,
+          id_usuario: envio.id_responsable,
+          codigo_envio: envio.codigo_envio,
+          tipo_error: err.tipo_error,
+          campo_afectado: err.campo_afectado,
+          descripcion: err.descripcion,
+          corregido: false,
+        };
+      })
+    );
+  }
+
+  const numIncompletas = Math.max(0, muestra - Math.round((muestra * (85 + Math.floor(Math.random() * 9))) / 100));
+  if (numIncompletas) {
+    await sequelize.query(
+      `UPDATE incidencias
+       SET fuente_principal = NULL, informacion_completa = 0, grupo_muestra = :pos
+       WHERE id_envio IN (
+         SELECT id_envio FROM (
+           SELECT id_envio FROM incidencias WHERE id_envio IN (:ids) ORDER BY RAND() LIMIT :n
+         ) t
+       )`,
+      { replacements: { ...comunes, n: numIncompletas } }
+    );
+  }
 
   return {
-    total: seleccion.length,
+    total: ids.length,
     muestra,
-    poolDisponible: idsNuevos.length,
-    creados,
+    poolDisponible: ids.length,
+    creados: 0,
     ventana: { desde: ventana.desde, hasta: ventana.hasta },
     capturaHasta,
   };

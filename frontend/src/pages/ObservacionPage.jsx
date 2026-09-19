@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
+import { resolveAleatorizarUrl } from '../config/apiUrl';
 import PageHeader from '../components/PageHeader';
 import {
   ClipboardList,
@@ -110,7 +111,7 @@ const ObservacionPage = () => {
   const aleatorizarPosprueba = async () => {
     setAleatorizando(true);
     try {
-      await api.post('/observacion/posprueba/aleatorizar');
+      await api.post(resolveAleatorizarUrl());
       toastSuccess(
         'Registros aleatorizados',
         'mostrando registros aleatorios posprueba (01-09-2026 al 19-09-2026, sin domingos)'
