@@ -796,6 +796,12 @@ const aleatorizarPosprueba = async () => {
     },
   });
 
+  // En producción puede haber cientos de registros en ventana; acotamos el pool
+  // operativo para que la aleatorización responda sin timeout.
+  if (pool.length > poolObjetivo) {
+    pool = shuffle(pool).slice(0, poolObjetivo);
+  }
+
   let creados = 0;
 
   const equipo = await Usuario.findAll({
