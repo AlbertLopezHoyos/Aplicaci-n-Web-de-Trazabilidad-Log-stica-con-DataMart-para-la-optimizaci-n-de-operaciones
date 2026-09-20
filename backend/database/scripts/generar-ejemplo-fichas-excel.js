@@ -54,11 +54,11 @@ const FICHAS = [
   {
     sheet: 'Dim 2 - PDRE',
     titulo: 'Dimensión 2 — Calidad de la información (PDRE)',
-    indicador: 'PDRE = (RCE / TREvD) × 100 (media de los 20 porcentajes diarios)',
+    indicador: 'PDRE = (RCE / TRD) × 100 (media de los 20 porcentajes diarios)',
     headers: [
       'N°',
       'Fecha',
-      'Total de registros evaluados (TREvD)',
+      'Total de registros evaluados (TRD)',
       'Registros con error (RCE)',
       'Registros sin error',
       'Porcentaje diario de registros con error (%) (PDRE)',
@@ -75,11 +75,11 @@ const FICHAS = [
   {
     sheet: 'Dim 3 - PDEEA',
     titulo: 'Dimensión 3 — Control y seguimiento (PDEEA)',
-    indicador: 'PDEEA = (EEA / TEED) × 100 (media de los 20 porcentajes diarios)',
+    indicador: 'PDEEA = (EEA / TED) × 100 (media de los 20 porcentajes diarios)',
     headers: [
       'N°',
       'Fecha',
-      'Total de envíos evaluados (TEED)',
+      'Total de envíos evaluados (TED)',
       'Envíos con estado actualizado (EEA)',
       'Envíos con estado no actualizado',
       'Porcentaje diario de envíos con estado actualizado (%) (PDEEA)',
@@ -96,11 +96,11 @@ const FICHAS = [
   {
     sheet: 'Dim 4 - PDIOIC',
     titulo: 'Dimensión 4 — Gestión de la información operativa (PDIOIC)',
-    indicador: 'PDIOIC = (NIOC / TIOED) × 100 · Si TIOED = 0 el día se registra N/A (no 0)',
+    indicador: 'PDIOIC = (NIOC / TID) × 100 · Si TID = 0 el día se registra N/A (no 0)',
     headers: [
       'N°',
       'Fecha',
-      'Total de incidencias evaluadas (TIOED)',
+      'Total de incidencias evaluadas (TID)',
       'Incidencias con información completa (NIOC)',
       'Incidencias con información incompleta',
       'Porcentaje diario de incidencias con información completa (%) (PDIOIC)',

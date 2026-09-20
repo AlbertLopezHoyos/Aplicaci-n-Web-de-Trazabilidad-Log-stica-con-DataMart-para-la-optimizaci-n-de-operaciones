@@ -1,0 +1,60 @@
+// SPRINT 1 — Base tecnológica, acceso e información básica
+// HU-01 RF01 Autenticación | HU-02 RF02 Control de acceso
+// HU-03 RF03 Administración de usuarios | HU-04 RF04 Gestión de clientes
+// HU-17 RF17 Auditoría
+// Entidades: Usuario – Rol – Cliente – Auditoría
+
+Project trazabilidad_sprint_1 {
+  database_type: 'MySQL'
+  Note: '''
+    Sprint 1 — Base tecnológica y acceso
+    Módulos: LoginPage, UserAccountMenu, ClientesPage, auth.middleware.js
+    Entregable: autenticación JWT, roles, usuarios, clientes y auditoría
+  '''
+}
+
+Table roles [headercolor: #833a3c] {
+  id_rol int [pk, increment]
+  nombre varchar(50) [unique, not null, note: 'Administrador | Operador | Cliente']
+  descripcion varchar(255)
+  activo tinyint [default: 1]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table usuarios [headercolor: #833a3c] {
+  id_usuario int [pk, increment]
+  id_rol int [not null, ref: > roles.id_rol, note: 'HU-02 control de acceso por rol']
+  nombres varchar(100) [not null]
+  apellidos varchar(100) [not null]
+  email varchar(150) [unique, not null]
+  password_hash varchar(255) [not null, note: 'HU-01 autenticación']
+  telefono varchar(20)
+  activo tinyint [default: 1]
+  ultimo_acceso datetime
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table clientes [headercolor: #833a3c] {
+  id_cliente int [pk, increment]
+  razon_social varchar(200) [not null, note: 'HU-04 nombre completo del cliente']
+  dni varchar(8) [unique]
+  telefono varchar(20)
+  activo tinyint [default: 1]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table auditoria [headercolor: #833a3c] {
+  id_auditoria bigint [pk, increment]
+  id_usuario int [ref: > usuarios.id_usuario, note: 'HU-17 trazabilidad de acciones']
+  tabla_afectada varchar(80)
+  accion varchar [note: 'INSERT|UPDATE|DELETE|LOGIN|LOGOUT|EXPORT|OTRO']
+  registro_id varchar(50)
+  datos_anteriores json
+  datos_nuevos json
+  ip_address varchar(45)
+  user_agent varchar(255)
+  created_at timestamp
+}

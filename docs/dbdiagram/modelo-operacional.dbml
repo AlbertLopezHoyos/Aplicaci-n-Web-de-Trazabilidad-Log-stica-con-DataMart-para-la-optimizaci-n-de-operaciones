@@ -1,0 +1,223 @@
+// MODELO OPERACIONAL (OLTP) — Todas las tablas transaccionales
+// Pegar en https://dbdiagram.io → Auto Arrange → Export PNG/PDF
+
+Project trazabilidad_operacional {
+  database_type: 'MySQL'
+  Note: '''
+    Base operacional de la aplicación web
+    12 tablas persistentes | envíos, trazabilidad, incidencias, reportes y auditoría
+  '''
+}
+
+TableGroup seguridad {
+  roles
+  usuarios
+  auditoria
+}
+
+TableGroup maestros {
+  clientes
+  estados_envio
+}
+
+TableGroup envios_y_trazabilidad {
+  envios
+  historial_estados
+  errores_registro
+  incidencias
+  evidencias
+}
+
+TableGroup consultas_y_etl {
+  reportes
+  etl_ejecuciones
+}
+
+// --- Seguridad y acceso ---
+
+Table roles [headercolor: #833a3c] {
+  id_rol int [pk, increment]
+  nombre varchar(50) [unique, not null, note: 'Administrador | Operador logístico']
+  descripcion varchar(255)
+  activo tinyint [default: 1]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table usuarios [headercolor: #833a3c] {
+  id_usuario int [pk, increment]
+  id_rol int [not null, ref: > roles.id_rol]
+  nombres varchar(100) [not null]
+  apellidos varchar(100) [not null]
+  email varchar(150) [unique, not null]
+  password_hash varchar(255) [not null]
+  telefono varchar(20)
+  activo tinyint [default: 1]
+  ultimo_acceso datetime
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table auditoria [headercolor: #833a3c] {
+  id_auditoria bigint [pk, increment]
+  id_usuario int [ref: > usuarios.id_usuario]
+  tabla_afectada varchar(80)
+  accion varchar [note: 'INSERT|UPDATE|DELETE|LOGIN|LOGOUT|EXPORT|OTRO']
+  registro_id varchar(50)
+  datos_anteriores json
+  datos_nuevos json
+  ip_address varchar(45)
+  user_agent varchar(255)
+  created_at timestamp
+}
+
+// --- Maestros ---
+
+Table clientes [headercolor: #2563eb] {
+  id_cliente int [pk, increment]
+  razon_social varchar(200) [not null, note: 'Remitente / quien envía']
+  dni varchar(8) [unique]
+  telefono varchar(20)
+  activo tinyint [default: 1]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table estados_envio [headercolor: #2563eb] {
+  id_estado int [pk, increment]
+  codigo varchar(30) [unique, not null, note: 'recibido|en_transito|entregado|retrasado|cancelado']
+  nombre varchar(80) [not null]
+  descripcion varchar(255)
+  color_hex varchar(7) [default: '#64748b']
+  orden int [default: 0]
+  es_final tinyint [default: 0]
+  activo tinyint [default: 1]
+  created_at timestamp
+}
+
+// --- Núcleo de envíos ---
+
+Table envios [headercolor: #2563eb] {
+  id_envio int [pk, increment]
+  codigo_envio varchar(30) [unique, not null]
+  id_cliente int [not null, ref: > clientes.id_cliente]
+  id_estado_actual int [not null, ref: > estados_envio.id_estado]
+  id_responsable int [ref: > usuarios.id_usuario]
+  origen varchar(255) [not null, note: 'Fijo: Lima']
+  destino varchar(255) [not null]
+  nombre_destinatario varchar(150) [not null]
+  dni_destinatario varchar(8) [not null]
+  telefono_destinatario varchar(20) [not null]
+  fecha_registro date [not null]
+  fecha_estimada_entrega date
+  fecha_entrega_real date
+  tipo_carga varchar(100) [not null, note: 'frágil|general|vulnerable']
+  peso_kg decimal(10,2) [default: 0]
+  numero_paquetes int [default: 1]
+  hora_inicio_registro datetime
+  hora_fin_registro datetime
+  tiempo_registro_min decimal(8,2)
+  registro_correcto tinyint [default: 1]
+  total_envio decimal(10,2) [not null, default: 0]
+  observaciones text
+  prioridad varchar(20) [note: 'baja|normal|alta|urgente']
+  origen_dato varchar(20) [not null, note: 'REAL|SINTETICO']
+  grupo_muestra varchar(20) [not null, note: 'PREPRUEBA|POSPRUEBA|NO_MUESTRA']
+  activo tinyint [default: 1]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table historial_estados [headercolor: #16a34a] {
+  id_historial int [pk, increment]
+  id_envio int [not null, ref: > envios.id_envio]
+  id_estado int [not null, ref: > estados_envio.id_estado]
+  id_usuario int [ref: > usuarios.id_usuario]
+  ubicacion varchar(255)
+  comentario text
+  fecha_hora datetime [not null]
+}
+
+Table errores_registro [headercolor: #2563eb] {
+  id_error int [pk, increment]
+  id_envio int [ref: > envios.id_envio]
+  id_usuario int [ref: > usuarios.id_usuario]
+  codigo_envio varchar(30)
+  tipo_error varchar(80) [not null]
+  campo_afectado varchar(80) [not null]
+  descripcion text
+  corregido tinyint [default: 0]
+  created_at timestamp
+}
+
+// --- Incidencias y evidencias ---
+
+Table incidencias [headercolor: #16a34a] {
+  id_incidencia int [pk, increment]
+  codigo_incidencia varchar(30) [unique]
+  id_envio int [not null, ref: > envios.id_envio]
+  id_usuario_reporta int [ref: > usuarios.id_usuario]
+  tipo varchar(20) [not null, note: 'error|retraso|dano|perdida|observacion|otro']
+  area varchar(100)
+  fuente_principal varchar(120)
+  informacion_completa tinyint [default: 0]
+  severidad varchar(20) [note: 'baja|media|alta|critica']
+  titulo varchar(200) [not null]
+  descripcion text [not null]
+  observacion text
+  estado_incidencia varchar(20) [note: 'abierta|en_revision|resuelta|cerrada']
+  origen_dato varchar(20) [not null, note: 'REAL|SINTETICO']
+  grupo_muestra varchar(20) [not null, note: 'PREPRUEBA|POSPRUEBA|NO_MUESTRA']
+  fecha_reporte datetime
+  fecha_resolucion datetime
+  resolucion text
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table evidencias [headercolor: #16a34a] {
+  id_evidencia int [pk, increment]
+  id_envio int [not null, ref: > envios.id_envio]
+  id_usuario int [ref: > usuarios.id_usuario]
+  id_incidencia int [ref: > incidencias.id_incidencia]
+  tipo varchar(20) [note: 'imagen|comprobante|documento|firma|otro']
+  nombre_archivo varchar(255) [not null]
+  ruta_archivo varchar(500) [not null]
+  mime_type varchar(100)
+  tamano_bytes int
+  descripcion varchar(255)
+  created_at timestamp
+}
+
+// --- Reportes y bitácora ETL ---
+
+Table reportes [headercolor: #ea580c] {
+  id_reporte int [pk, increment]
+  id_usuario int [ref: > usuarios.id_usuario]
+  tipo_reporte varchar(80) [not null]
+  titulo varchar(200) [not null]
+  parametros json
+  ruta_archivo varchar(500)
+  formato varchar(20) [note: 'pdf|excel|json']
+  estado varchar(20) [note: 'generado|error|pendiente']
+  hora_inicio datetime
+  hora_fin datetime
+  tiempo_generacion_min decimal(8,2)
+  area_solicitante varchar(100)
+  cantidad_registros int
+  observaciones text
+  created_at timestamp
+}
+
+Table etl_ejecuciones [headercolor: #9333ea] {
+  id_ejecucion int [pk, increment]
+  proceso varchar(80) [not null, default: 'staging_datamart']
+  fecha_inicio datetime [not null]
+  fecha_fin datetime
+  estado varchar(20) [note: 'EN_PROCESO|EXITOSO|FALLIDO']
+  registros_extraidos int [default: 0]
+  registros_transformados int [default: 0]
+  registros_cargados int [default: 0]
+  mensaje_error text
+  created_at timestamp
+}

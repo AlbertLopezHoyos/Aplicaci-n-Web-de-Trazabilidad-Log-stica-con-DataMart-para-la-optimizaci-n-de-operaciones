@@ -1,0 +1,82 @@
+// SPRINT 2 — Registro y administración de envíos
+// HU-05 RF05 Registro | HU-06 RF06 Consulta | HU-07 RF07 Actualización
+// HU-08 RF08 Alcance | HU-09 RF09 Validación
+// Entidades: Cliente – Envío – Usuario – Estado de envío – Error de registro
+
+Project trazabilidad_sprint_2 {
+  database_type: 'MySQL'
+  Note: '''
+    Sprint 2 — Proceso principal de envíos
+    Módulos: EnviosPage, EnvioFormPage, envio.service.js, errorRegistro.service.js
+
+    Quien envía: cliente (id_cliente)
+    Quien recibe: destinatario (nombre + DNI + teléfono obligatorios en envios)
+  '''
+}
+
+// Contexto Sprint 1 (solo entidades que el diseño reutiliza)
+Table clientes {
+  id_cliente int [pk]
+  razon_social varchar(200) [note: 'Quien envía — remitente']
+  dni varchar(8)
+  telefono varchar(20)
+  activo tinyint
+}
+
+Table usuarios {
+  id_usuario int [pk]
+  nombres varchar(100)
+  apellidos varchar(100)
+  email varchar(150)
+}
+
+// Incremento Sprint 2
+Table estados_envio [headercolor: #2563eb] {
+  id_estado int [pk, increment]
+  codigo varchar(30) [unique, not null]
+  nombre varchar(80) [not null]
+  descripcion varchar(255)
+  color_hex varchar(7)
+  orden int
+  es_final tinyint
+  activo tinyint [default: 1]
+  created_at timestamp
+}
+
+Table envios [headercolor: #2563eb] {
+  id_envio int [pk, increment]
+  codigo_envio varchar(30) [unique, not null, note: 'RF05']
+  id_cliente int [not null, ref: > clientes.id_cliente, note: 'Quien envía (remitente)']
+  id_estado_actual int [not null, ref: > estados_envio.id_estado]
+  id_responsable int [ref: > usuarios.id_usuario, note: 'RF08 alcance por responsable']
+  origen varchar(255) [not null, note: 'Fijo: Lima']
+  destino varchar(255) [not null]
+  nombre_destinatario varchar(150) [not null, note: 'Quien recibe — RF05/RF09']
+  dni_destinatario varchar(8) [not null, note: '8 dígitos — RF09']
+  telefono_destinatario varchar(20) [not null, note: 'Quien recibe — RF09']
+  fecha_registro date [not null]
+  fecha_estimada_entrega date
+  fecha_entrega_real date
+  tipo_carga varchar(100) [not null, note: 'frágil|general|vulnerable']
+  peso_kg decimal(10,2)
+  numero_paquetes int [default: 1]
+  total_envio decimal(10,2) [not null]
+  observaciones text [note: 'Especificaciones opcionales de la carga']
+  prioridad varchar(20) [note: 'baja|normal|alta|urgente']
+  registro_correcto tinyint [default: 1, note: 'RF09 resultado de validación']
+  activo tinyint [default: 1, note: 'RF07 baja lógica']
+  created_at timestamp [note: 'RF06 consulta']
+  updated_at timestamp [note: 'RF07 actualización']
+}
+
+Table errores_registro [headercolor: #2563eb] {
+  id_error int [pk, increment]
+  id_envio int [ref: > envios.id_envio, note: 'RF09']
+  id_usuario int [ref: > usuarios.id_usuario]
+  codigo_envio varchar(30)
+  tipo_error varchar(80) [not null]
+  campo_afectado varchar(80) [not null, note: 'Ej. destinatario, dni_destinatario']
+  descripcion text
+  corregido tinyint [default: 0]
+  created_at timestamp
+}

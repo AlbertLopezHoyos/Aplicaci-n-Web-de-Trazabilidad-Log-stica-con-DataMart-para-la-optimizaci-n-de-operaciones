@@ -82,10 +82,19 @@ describe('Validación de parámetros de las fichas', () => {
     expect(res.status).toBe(400);
   });
 
-  it('rechaza un alcance no permitido', async () => {
+  it('ignora alcance y grupo: el módulo solo lee el postest real', async () => {
     const res = await request(app)
-      .get('/api/observacion/indicadores?alcance=DATAMART')
+      .get('/api/observacion/indicadores?alcance=DATAMART&grupo=PREPRUEBA')
       .set('Authorization', `Bearer ${tokenDe(1)}`);
-    expect(res.status).toBe(400);
+    expect(res.status).not.toBe(400);
+    expect(res.status).not.toBe(401);
+    expect(res.status).not.toBe(403);
+  });
+
+  it('no expone el endpoint de aleatorización', async () => {
+    const res = await request(app)
+      .post('/api/observacion/posprueba/aleatorizar')
+      .set('Authorization', `Bearer ${tokenDe(1)}`);
+    expect(res.status).toBe(404);
   });
 });

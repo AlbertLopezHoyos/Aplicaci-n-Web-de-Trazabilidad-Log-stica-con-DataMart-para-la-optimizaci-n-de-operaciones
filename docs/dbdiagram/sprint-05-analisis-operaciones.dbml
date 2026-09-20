@@ -1,0 +1,105 @@
+// SPRINT 5 — Integración analítica y cierre (último sprint)
+// HU-18 RF18 Análisis de operaciones
+// Scrum: solo integración funcional app web ↔ componente analítico
+// Kimball: dim_* y fact_* documentados aparte (sprint-06-datamart.dbml)
+
+Project trazabilidad_sprint_5 {
+  database_type: 'MySQL'
+  Note: '''
+    Objetivo: integrar la app con el componente analítico y estabilizar el producto.
+    Flujo RF18:
+    Aplicación web → Información operacional → Componente analítico → Análisis de operaciones
+    Módulos: DataMartPage, POST /datamart/etl/run, GET /datamart/analytics
+  '''
+}
+
+TableGroup informacion_operacional {
+  clientes
+  usuarios
+  estados_envio
+  envios
+  historial_estados
+  incidencias
+}
+
+// Información operacional (contexto S1-S4, fuente del ETL)
+Table clientes {
+  id_cliente int [pk]
+  razon_social varchar(200)
+}
+
+Table usuarios {
+  id_usuario int [pk]
+  nombres varchar(100)
+  apellidos varchar(100)
+}
+
+Table estados_envio {
+  id_estado int [pk]
+  codigo varchar(30)
+  nombre varchar(80)
+}
+
+Table envios {
+  id_envio int [pk]
+  codigo_envio varchar(30)
+  id_cliente int [ref: > clientes.id_cliente]
+  id_estado_actual int [ref: > estados_envio.id_estado]
+  fecha_registro date
+}
+
+Table historial_estados {
+  id_historial int [pk]
+  id_envio int [ref: > envios.id_envio]
+  id_estado int [ref: > estados_envio.id_estado]
+  fecha_hora datetime
+}
+
+Table incidencias {
+  id_incidencia int [pk]
+  id_envio int [ref: > envios.id_envio]
+  codigo_incidencia varchar(30)
+  estado_incidencia varchar(20)
+}
+
+// Incremento Sprint 5 — integración funcional RF18
+Table aplicacion_web [headercolor: #9333ea] {
+  id int [pk, increment, note: 'Paso 1 del flujo']
+  nombre varchar(80) [note: 'Aplicación web de trazabilidad']
+  Note: '''
+    Usuario admin ejecuta Actualizar indicadores
+    Consume GET /datamart/analytics
+  '''
+}
+
+Table etl_ejecuciones [headercolor: #9333ea] {
+  id_ejecucion int [pk, increment, note: 'Paso 2: extrae OLTP']
+  proceso varchar(80) [not null, default: 'staging_datamart']
+  fecha_inicio datetime [not null]
+  fecha_fin datetime
+  estado varchar(20) [note: 'EN_PROCESO|EXITOSO|FALLIDO']
+  registros_extraidos int [default: 0]
+  registros_transformados int [default: 0]
+  registros_cargados int [default: 0]
+  mensaje_error text
+  created_at timestamp
+}
+
+Table componente_analitico [headercolor: #9333ea] {
+  id int [pk, increment, note: 'Paso 3 del flujo']
+  nombre varchar(80) [note: 'Componente analítico / DataMart']
+  Note: '''
+    Recibe datos operacionales vía ETL
+    Diseño dimensional dim_* / fact_*: ver Kimball
+  '''
+}
+
+Table analisis_operaciones [headercolor: #9333ea] {
+  id int [pk, increment, note: 'Paso 4 del flujo, RF18']
+  nombre varchar(80) [note: 'Análisis de operaciones']
+  Note: '''
+    Pantalla Análisis (DataMartPage)
+    KPIs: OTIF, tránsito, incidencias
+    Sin detalle Kimball en esta sección Scrum
+  '''
+}

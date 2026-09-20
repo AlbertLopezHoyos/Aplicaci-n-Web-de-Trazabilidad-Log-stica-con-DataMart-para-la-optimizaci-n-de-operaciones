@@ -266,9 +266,9 @@ const jornadasMock = () =>
     const sumaTre = Math.round(nerd * (3.2 + (i % 5) * 0.15) * 100) / 100;
     const rce = i % 5 === 0 ? 1 : 0;
     const eea = Math.max(0, nerd - (i % 7 === 0 ? 1 : 0));
-    const tioed = i % 4 === 0 ? 0 : 1;
-    const nioc = tioed && i % 6 !== 0 ? 1 : 0;
-    return { iso, nerd, sumaTre, rce, eea, tioed, nioc };
+    const tid = i % 4 === 0 ? 0 : 1;
+    const nioc = tid && i % 6 !== 0 ? 1 : 0;
+    return { iso, nerd, sumaTre, rce, eea, tid, nioc };
   });
 
 const ratioONa = (numerador, denominador, porcentaje = false) => {
@@ -288,7 +288,7 @@ const buildFichaEficiencia = () =>
 const buildFichaCalidad = () =>
   jornadasMock().map(({ iso, nerd, rce }) => ({
     fecha: fmtFechaFicha(iso),
-    trevd: nerd,
+    trd: nerd,
     rce,
     sin_error: nerd - rce,
     pdre: ratioONa(rce, nerd, true),
@@ -297,19 +297,19 @@ const buildFichaCalidad = () =>
 const buildFichaControl = () =>
   jornadasMock().map(({ iso, nerd, eea }) => ({
     fecha: fmtFechaFicha(iso),
-    teed: nerd,
+    ted: nerd,
     eea,
     no_actualizado: nerd - eea,
     pdeea: ratioONa(eea, nerd, true),
   }));
 
 const buildFichaInformacionOperativa = () =>
-  jornadasMock().map(({ iso, tioed, nioc }) => ({
+  jornadasMock().map(({ iso, tid, nioc }) => ({
     fecha: fmtFechaFicha(iso),
-    tioed,
+    tid,
     nioc,
-    incompletas: Math.max(0, tioed - nioc),
-    pdioic: ratioONa(nioc, tioed, true),
+    incompletas: Math.max(0, tid - nioc),
+    pdioic: ratioONa(nioc, tid, true),
   }));
 
 const buildMockReportData = (tipo) => {
@@ -417,10 +417,10 @@ const FICHA_CONFIG = {
   2: {
     titulo: 'Dimensión 2 - Calidad información (PDRE)',
     indicador: 'PDRE',
-    columnas: ['fecha', 'trevd', 'rce', 'sin_error', 'pdre'],
+    columnas: ['fecha', 'trd', 'rce', 'sin_error', 'pdre'],
     labels: [
       'Fecha',
-      'Total de registros evaluados (TREvD)',
+      'Total de registros evaluados (TRD)',
       'Registros con error (RCE)',
       'Registros sin error',
       'Porcentaje diario de registros con error (%) (PDRE)',
@@ -429,10 +429,10 @@ const FICHA_CONFIG = {
   3: {
     titulo: 'Dimensión 3 - Control y seguimiento (PDEEA)',
     indicador: 'PDEEA',
-    columnas: ['fecha', 'teed', 'eea', 'no_actualizado', 'pdeea'],
+    columnas: ['fecha', 'ted', 'eea', 'no_actualizado', 'pdeea'],
     labels: [
       'Fecha',
-      'Total de envíos evaluados (TEED)',
+      'Total de envíos evaluados (TED)',
       'Envíos con estado actualizado (EEA)',
       'Envíos con estado no actualizado',
       'Porcentaje diario de envíos con estado actualizado (%) (PDEEA)',
@@ -441,10 +441,10 @@ const FICHA_CONFIG = {
   4: {
     titulo: 'Dimensión 4 - Gestión de la información operativa (PDIOIC)',
     indicador: 'PDIOIC',
-    columnas: ['fecha', 'tioed', 'nioc', 'incompletas', 'pdioic'],
+    columnas: ['fecha', 'tid', 'nioc', 'incompletas', 'pdioic'],
     labels: [
       'Fecha',
-      'Total de incidencias evaluadas (TIOED)',
+      'Total de incidencias evaluadas (TID)',
       'Incidencias con información completa (NIOC)',
       'Incidencias con información incompleta',
       'Porcentaje diario de incidencias con información completa (%) (PDIOIC)',
@@ -477,13 +477,9 @@ const buildFichaExportPayload = (dim) => {
     exportados: filas.length,
     limite: FICHA_MUESTRA,
     indicadores: {
-      tpre: ind.tpre,
       tpdre: ind.tpdre,
-      per: ind.per,
       pdre: ind.pdre,
-      peea: ind.peea,
       pdeea: ind.pdeea,
-      pioic: ind.pioic,
       pdioic: ind.pdioic,
     },
   };
@@ -508,15 +504,15 @@ const calcIndicadores = () => {
   const tpdre = mediaDiariaMock(dias, 'sumaTre', 'nerd');
   const pdre = mediaDiariaMock(dias, 'rce', 'nerd', true);
   const pdeea = mediaDiariaMock(dias, 'eea', 'nerd', true);
-  const pdioic = mediaDiariaMock(dias, 'nioc', 'tioed', true);
+  const pdioic = mediaDiariaMock(dias, 'nioc', 'tid', true);
   const nerd = dias.reduce((a, d) => a + d.nerd, 0);
   const sumaTre = redondear(dias.reduce((a, d) => a + d.sumaTre, 0));
   const rce = dias.reduce((a, d) => a + d.rce, 0);
   const eea = dias.reduce((a, d) => a + d.eea, 0);
-  const tioed = dias.reduce((a, d) => a + d.tioed, 0);
+  const tid = dias.reduce((a, d) => a + d.tid, 0);
   const nioc = dias.reduce((a, d) => a + d.nioc, 0);
   const nDias = dias.filter((d) => d.nerd > 0).length;
-  const nDiasInc = dias.filter((d) => d.tioed > 0).length;
+  const nDiasInc = dias.filter((d) => d.tid > 0).length;
 
   return {
     alcance: 'MUESTRA',
@@ -525,25 +521,17 @@ const calcIndicadores = () => {
     unidadObservacion: 'jornada',
     nJornadas: JORNADAS_FICHA,
     nJornadasConDatos: nDias,
-    tpre: tpdre,
     tpdre,
-    per: pdre,
     pdre,
-    peea: pdeea,
     pdeea,
-    pioic: pdioic,
     pdioic,
     totalEnvios: nerd,
-    totalIncidencias: tioed,
+    totalIncidencias: tid,
     detalle: {
-      tpre: { suma_tre: sumaTre, ner: nerd, n_jornadas: nDias, unidad: 'minutos', media_diaria: true },
       tpdre: { suma_tre: sumaTre, nerd, n_jornadas: nDias, unidad: 'minutos', media_diaria: true },
-      per: { rce, treg: nerd, n_jornadas: nDias, media_diaria: true },
-      pdre: { rce, trevd: nerd, n_jornadas: nDias, media_diaria: true },
-      peea: { eea, tee: nerd, n_jornadas: nDias, media_diaria: true },
-      pdeea: { eea, teed: nerd, n_jornadas: nDias, media_diaria: true },
-      pioic: { nioc, ntir: tioed, n_jornadas: nDiasInc, media_diaria: true },
-      pdioic: { nioc, tioed, n_jornadas: nDiasInc, media_diaria: true },
+      pdre: { rce, trd: nerd, n_jornadas: nDias, media_diaria: true },
+      pdeea: { eea, ted: nerd, n_jornadas: nDias, media_diaria: true },
+      pdioic: { nioc, tid, n_jornadas: nDiasInc, media_diaria: true },
     },
   };
 };
@@ -551,7 +539,6 @@ const calcIndicadores = () => {
 const buildMedicionMock = () => {
   const base = calcIndicadores();
   return {
-    preprueba: { ...base, grupo: 'PREPRUEBA' },
     posprueba: { ...base, grupo: 'POSPRUEBA' },
     ventanas: {
       posprueba: {
@@ -570,12 +557,8 @@ const buildMedicionMock = () => {
     },
     muestra: {
       esperadoPorGrupo: JORNADAS_FICHA,
-      esperadoTotal: JORNADAS_FICHA * 2,
-      registradoPreprueba: 0,
       registradoPosprueba: JORNADAS_FICHA,
-      registradoTotal: JORNADAS_FICHA,
-      completa: false,
-      pareada: false,
+      completa: true,
       unidadObservacion: 'jornada',
     },
     datosSinteticos: {

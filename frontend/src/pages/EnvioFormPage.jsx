@@ -441,7 +441,7 @@ const EnvioFormPage = () => {
           <Clock className="h-4 w-4 shrink-0" />
           <span className="flex-1">
             Cronómetro activo desde {new Date(horaInicioRef.current).toLocaleTimeString('es-PE')}. Al guardar se
-            registran hora inicio, fin y tiempo empleado (TPRE).
+            registran hora inicio, fin y tiempo empleado (TPDRE).
           </span>
         </div>
       )}

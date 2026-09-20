@@ -1,0 +1,83 @@
+// SPRINT 3 — Trazabilidad y acontecimientos de envíos
+// HU-10 RF10 Actualización de estados | HU-11 RF11 Trazabilidad
+// HU-12 RF12 Evidencias | HU-13 RF13 Incidencias
+// Entidades: Envío – Estado – Historial de estados – Incidencia – Evidencia – Usuario
+
+Project trazabilidad_sprint_3 {
+  database_type: 'MySQL'
+  Note: '''
+    Sprint 3 — Trazabilidad y acontecimientos
+    Módulos: SeguimientoPage, IncidenciasPage, evidencia.routes.js, incidencia.service.js
+  '''
+}
+
+// Contexto sprints anteriores (entidades que el diseño reutiliza)
+Table usuarios {
+  id_usuario int [pk]
+  nombres varchar(100)
+  apellidos varchar(100)
+  email varchar(150)
+}
+
+Table estados_envio {
+  id_estado int [pk]
+  codigo varchar(30)
+  nombre varchar(80)
+  color_hex varchar(7)
+}
+
+Table envios {
+  id_envio int [pk]
+  codigo_envio varchar(30)
+  id_estado_actual int [ref: > estados_envio.id_estado, note: 'RF10 estado vigente']
+  id_responsable int [ref: > usuarios.id_usuario]
+  origen varchar(255)
+  destino varchar(255)
+  activo tinyint
+}
+
+// Incremento Sprint 3
+Table historial_estados [headercolor: #16a34a] {
+  id_historial int [pk, increment]
+  id_envio int [not null, ref: > envios.id_envio, note: 'RF10 y RF11']
+  id_estado int [not null, ref: > estados_envio.id_estado]
+  id_usuario int [ref: > usuarios.id_usuario]
+  ubicacion varchar(255)
+  comentario text
+  fecha_hora datetime [not null, note: 'RF11 línea de tiempo']
+}
+
+Table incidencias [headercolor: #16a34a] {
+  id_incidencia int [pk, increment]
+  codigo_incidencia varchar(30) [unique, note: 'INC-AAAA-NNNNN, RF13']
+  id_envio int [not null, ref: > envios.id_envio]
+  id_usuario_reporta int [ref: > usuarios.id_usuario]
+  tipo varchar(20) [not null, note: 'error|retraso|dano|perdida|observacion|otro']
+  area varchar(100)
+  fuente_principal varchar(120)
+  informacion_completa tinyint [note: 'Completitud operativa al guardar']
+  severidad varchar(20) [note: 'baja|media|alta|critica']
+  titulo varchar(200) [not null]
+  descripcion text [not null]
+  observacion text
+  estado_incidencia varchar(20) [note: 'abierta|en_revision|resuelta|cerrada']
+  fecha_reporte datetime
+  fecha_resolucion datetime
+  resolucion text
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table evidencias [headercolor: #16a34a] {
+  id_evidencia int [pk, increment]
+  id_envio int [not null, ref: > envios.id_envio, note: 'RF12']
+  id_usuario int [ref: > usuarios.id_usuario]
+  id_incidencia int [ref: > incidencias.id_incidencia, note: 'Opcional: evidencia de incidencia']
+  tipo varchar(20) [note: 'imagen|comprobante|documento|firma|otro']
+  nombre_archivo varchar(255) [not null]
+  ruta_archivo varchar(500) [not null]
+  mime_type varchar(100)
+  tamano_bytes int
+  descripcion varchar(255)
+  created_at timestamp
+}

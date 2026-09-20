@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
-import { resolveAleatorizarUrl } from '../config/apiUrl';
 import PageHeader from '../components/PageHeader';
 import {
   ClipboardList,
@@ -13,7 +12,6 @@ import {
   Loader2,
   Info,
   ChevronLeft,
-  Shuffle,
 } from 'lucide-react';
 import { toastSuccess, toastError } from '../utils/alerts';
 import { exportFichaExcel } from '../utils/fichaExport';
@@ -58,14 +56,10 @@ const DIMENSIONES = [
 ];
 
 const CLAVE_INDICADOR = { 1: 'tpdre', 2: 'pdre', 3: 'pdeea', 4: 'pdioic' };
-const CLAVE_INDICADOR_LEGACY = { 1: 'tpre', 2: 'per', 3: 'peea', 4: 'pioic' };
-const ALCANCE_FICHA = 'MUESTRA';
-const GRUPO_FICHA = 'POSPRUEBA';
 const JORNADAS_POSPRUEBA = 20;
 const VENTANA_POSPRUEBA = { desde: '2026-09-01', hasta: '2026-09-20' };
 
-const valorIndicadorDe = (indicadores, dimId) =>
-  indicadores?.[CLAVE_INDICADOR[dimId]] ?? indicadores?.[CLAVE_INDICADOR_LEGACY[dimId]];
+const valorIndicadorDe = (indicadores, dimId) => indicadores?.[CLAVE_INDICADOR[dimId]];
 
 const ObservacionPage = () => {
   const [indicadores, setIndicadores] = useState(null);
@@ -73,17 +67,13 @@ const ObservacionPage = () => {
   const [datos, setDatos] = useState([]);
   const [columnas, setColumnas] = useState([]);
   const [labels, setLabels] = useState([]);
-  const [totalRegistros, setTotalRegistros] = useState(0);
   const [tituloDim, setTituloDim] = useState('');
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [aleatorizando, setAleatorizando] = useState(false);
-
-  const paramsFicha = { alcance: ALCANCE_FICHA, grupo: GRUPO_FICHA };
 
   const loadIndicadores = () => {
     api
-      .get('/observacion/indicadores', { params: paramsFicha })
+      .get('/observacion/indicadores')
       .then((r) => setIndicadores(r.data.data))
       .catch(() => {});
   };
@@ -91,13 +81,12 @@ const ObservacionPage = () => {
   const loadDimension = (dim) => {
     setLoading(true);
     api
-      .get(`/observacion/ficha/${dim}`, { params: paramsFicha })
+      .get(`/observacion/ficha/${dim}`)
       .then((r) => {
         const payload = r.data.data || {};
         setDatos(payload.data || []);
         setColumnas(payload.columnas || (payload.data?.[0] ? Object.keys(payload.data[0]) : []));
         setLabels(payload.labels || []);
-        setTotalRegistros(payload.total ?? payload.data?.length ?? 0);
         setTituloDim(payload.titulo || DIMENSIONES.find((d) => d.id === dim)?.titulo || '');
       })
       .catch(() => toastError('Error', 'No se pudo cargar la ficha'))
@@ -112,33 +101,10 @@ const ObservacionPage = () => {
     loadDimension(dimensionActiva);
   }, [dimensionActiva]);
 
-  const aleatorizarPosprueba = async () => {
-    setAleatorizando(true);
-    try {
-      await api.post(resolveAleatorizarUrl());
-      toastSuccess(
-        'Muestra actualizada',
-        'fichas de 20 jornadas (01-09-2026 al 20-09-2026, promedio por día)'
-      );
-      loadIndicadores();
-      loadDimension(dimensionActiva);
-    } catch (err) {
-      const cortado = err.code === 'ECONNABORTED' || err.response?.status === 504 || err.response?.status === 502;
-      toastError(
-        'Error',
-        cortado
-          ? 'La nube cortó la espera. Recargue y vuelva a intentar; el sorteo ahora es más corto.'
-          : (err.response?.data?.message || 'No se pudo aleatorizar la muestra')
-      );
-    } finally {
-      setAleatorizando(false);
-    }
-  };
-
   const exportar = async (dim) => {
     setExporting(true);
     try {
-      const { data } = await api.get(`/observacion/ficha/${dim}/export`, { params: paramsFicha });
+      const { data } = await api.get(`/observacion/ficha/${dim}/export`);
       const payload = data.data || {};
       await exportFichaExcel({
         titulo: payload.titulo,
@@ -174,37 +140,22 @@ const ObservacionPage = () => {
       </Link>
       <PageHeader
         title="Fichas de observación"
-        subtitle={`Postest — ${JORNADAS_POSPRUEBA} jornadas (promedio por día) · 1 al 20 set 2026`}
+        subtitle={`${JORNADAS_POSPRUEBA} jornadas posteriores a la implementación · 1 al 20 set 2026`}
         compact
         action={
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="btn-secondary"
-              disabled={aleatorizando}
-              onClick={aleatorizarPosprueba}
-            >
-              {aleatorizando ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Shuffle className="h-4 w-4" />
-              )}
-              Aleatorizar datos
-            </button>
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={exporting}
-              onClick={() => exportar(dimensionActiva)}
-            >
-              {exporting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4" />
-              )}
-              Exportar Excel
-            </button>
-          </div>
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={exporting}
+            onClick={() => exportar(dimensionActiva)}
+          >
+            {exporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            Exportar Excel
+          </button>
         }
       />
 
@@ -212,17 +163,18 @@ const ObservacionPage = () => {
         <p className="flex items-start gap-2">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-salazar-700" />
           <span>
-            Cada fila es <strong>un día operativo</strong> ({JORNADAS_POSPRUEBA} jornadas del{' '}
-            {VENTANA_POSPRUEBA.desde} al {VENTANA_POSPRUEBA.hasta}). Los indicadores son el promedio
-            diario (TPDRE, PDRE, PDEEA, PDIOIC). Si un día no tiene incidencias, PDIOIC se muestra
-            como N/A. No crean envíos ni cambian la operación diaria.
+            Cada fila es <strong>una jornada operativa</strong> ({JORNADAS_POSPRUEBA} días del{' '}
+            {VENTANA_POSPRUEBA.desde} al {VENTANA_POSPRUEBA.hasta}). Se leen todos los registros
+            reales ya almacenados para esa fecha. TPDRE, PDRE, PDEEA y PDIOIC se calculan y se
+            exportan; no se modifican datos. Si un día no tiene incidencias, PDIOIC se muestra como
+            N/A.
           </span>
         </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="rounded-full bg-salazar-50 px-3 py-1.5 text-xs font-medium text-salazar-800 ring-1 ring-salazar-200">
-          Posprueba · {VENTANA_POSPRUEBA.desde} a {VENTANA_POSPRUEBA.hasta} · {JORNADAS_POSPRUEBA} jornadas
+          Postest · {VENTANA_POSPRUEBA.desde} a {VENTANA_POSPRUEBA.hasta} · {JORNADAS_POSPRUEBA} jornadas
         </span>
       </div>
 
@@ -263,7 +215,7 @@ const ObservacionPage = () => {
               {tituloDim || dimActual?.titulo}
             </h3>
             <p className="text-xs text-slate-500">
-              {datos.length} jornadas · {VENTANA_POSPRUEBA.desde} a {VENTANA_POSPRUEBA.hasta} · media diaria {dimActual?.indicador}:{' '}
+              {datos.length} jornadas · media diaria {dimActual?.indicador}:{' '}
               <strong>{valorIndicador ?? '—'}{dimActual?.unidad === '%' ? '%' : ' min'}</strong>
             </p>
           </div>
@@ -293,7 +245,7 @@ const ObservacionPage = () => {
                 {datos.length === 0 && (
                   <tr>
                     <td colSpan={columnas.length + 1} className="px-4 py-10 text-center text-slate-500">
-                      Sin jornadas de posprueba en la ventana {VENTANA_POSPRUEBA.desde} a {VENTANA_POSPRUEBA.hasta}.
+                      Sin jornadas en la ventana {VENTANA_POSPRUEBA.desde} a {VENTANA_POSPRUEBA.hasta}.
                     </td>
                   </tr>
                 )}

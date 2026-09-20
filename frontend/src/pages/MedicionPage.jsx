@@ -27,46 +27,43 @@ const INDICADORES = [
     unidad: 'min',
     icon: Timer,
     color: 'text-blue-600',
-    detalle: (d) => `Media de ${d?.tpdre?.n_jornadas ?? d?.tpre?.n_jornadas ?? 0} días · ΣTRE ${d?.tpdre?.suma_tre ?? d?.tpre?.suma_tre ?? 0} min`,
+    detalle: (d) => `Media de ${d?.tpdre?.n_jornadas ?? 0} días · ΣTRE ${d?.tpdre?.suma_tre ?? 0} min`,
   },
   {
     clave: 'pdre',
     nombre: 'PDRE',
     dimension: 'Calidad de la información logística',
     descripcion: 'Porcentaje diario de registros con error (media de 20 jornadas)',
-    formula: 'PDRE = (RCE / TREvD) × 100',
+    formula: 'PDRE = (RCE / TRD) × 100',
     unidad: '%',
     icon: AlertTriangle,
     color: 'text-red-600',
-    detalle: (d) => `Media de ${d?.pdre?.n_jornadas ?? d?.per?.n_jornadas ?? 0} días · RCE ${d?.pdre?.rce ?? d?.per?.rce ?? 0}`,
+    detalle: (d) => `Media de ${d?.pdre?.n_jornadas ?? 0} días · RCE ${d?.pdre?.rce ?? 0}`,
   },
   {
     clave: 'pdeea',
     nombre: 'PDEEA',
     dimension: 'Control y seguimiento de envíos',
     descripcion: 'Porcentaje diario de envíos con estado actualizado (media de 20 jornadas)',
-    formula: 'PDEEA = (EEA / TEED) × 100',
+    formula: 'PDEEA = (EEA / TED) × 100',
     unidad: '%',
     icon: MapPin,
     color: 'text-green-600',
-    detalle: (d) => `Media de ${d?.pdeea?.n_jornadas ?? d?.peea?.n_jornadas ?? 0} días · EEA ${d?.pdeea?.eea ?? d?.peea?.eea ?? 0}`,
+    detalle: (d) => `Media de ${d?.pdeea?.n_jornadas ?? 0} días · EEA ${d?.pdeea?.eea ?? 0}`,
   },
   {
     clave: 'pdioic',
     nombre: 'PDIOIC',
     dimension: 'Gestión de la información operativa',
     descripcion: 'Porcentaje diario de incidencias con información completa (media de 20 jornadas)',
-    formula: 'PDIOIC = (NIOC / TIOED) × 100',
+    formula: 'PDIOIC = (NIOC / TID) × 100',
     unidad: '%',
     icon: ClipboardCheck,
     color: 'text-amber-600',
-    detalle: (d) => `Media de ${d?.pdioic?.n_jornadas ?? d?.pioic?.n_jornadas ?? 0} días · NIOC ${d?.pdioic?.nioc ?? d?.pioic?.nioc ?? 0}`,
+    detalle: (d) => `Media de ${d?.pdioic?.n_jornadas ?? 0} días · NIOC ${d?.pdioic?.nioc ?? 0}`,
   },
 ];
 
-const GRUPOS = [
-  { clave: 'posprueba', etiqueta: 'Posprueba (postest)' },
-];
 
 const formatoValor = (valor, unidad) =>
   valor === null || valor === undefined ? '—' : `${valor}${unidad === '%' ? '%' : ''}`;
@@ -132,23 +129,20 @@ const MedicionPage = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  const exportarFicha = async (dimension, grupo) => {
-    const clave = `${dimension}-${grupo}`;
-    setExportando(clave);
+  const exportarFicha = async (dimension) => {
+    setExportando(dimension);
     try {
-      const { data } = await api.get(`/observacion/ficha/${dimension}/export`, {
-        params: { alcance: 'MUESTRA', grupo: grupo.toUpperCase() },
-      });
+      const { data } = await api.get(`/observacion/ficha/${dimension}/export`);
       const payload = data.data || {};
       await exportFichaExcel({
-        titulo: `${payload.titulo} — ${grupo.toUpperCase()}`,
+        titulo: payload.titulo,
         indicador: payload.indicador,
         dimension: payload.dimension ?? dimension,
         headers: payload.headers || [],
         filas: payload.filas || [],
         indicadores: payload.indicadores || {},
       });
-        toastSuccess('Ficha exportada', `Dimensión ${dimension} · ${grupo} · ${payload.filas?.length ?? 0} jornadas`);
+      toastSuccess('Ficha exportada', `Dimensión ${dimension} · ${payload.filas?.length ?? 0} jornadas`);
     } catch {
       toastError('Error', 'No se pudo exportar la ficha');
     } finally {
@@ -179,7 +173,7 @@ const MedicionPage = () => {
       </Link>
       <PageHeader
         title="Medición de investigación"
-        subtitle="Postest — TPDRE, PDRE, PDEEA y PDIOIC sobre 20 jornadas (1–20 set 2026)"
+        subtitle="TPDRE, PDRE, PDEEA y PDIOIC sobre las 20 jornadas posteriores a la implementación (1–20 set 2026)"
         compact
       />
 
@@ -187,18 +181,18 @@ const MedicionPage = () => {
         <p className="flex items-start gap-2">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-salazar-700" />
           <span>
-            Este módulo solo extrae los datos del <strong>postest</strong>. Cada observación es un
-            día (20 jornadas, 1–20 set 2026). Los indicadores son el promedio diario. No registra
-            envíos ni cambia la operación.
+            Este módulo solo extrae los indicadores de las jornadas posteriores a la implementación.
+            Cada observación es un día (20 jornadas, 1–20 set 2026). Los valores se calculan sobre
+            los registros reales ya almacenados. No se modifican datos.
           </span>
         </p>
       </div>
 
-      <VentanaCard etiqueta="Periodo de posprueba (postest)" ventana={ventanaPos} />
+      <VentanaCard etiqueta="Periodo posterior a la implementación" ventana={ventanaPos} />
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
         <StatChip
-          label="Jornadas de postest"
+          label="Jornadas observadas"
           value={`${muestra?.registradoPosprueba ?? 0} / ${muestra?.esperadoPorGrupo ?? 20}`}
           accent="salazar"
         />
@@ -216,9 +210,9 @@ const MedicionPage = () => {
 
       <div className="table-panel">
         <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
-          <h3 className="font-semibold text-salazar-900">Indicadores del postest</h3>
+          <h3 className="font-semibold text-salazar-900">Indicadores por dimensión</h3>
           <p className="text-xs text-slate-500">
-            Media de los promedios diarios (20 jornadas, 1–20 set 2026)
+            Media de los promedios diarios de las jornadas disponibles (1–20 set 2026)
           </p>
         </div>
         <div className="table-panel-body">
@@ -227,13 +221,13 @@ const MedicionPage = () => {
               <tr>
                 <th className="px-3 py-2.5">Dimensión / Indicador</th>
                 <th className="px-3 py-2.5">Fórmula</th>
-                <th className="px-3 py-2.5 text-right">Posprueba (postest)</th>
+                <th className="px-3 py-2.5 text-right">Valor</th>
                 <th className="px-3 py-2.5">Detalle</th>
               </tr>
             </thead>
             <tbody>
               {INDICADORES.map(({ clave, nombre, dimension, descripcion, formula, unidad, icon: Icon, color, detalle }) => {
-                const pos = posprueba?.[clave] ?? posprueba?.[{ tpdre: 'tpre', pdre: 'per', pdeea: 'peea', pdioic: 'pioic' }[clave]];
+                const pos = posprueba?.[clave];
                 return (
                   <tr key={clave} className="border-t border-slate-100 align-top">
                     <td className="px-3 py-3">
@@ -260,9 +254,9 @@ const MedicionPage = () => {
       </div>
 
       <div className="card">
-        <h3 className="panel-title">Exportar fichas del postest</h3>
+        <h3 className="panel-title">Exportar fichas</h3>
         <p className="mb-3 text-xs text-slate-500">
-          Cada Excel incluye las 20 jornadas de posprueba (una fila = un día). No exporta la operación completa.
+          Cada Excel incluye las jornadas disponibles (una fila = un día). Solo lectura.
         </p>
         <div className="grid gap-2 sm:grid-cols-2">
           {[1, 2, 3, 4].map((dim) => (
@@ -270,24 +264,19 @@ const MedicionPage = () => {
               <p className="mb-2 text-sm font-medium text-slate-700">
                 Dimensión {dim} · {INDICADORES[dim - 1].nombre}
               </p>
-              <div className="flex gap-2">
-                {GRUPOS.map(({ clave, etiqueta }) => (
-                  <button
-                    key={clave}
-                    type="button"
-                    className="btn-secondary flex-1 text-xs"
-                    disabled={exportando === `${dim}-${clave}`}
-                    onClick={() => exportarFicha(dim, clave)}
-                  >
-                    {exportando === `${dim}-${clave}` ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Download className="h-3.5 w-3.5" />
-                    )}
-                    {etiqueta}
-                  </button>
-                ))}
-              </div>
+              <button
+                type="button"
+                className="btn-secondary w-full text-xs"
+                disabled={exportando === dim}
+                onClick={() => exportarFicha(dim)}
+              >
+                {exportando === dim ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Download className="h-3.5 w-3.5" />
+                )}
+                Exportar Excel
+              </button>
             </div>
           ))}
         </div>

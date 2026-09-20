@@ -32,14 +32,14 @@ Requiere backend en marcha (`VITE_DEMO_MODE=false` y `VITE_API_URL` apuntando a 
 | /envios | CRUD con filtros, paginación y alcance (todos / mis registros) | Autenticado |
 | /clientes | Gestión de clientes | Autenticado |
 | /seguimiento | Timeline y cambio de estados | Autenticado |
-| /incidencias | Registro de incidencias operativas (PIOIC) | Autenticado |
+| /incidencias | Registro de incidencias operativas (PDIOIC) | Autenticado |
 | /reportes | Export PDF/Excel | Autenticado |
-| /observacion | Fichas de observación por dimensión (TPRE, PER, PEEA, PIOIC) | Autenticado |
-| /medicion | Medición de investigación: preprueba vs. posprueba | **Administrador** |
+| /observacion | Fichas de observación por dimensión (TPDRE, PDRE, PDEEA, PDIOIC) | Autenticado |
+| /medicion | Medición de las jornadas posteriores a la implementación | **Administrador** |
 | /datamart | Esquema estrella, ETL y KPIs analíticos | **Administrador** |
 
 ## Indicadores de investigación en la interfaz
 
-- **`/observacion`** muestra las fichas de cada dimensión. El administrador puede elegir *Muestra de investigación* o *Toda la operación*. Por defecto se abre la operación completa.
-- **`/medicion`** presenta preprueba y posprueba **por separado** para TPRE, PER, PEEA y PIOIC, con el numerador y el denominador de cada fórmula, las ventanas de los Anexos 2 y 3, y exportación por grupo. Estos indicadores **no** se mezclan con los KPI analíticos del DataMart.
+- **`/observacion`** muestra una fila por jornada y permite exportar las cuatro fichas. Solo lectura: no aleatoriza ni modifica registros.
+- **`/medicion`** presenta TPDRE, PDRE, PDEEA y PDIOIC de las jornadas posteriores a la implementación. No muestra preprueba ni comparación pre-post. Estos indicadores **no** se mezclan con los KPI analíticos del DataMart.
 - **`/datamart`** muestra hechos, dimensiones, KPIs analíticos (OTIF, lead time, incidencias) y la bitácora del ETL.

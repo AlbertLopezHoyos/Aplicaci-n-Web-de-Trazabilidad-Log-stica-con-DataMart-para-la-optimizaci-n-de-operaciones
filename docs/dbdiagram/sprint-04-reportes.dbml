@@ -1,0 +1,85 @@
+// SPRINT 4 — Dashboard, reportes y exportación
+// HU-14 RF14 Dashboard | HU-15 RF15 Reportes | HU-16 RF16 Exportación
+// Fuentes de diseño: Envíos, Clientes, Estados, Incidencias, Usuarios
+// Sin nuevo proceso logístico: consulta y presentación de datos existentes
+
+Project trazabilidad_sprint_4 {
+  database_type: 'MySQL'
+  Note: '''
+    Sprint 4 — Información resumida y consulta
+    Módulos: DashboardPage, ReportesPage, reporte.service.js
+    El dashboard consulta tablas de sprints anteriores (KPIs, gráficos).
+  '''
+}
+
+TableGroup fuentes_consulta {
+  clientes
+  usuarios
+  estados_envio
+  envios
+  incidencias
+}
+
+// Información operacional reutilizada (contexto S1-S3)
+Table clientes {
+  id_cliente int [pk]
+  razon_social varchar(200)
+  activo tinyint
+}
+
+Table usuarios {
+  id_usuario int [pk]
+  nombres varchar(100)
+  apellidos varchar(100)
+  email varchar(150)
+}
+
+Table estados_envio {
+  id_estado int [pk]
+  codigo varchar(30)
+  nombre varchar(80)
+  color_hex varchar(7)
+}
+
+Table envios {
+  id_envio int [pk]
+  codigo_envio varchar(30)
+  id_cliente int [ref: > clientes.id_cliente]
+  id_estado_actual int [ref: > estados_envio.id_estado]
+  id_responsable int [ref: > usuarios.id_usuario]
+  fecha_registro date
+  activo tinyint
+}
+
+Table incidencias {
+  id_incidencia int [pk]
+  codigo_incidencia varchar(30)
+  id_envio int [ref: > envios.id_envio]
+  id_usuario_reporta int [ref: > usuarios.id_usuario]
+  tipo varchar(20)
+  severidad varchar(20)
+  estado_incidencia varchar(20)
+}
+
+// Incremento Sprint 4
+Table dashboard_operativo [headercolor: #ea580c] {
+  id int [pk, increment, note: 'Entidad conceptual RF14']
+  nombre varchar(80) [note: 'Dashboard operativo']
+  Note: '''
+    RF14: KPIs y gráficos sobre envíos, estados e incidencias
+    Consulta envios, clientes, estados_envio, incidencias, usuarios
+    Sin tabla persistente propia
+  '''
+}
+
+Table reportes [headercolor: #ea580c] {
+  id_reporte int [pk, increment, note: 'RF15 generación de reportes']
+  id_usuario int [ref: > usuarios.id_usuario]
+  tipo_reporte varchar(80) [not null, note: 'envios_estado|tiempos|incidencias|productividad']
+  titulo varchar(200) [not null]
+  parametros json [note: 'Filtros y criterios de consulta']
+  ruta_archivo varchar(500) [note: 'RF16 archivo exportado']
+  formato varchar(20) [not null, note: 'RF16 pdf|excel|json']
+  estado varchar(20) [note: 'generado|error|pendiente']
+  created_at timestamp
+}

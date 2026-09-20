@@ -1,0 +1,82 @@
+// KIMBALL - Esquema estrella del DataMart
+// 4 dimensiones + 1 hecho | dim_fecha role-playing (registro y entrega)
+
+Project trazabilidad_kimball {
+  database_type: 'MySQL'
+  Note: '''
+    Grano: 1 fila en fact_operaciones_logisticas = 1 operacion de envio
+    dim_fecha se referencia dos veces (fecha registro y fecha entrega)
+  '''
+}
+
+Table dim_fecha [headercolor: #0ea5e9] {
+  id_fecha int [pk, note: 'AAAAMMDD']
+  fecha date [unique, not null]
+  anio smallint [not null]
+  trimestre tinyint [not null]
+  mes tinyint [not null]
+  nombre_mes varchar(20) [not null]
+  dia tinyint [not null]
+  dia_semana tinyint [not null]
+  nombre_dia varchar(15) [not null]
+  es_fin_semana tinyint [default: 0]
+  semana_anio tinyint [not null]
+  Note: 'SCD Tipo 0 precargada 2024-2027'
+}
+
+Table dim_cliente [headercolor: #0ea5e9] {
+  id_dim_cliente int [pk, increment]
+  id_cliente_origen int [not null]
+  razon_social varchar(200) [not null]
+  ruc varchar(11)
+  ciudad varchar(100)
+  distrito varchar(100)
+  segmento varchar(50) [default: 'general']
+  vigente_desde date [not null]
+  vigente_hasta date
+  es_actual tinyint [default: 1]
+  Note: 'SCD Tipo 1'
+}
+
+Table dim_estado [headercolor: #0ea5e9] {
+  id_dim_estado int [pk, increment]
+  id_estado_origen int [not null]
+  codigo varchar(30) [not null]
+  nombre varchar(80) [not null]
+  es_final tinyint [default: 0]
+  categoria varchar(50)
+  vigente_desde date [not null]
+  vigente_hasta date
+  es_actual tinyint [default: 1]
+  Note: 'SCD Tipo 1'
+}
+
+Table dim_operador [headercolor: #0ea5e9] {
+  id_dim_operador int [pk, increment]
+  id_usuario_origen int [not null]
+  nombre_completo varchar(200) [not null]
+  rol varchar(50)
+  vigente_desde date [not null]
+  vigente_hasta date
+  es_actual tinyint [default: 1]
+  Note: 'SCD Tipo 1'
+}
+
+Table fact_operaciones_logisticas [headercolor: #0369a1] {
+  id_fact bigint [pk, increment]
+  id_envio int [unique, not null, note: 'Grano 1 fila por envio']
+  id_fecha_registro int [not null, ref: > dim_fecha.id_fecha]
+  id_fecha_entrega int [ref: > dim_fecha.id_fecha]
+  id_dim_cliente int [not null, ref: > dim_cliente.id_dim_cliente]
+  id_dim_estado int [not null, ref: > dim_estado.id_dim_estado]
+  id_dim_operador int [ref: > dim_operador.id_dim_operador]
+  codigo_envio varchar(30) [not null, note: 'Atributo degenerado']
+  peso_kg decimal(10,2) [default: 0]
+  tipo_carga varchar(100)
+  dias_transito int
+  cantidad_incidencias int [default: 0]
+  tuvo_retraso tinyint [default: 0]
+  entregado_a_tiempo tinyint
+  origen_dato varchar(20) [not null, note: 'REAL o SINTETICO']
+  fecha_carga timestamp
+}

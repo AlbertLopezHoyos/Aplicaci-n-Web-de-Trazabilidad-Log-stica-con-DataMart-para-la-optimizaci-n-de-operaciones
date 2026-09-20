@@ -7,7 +7,7 @@
 | **Variable independiente** | Aplicación web de trazabilidad logística con DataMart |
 | **Variable dependiente** | Optimización de operaciones logísticas |
 | **Dimensiones** | 4 (eficiencia operativa, calidad de la información, control y seguimiento, gestión de la información operativa) |
-| **Indicadores** | TPRE, PER, PEEA, PIOIC |
+| **Indicadores** | TPDRE, PDRE, PDEEA, PDIOIC |
 
 ---
 
@@ -17,12 +17,12 @@
 
 | Campo | Contenido |
 |---|---|
-| **Indicador** | TPRE — Tiempo promedio de registro de envíos |
-| **Fórmula** | `TPRE = ΣTRE / NER` |
+| **Indicador** | TPDRE — Tiempo promedio diario de registro de envíos |
+| **Fórmula** | `TPDRE = ΣTRE / NERD` |
 | **Tabla/campo origen** | `envios.hora_inicio_registro`, `envios.hora_fin_registro`, `envios.tiempo_registro_min` |
 | **Endpoint** | `GET /api/observacion/indicadores`, `GET /api/observacion/medicion`, `GET /api/observacion/ficha/1` |
 | **Pantalla** | Fichas de observación (dim. 1) · Medición de investigación |
-| **Regla de cálculo** | Suma de `tiempo_registro_min` de los envíos evaluados dividida entre la cantidad de envíos con tiempo registrado (NER). Se excluyen los envíos sin tiempo capturado. Unidad: minutos. |
+| **Regla de cálculo** | Por jornada: ΣTRE / NERD, usando todos los registros reales de esa fecha. El indicador del periodo es la media de los TPDRE diarios. Unidad: minutos. |
 
 `tiempo_registro_min` se calcula en `calcularTiemposRegistro()` (`backend/src/services/envio.service.js`) a partir de la hora en que el frontend abre el formulario (`hora_inicio_registro`, enviada en el POST) y la hora de guardado en el servidor (`hora_fin_registro`). Los tres campos existían ya en el esquema; no se generan valores artificiales.
 
@@ -30,12 +30,12 @@
 
 | Campo | Contenido |
 |---|---|
-| **Indicador** | PER — Porcentaje de errores en los registros |
-| **Fórmula** | `PER = (RCE / TREg) × 100` |
+| **Indicador** | PDRE — Porcentaje diario de registros con error |
+| **Fórmula** | `PDRE = (RCE / TRD) × 100` |
 | **Tabla/campo origen** | `envios.registro_correcto`, tabla `errores_registro` (`tipo_error`, `campo_afectado`) |
 | **Endpoint** | `GET /api/observacion/indicadores`, `GET /api/observacion/ficha/2` |
 | **Pantalla** | Fichas de observación (dim. 2) · Medición de investigación |
-| **Regla de cálculo** | RCE = envíos evaluados que cumplen al menos una condición: `registro_correcto = 0`, o existe al menos una fila en `errores_registro` referida a ese envío. **Un envío con varios errores cuenta una sola vez.** TREg = total de envíos evaluados. |
+| **Regla de cálculo** | Por jornada: (RCE / TRD) × 100. RCE = envíos de esa fecha con `registro_correcto = 0` o al menos una fila en `errores_registro`. Un envío con varios errores cuenta una sola vez. |
 
 Los errores no son subjetivos: provienen de las validaciones ya existentes de `express-validator`, que se persisten mediante `validateConRegistroErrores` en `errores_registro`, y de las correcciones marcadas por el operador.
 
@@ -43,8 +43,8 @@ Los errores no son subjetivos: provienen de las validaciones ya existentes de `e
 
 | Campo | Contenido |
 |---|---|
-| **Indicador** | PEEA — Porcentaje de envíos con estado actualizado |
-| **Fórmula** | `PEEA = (EEA / TEE) × 100` |
+| **Indicador** | PDEEA — Porcentaje diario de envíos con estado actualizado |
+| **Fórmula** | `PDEEA = (EEA / TED) × 100` |
 | **Tabla/campo origen** | `envios.id_estado_actual`, `historial_estados.id_estado`, `historial_estados.fecha_hora`, `estados_envio` |
 | **Endpoint** | `GET /api/observacion/indicadores`, `GET /api/observacion/ficha/3` |
 | **Pantalla** | Fichas de observación (dim. 3) · Medición de investigación |
@@ -59,12 +59,12 @@ exactamente lo que la dimensión "control y seguimiento" busca medir.
 
 | Campo | Contenido |
 |---|---|
-| **Indicador** | PIOIC — Porcentaje de incidencias operativas con información completa |
-| **Fórmula** | `PIOIC = (NIOC / NTIR) × 100` |
+| **Indicador** | PDIOIC — Porcentaje diario de incidencias operativas con información completa |
+| **Fórmula** | `PDIOIC = (NIOC / TID) × 100` |
 | **Tabla/campo origen** | `incidencias.tipo`, `incidencias.area`, `incidencias.titulo`, `incidencias.descripcion`, `incidencias.fuente_principal` |
 | **Endpoint** | `GET /api/observacion/indicadores`, `GET /api/observacion/ficha/4` |
 | **Pantalla** | Incidencias · Fichas de observación (dim. 4) · Medición de investigación |
-| **Regla de cálculo** | NTIR = **incidencias registradas** en los envíos seleccionados (no los 50 envíos). NIOC = incidencias en las que los cinco campos obligatorios tienen contenido no vacío. |
+| **Regla de cálculo** | Por jornada según `DATE(i.fecha_reporte)`: (NIOC / TID) × 100. Si TID = 0 se muestra N/A (no 0%). NIOC = incidencias con los cinco campos obligatorios no vacíos. |
 
 #### Criterio exacto de "incidencia completa"
 
@@ -80,7 +80,7 @@ Una incidencia se considera **completa** cuando todos estos campos de la tabla `
 
 El criterio está centralizado en `backend/src/utils/reglasIndicadores.js` (`esIncidenciaCompleta`) y la expresión SQL equivalente se **genera a partir de la misma constante** (`CAMPOS_INCIDENCIA_COMPLETA`) en `observacion.service.js`, de modo que backend, fichas y reportes no puedan divergir. La columna `incidencias.informacion_completa` se sigue guardando al crear/editar como caché de consulta, pero el indicador se recalcula siempre desde los campos.
 
-La ficha de observación de la Dimensión 4 expone **Título**, **Descripción** y **Observación** como columnas distintas. `incidencias.observacion` es un campo de ficha **opcional**; **no** forma parte de PIOIC. Un registro con los cinco campos obligatorios completos cuenta como NIOC aunque `observacion` esté vacío.
+La ficha de la Dimensión 4 agrupa por jornada (`DATE(i.fecha_reporte)`). Cada fila muestra Fecha, TID, NIOC, incidencias incompletas y PDIOIC. `incidencias.observacion` es opcional y **no** forma parte de PDIOIC.
 
 | Columna de la ficha | Origen |
 |---|---|
@@ -92,46 +92,34 @@ La ficha de observación de la Dimensión 4 expone **Título**, **Descripción**
 | Estado de incidencia | `incidencias.estado_incidencia` |
 | Título | `incidencias.titulo` |
 | Descripción | `incidencias.descripcion` |
-| Información completa (Sí/No) | Recalculado con la regla PIOIC (cinco campos) |
+| Información completa (Sí/No) | Recalculado con la regla PDIOIC (cinco campos) |
 | Fuente principal de información | `incidencias.fuente_principal` |
-| Observación | `incidencias.observacion` (opcional; no entra en PIOIC) |
+| Observación | `incidencias.observacion` (opcional; no entra en PDIOIC) |
 
 ---
 
-## 2. Preprueba y posprueba
+## 2. Unidad de análisis y postest
 
-- **50 registros** de preprueba y **50 registros** de posprueba, **diferentes entre sí**.
-- Muestra total: **100 registros**. **No son muestras pareadas**; se reportan por separado y no se calcula diferencia por pares.
-- Los periodos de observación están declarados en `reglasIndicadores.js` (Anexo 2: 1–31 ago 2026; Anexo 3: 1–20 set 2026).
-- El volumen analítico del DataMart se mantiene separado de la muestra: los indicadores de investigación filtran `origen_dato = 'REAL'` y `grupo_muestra`.
+- La unidad de análisis es la **jornada operativa**. Cada fila de ficha es un día (1–20 set 2026).
+- Se leen **todos** los registros reales y válidos de esa fecha. No hay cantidad fija, ni `LIMIT 50`, ni sorteo.
+- La **preprueba no forma parte del software**: no se muestra, no se calcula y no se compara.
+- El módulo se limita a: **LEER → AGRUPAR POR JORNADA → CALCULAR → MOSTRAR → EXPORTAR**.
+- El DataMart permanece separado: los indicadores filtran `origen_dato = 'REAL'` y excluyen `grupo_muestra = 'PREPRUEBA'` y los datos `SINTETICO`.
 
 ### Cómo se separan los datos
 
-Columnas añadidas por la migración `backend/database/scripts/07_muestra_investigacion.sql` en `envios` e `incidencias`:
+Columnas históricas en `envios` e `incidencias` (compatibilidad técnica; el módulo actual no depende de PREPRUEBA):
 
 | Columna | Valores | Uso |
 |---|---|---|
 | `origen_dato` | `REAL` \| `SINTETICO` | Procedencia del registro |
-| `grupo_muestra` | `PREPRUEBA` \| `POSPRUEBA` \| `NO_MUESTRA` | Pertenencia a la muestra estadística |
+| `grupo_muestra` | `PREPRUEBA` \| `POSPRUEBA` \| `NO_MUESTRA` | Clasificación histórica |
 
 Reglas aplicadas:
 
-1. Los indicadores de investigación filtran siempre `origen_dato = 'REAL' AND grupo_muestra IN ('PREPRUEBA','POSPRUEBA')`.
+1. Las fichas e indicadores usan `origen_dato = 'REAL' AND grupo_muestra <> 'PREPRUEBA'` en la ventana 1–20 set 2026.
 2. `npm run db:seed-bulk` y `npm run db:seed` marcan todo lo que generan como `SINTETICO` / `NO_MUESTRA`.
-3. Las incidencias heredan la clasificación del envío al que pertenecen.
-4. `GET /api/observacion/indicadores?alcance=TODOS` permite ver el conjunto operativo completo. **Ese modo no debe usarse para el contraste de hipótesis.**
-
-### Marcado de la muestra
-
-```bash
-cd backend
-npm run db:muestra -- --estado                                        # ver distribución actual
-npm run db:muestra -- --grupo=PREPRUEBA --desde=AAAA-MM-DD --hasta=AAAA-MM-DD   # simulación
-npm run db:muestra -- --grupo=PREPRUEBA --desde=AAAA-MM-DD --hasta=AAAA-MM-DD --aplicar
-npm run db:muestra -- --grupo=POSPRUEBA --codigos=GLS-2026-00120,GLS-2026-00121 --aplicar
-```
-
-El script **no genera registros**: solo etiqueta envíos ya existentes y rechaza intentos de incluir en la muestra registros que no sean `REAL` o que caigan fuera de la ventana del instrumento.
+3. PDIOIC agrupa por `DATE(i.fecha_reporte)`, no por la fecha de registro del envío.
 
 ---
 
@@ -139,12 +127,12 @@ El script **no genera registros**: solo etiqueta envíos ya existentes y rechaza
 
 | Método | Ruta | Rol | Descripción |
 |---|---|---|---|
-| GET | `/api/observacion/indicadores` | Autenticado | TPRE, PER, PEEA, PIOIC con numeradores y denominadores. Parámetros `alcance` (`MUESTRA` por defecto, `TODOS`) y `grupo` (`PREPRUEBA`, `POSPRUEBA`) |
-| GET | `/api/observacion/medicion` | **Administrador** | Preprueba y posprueba por separado, cobertura de la muestra y ventanas de observación |
-| GET | `/api/observacion/ficha/:1-4` | Autenticado | Filas de la ficha de observación de la dimensión indicada |
+| GET | `/api/observacion/indicadores` | Autenticado | TPDRE, PDRE, PDEEA, PDIOIC (media diaria del postest) |
+| GET | `/api/observacion/medicion` | **Administrador** | Indicadores de las jornadas posteriores a la implementación |
+| GET | `/api/observacion/ficha/:1-4` | Autenticado | Una fila por jornada de la dimensión indicada |
 | GET | `/api/observacion/ficha/:1-4/export` | Autenticado | Payload de exportación a Excel (cabeceras + filas + indicadores) |
-| GET | `/api/observacion/errores-registro` | Autenticado | Errores de validación registrados (insumo de PER) |
-| POST | `/api/observacion/errores-registro` | Autenticado | Alta manual de un error detectado |
+| GET | `/api/observacion/errores-registro` | Autenticado | Errores de validación registrados (insumo de PDRE) |
+| POST | `/api/observacion/errores-registro` | Autenticado | Alta operativa de un error detectado (no forma parte del cálculo de fichas) |
 
 ---
 
@@ -152,8 +140,8 @@ El script **no genera registros**: solo etiqueta envíos ya existentes y rechaza
 
 | Pantalla | Ruta | Rol | Contenido |
 |---|---|---|---|
-| Fichas de evidencia | `/observacion` | Autenticado | Fichas por dimensión, con selector de alcance (muestra / toda la operación) y exportación a Excel |
-| Medición de investigación | `/medicion` | **Administrador** | Preprueba vs. posprueba para los cuatro indicadores, cobertura de la muestra y exportación por grupo |
+| Fichas de evidencia | `/observacion` | Autenticado | Cuatro fichas diarias (TPDRE, PDRE, PDEEA, PDIOIC) y exportación a Excel. Solo lectura. |
+| Medición de investigación | `/medicion` | **Administrador** | Indicadores de las jornadas posteriores a la implementación. Sin preprueba ni comparación pre-post. |
 | DataMart | `/datamart` | **Administrador** | KPIs analíticos, esquema estrella, ETL y bitácora |
 
 Los indicadores de investigación **no** se mezclan con los KPI analíticos del DataMart (OTIF, lead time, tasa de incidencias): viven en pantallas distintas y se calculan sobre conjuntos distintos.

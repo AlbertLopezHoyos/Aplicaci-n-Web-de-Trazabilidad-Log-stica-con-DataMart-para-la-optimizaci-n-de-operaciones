@@ -1,0 +1,150 @@
+// MODELO COMPLETO — Operacional (OLTP) + DataMart (Kimball)
+// Pegar en https://dbdiagram.io → Auto Arrange → Export PNG/PDF
+
+Project trazabilidad_completo {
+  database_type: 'MySQL'
+  Note: '''
+    Vista integrada del sistema
+    OLTP: operación diaria | DataMart: análisis y Power BI
+    Las refs punteadas representan linaje ETL (no FK física en MySQL)
+  '''
+}
+
+TableGroup operacional {
+  roles
+  usuarios
+  clientes
+  estados_envio
+  envios
+  historial_estados
+  errores_registro
+  incidencias
+  evidencias
+  reportes
+  auditoria
+}
+
+TableGroup datamart {
+  dim_fecha
+  dim_cliente
+  dim_estado
+  dim_operador
+  fact_operaciones_logisticas
+}
+
+TableGroup etl {
+  etl_ejecuciones
+}
+
+// ===================== OPERACIONAL =====================
+
+Table roles { id_rol int [pk, increment] nombre varchar(50) [unique, not null] descripcion varchar(255) activo tinyint }
+Table usuarios { id_usuario int [pk, increment] id_rol int [not null, ref: > roles.id_rol] nombres varchar(100) apellidos varchar(100) email varchar(150) [unique] activo tinyint }
+Table clientes { id_cliente int [pk, increment] razon_social varchar(200) [not null] dni varchar(8) [unique] activo tinyint }
+Table estados_envio { id_estado int [pk, increment] codigo varchar(30) [unique, not null] nombre varchar(80) [not null] es_final tinyint color_hex varchar(7) }
+
+Table envios {
+  id_envio int [pk, increment]
+  codigo_envio varchar(30) [unique, not null]
+  id_cliente int [not null, ref: > clientes.id_cliente]
+  id_estado_actual int [not null, ref: > estados_envio.id_estado]
+  id_responsable int [ref: > usuarios.id_usuario]
+  origen varchar(255) [not null]
+  destino varchar(255) [not null]
+  nombre_destinatario varchar(150) [not null]
+  dni_destinatario varchar(8) [not null]
+  telefono_destinatario varchar(20) [not null]
+  fecha_registro date [not null]
+  fecha_estimada_entrega date
+  fecha_entrega_real date
+  tipo_carga varchar(100) [not null]
+  peso_kg decimal(10,2)
+  numero_paquetes int
+  tiempo_registro_min decimal(8,2)
+  registro_correcto tinyint
+  total_envio decimal(10,2)
+  origen_dato varchar(20) [note: 'REAL|SINTETICO']
+  grupo_muestra varchar(20) [note: 'PREPRUEBA|POSPRUEBA|NO_MUESTRA']
+  activo tinyint
+}
+
+Table historial_estados { id_historial int [pk, increment] id_envio int [not null, ref: > envios.id_envio] id_estado int [not null, ref: > estados_envio.id_estado] id_usuario int [ref: > usuarios.id_usuario] comentario text fecha_hora datetime [not null] }
+Table errores_registro { id_error int [pk, increment] id_envio int [ref: > envios.id_envio] id_usuario int [ref: > usuarios.id_usuario] tipo_error varchar(80) campo_afectado varchar(80) corregido tinyint created_at timestamp }
+Table incidencias { id_incidencia int [pk, increment] codigo_incidencia varchar(30) [unique] id_envio int [not null, ref: > envios.id_envio] id_usuario_reporta int [ref: > usuarios.id_usuario] tipo varchar(20) area varchar(100) titulo varchar(200) descripcion text fuente_principal varchar(120) informacion_completa tinyint origen_dato varchar(20) grupo_muestra varchar(20) estado_incidencia varchar(20) }
+Table evidencias { id_evidencia int [pk, increment] id_envio int [not null, ref: > envios.id_envio] id_incidencia int [ref: > incidencias.id_incidencia] id_usuario int [ref: > usuarios.id_usuario] nombre_archivo varchar(255) ruta_archivo varchar(500) created_at timestamp }
+Table reportes { id_reporte int [pk, increment] id_usuario int [ref: > usuarios.id_usuario] tipo_reporte varchar(80) titulo varchar(200) formato varchar(20) estado varchar(20) created_at timestamp }
+Table auditoria { id_auditoria bigint [pk, increment] id_usuario int [ref: > usuarios.id_usuario] tabla_afectada varchar(80) accion varchar registro_id varchar(50) created_at timestamp }
+
+// ===================== DATAMART =====================
+
+Table dim_fecha [headercolor: #0ea5e9] {
+  id_fecha int [pk]
+  fecha date [unique, not null]
+  anio smallint
+  mes tinyint
+  nombre_mes varchar(20)
+  dia tinyint
+  nombre_dia varchar(15)
+  es_fin_semana tinyint
+}
+
+Table dim_cliente [headercolor: #0ea5e9] {
+  id_dim_cliente int [pk, increment]
+  id_cliente_origen int [not null]
+  razon_social varchar(200) [not null]
+  segmento varchar(50)
+  es_actual tinyint
+}
+
+Table dim_estado [headercolor: #0ea5e9] {
+  id_dim_estado int [pk, increment]
+  id_estado_origen int [not null]
+  codigo varchar(30) [not null]
+  nombre varchar(80) [not null]
+  es_final tinyint
+  es_actual tinyint
+}
+
+Table dim_operador [headercolor: #0ea5e9] {
+  id_dim_operador int [pk, increment]
+  id_usuario_origen int [not null]
+  nombre_completo varchar(200) [not null]
+  rol varchar(50)
+  es_actual tinyint
+}
+
+Table fact_operaciones_logisticas [headercolor: #0369a1] {
+  id_fact bigint [pk, increment]
+  id_envio int [unique, not null]
+  id_fecha_registro int [not null, ref: > dim_fecha.id_fecha]
+  id_fecha_entrega int [ref: > dim_fecha.id_fecha]
+  id_dim_cliente int [not null, ref: > dim_cliente.id_dim_cliente]
+  id_dim_estado int [not null, ref: > dim_estado.id_dim_estado]
+  id_dim_operador int [ref: > dim_operador.id_dim_operador]
+  codigo_envio varchar(30) [not null]
+  peso_kg decimal(10,2)
+  tipo_carga varchar(100)
+  dias_transito int
+  cantidad_incidencias int
+  tuvo_retraso tinyint
+  entregado_a_tiempo tinyint
+  origen_dato varchar(20)
+  fecha_carga timestamp
+}
+
+Table etl_ejecuciones [headercolor: #9333ea] {
+  id_ejecucion int [pk, increment]
+  proceso varchar(80) [not null]
+  fecha_inicio datetime [not null]
+  fecha_fin datetime
+  estado varchar(20)
+  registros_cargados int
+  created_at timestamp
+}
+
+// ===================== LINAJE ETL (lógico) =====================
+
+Ref: fact_operaciones_logisticas.id_envio - envios.id_envio [note: 'ETL: envíos → hechos']
+Ref: dim_cliente.id_cliente_origen - clientes.id_cliente [note: 'ETL: dimensión cliente']
+Ref: dim_estado.id_estado_origen - estados_envio.id_estado [note: 'ETL: dimensión estado']
+Ref: dim_operador.id_usuario_origen - usuarios.id_usuario [note: 'ETL: dimensión operador']

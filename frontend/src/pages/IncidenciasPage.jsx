@@ -148,7 +148,7 @@ const IncidenciasPage = () => {
     <div className="page-shell">
       <PageHeader
         title="Gestión de incidencias"
-        subtitle="Registro operativo — ficha dimensión 4 (PIOIC): información completa"
+        subtitle="Registro operativo — ficha dimensión 4 (PDIOIC): información completa"
         compact
         action={
           <button type="button" className="btn-primary" onClick={() => setShowForm(!showForm)}>
@@ -276,7 +276,7 @@ const IncidenciasPage = () => {
             onChange={(e) => setForm((f) => ({ ...f, observacion: e.target.value }))}
           />
           <p className="text-xs text-slate-500">
-            Información completa (PIOIC) se determina solo con: tipo, área, título, descripción y fuente principal.
+            Información completa (PDIOIC) se determina solo con: tipo, área, título, descripción y fuente principal.
             La observación de la ficha es opcional y no entra en el cálculo.
           </p>
           <button type="submit" className="btn-primary">
@@ -368,7 +368,7 @@ const IncidenciasPage = () => {
               onChange={(e) => setEditForm((f) => ({ ...f, observacion: e.target.value }))}
             />
             <p className="text-xs text-slate-500">
-              PIOIC usa solo tipo, área, título, descripción y fuente principal. La observación no determina completitud.
+              PDIOIC usa solo tipo, área, título, descripción y fuente principal. La observación no determina completitud.
             </p>
             <select
               className="input-field"

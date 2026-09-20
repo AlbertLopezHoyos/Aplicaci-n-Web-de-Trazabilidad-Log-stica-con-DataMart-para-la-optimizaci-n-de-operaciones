@@ -2,15 +2,9 @@ const observacionService = require('../services/observacion.service');
 const errorRegistroService = require('../services/errorRegistro.service');
 const { success } = require('../utils/response');
 
-/** Alcance y grupo se leen del query string; por defecto solo la muestra real. */
-const opcionesDesdeQuery = (req) => ({
-  alcance: req.query.alcance,
-  grupo: req.query.grupo,
-});
-
-const getIndicadores = async (req, res, next) => {
+const getIndicadores = async (_req, res, next) => {
   try {
-    const indicadores = await observacionService.calcularIndicadores(opcionesDesdeQuery(req));
+    const indicadores = await observacionService.calcularIndicadores();
     return success(res, indicadores);
   } catch (err) {
     next(err);
@@ -29,14 +23,9 @@ const getMedicion = async (_req, res, next) => {
 const getDimension = async (req, res, next) => {
   try {
     const dimension = parseInt(req.params.dimension, 10);
-    const opciones = opcionesDesdeQuery(req);
-    const limite = req.query.limit || observacionService.limiteFichaGrupo(opciones.grupo);
     const [data, total] = await Promise.all([
-      observacionService.getDatosDimension(dimension, {
-        ...opciones,
-        limit: limite,
-      }),
-      observacionService.countDatosDimension(dimension, opciones),
+      observacionService.getDatosDimension(dimension),
+      observacionService.countDatosDimension(dimension),
     ]);
     const config = observacionService.DIMENSIONES[dimension];
     return success(res, {
@@ -45,11 +34,11 @@ const getDimension = async (req, res, next) => {
       indicador: config?.indicador,
       columnas: config?.columnas || [],
       labels: config?.labels || [],
-      alcance: opciones.alcance || observacionService.ALCANCE.MUESTRA,
-      grupo: opciones.grupo || null,
+      alcance: observacionService.ALCANCE.MUESTRA,
+      grupo: 'POSPRUEBA',
       data,
       total,
-      limite,
+      limite: observacionService.limiteFichaGrupo(),
     });
   } catch (err) {
     next(err);
@@ -59,7 +48,7 @@ const getDimension = async (req, res, next) => {
 const exportarFicha = async (req, res, next) => {
   try {
     const dimension = parseInt(req.params.dimension, 10);
-    const result = await observacionService.exportarExcel(dimension, opcionesDesdeQuery(req));
+    const result = await observacionService.exportarExcel(dimension);
     return success(res, result, 'Ficha exportada');
   } catch (err) {
     next(err);
@@ -87,15 +76,6 @@ const logErrorCliente = async (req, res, next) => {
   }
 };
 
-const aleatorizarPosprueba = async (_req, res, next) => {
-  try {
-    const resultado = await observacionService.aleatorizarPosprueba();
-    return success(res, resultado, 'Muestra posprueba aleatorizada');
-  } catch (err) {
-    next(err);
-  }
-};
-
 module.exports = {
   getIndicadores,
   getMedicion,
@@ -103,5 +83,4 @@ module.exports = {
   exportarFicha,
   listErrores,
   logErrorCliente,
-  aleatorizarPosprueba,
 };

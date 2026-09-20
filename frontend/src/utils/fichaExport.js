@@ -76,9 +76,8 @@ export async function exportFichaExcel({ titulo, indicador, dimension, headers, 
   ws.getCell('A3').alignment = { horizontal: 'center', vertical: 'middle' };
   ws.getRow(3).height = 22;
 
-  const valorIndicador = indicadores[indicador?.toLowerCase()]
-    ?? indicadores[{ TPDRE: 'tpre', PDRE: 'per', PDEEA: 'peea', PDIOIC: 'pioic' }[indicador]];
-  const unidad = ['TPRE', 'TPDRE'].includes(indicador) ? ' min' : '%';
+  const valorIndicador = indicadores[indicador?.toLowerCase()];
+  const unidad = indicador === 'TPDRE' ? ' min' : '%';
   ws.mergeCells(4, 1, 4, colCount);
   ws.getCell('A4').value =
     `Ficha de observación · Indicador ${indicador}${valorIndicador != null ? `: ${valorIndicador}${unidad}` : ''} · ${filas.length} jornadas (promedio por día) · Generado: ${formatDateTime(new Date())}`;
@@ -87,7 +86,7 @@ export async function exportFichaExcel({ titulo, indicador, dimension, headers, 
 
   ws.mergeCells(5, 1, 5, colCount);
   ws.getCell('A5').value =
-    'Evidencia cuantitativa para preprueba y posprueba — Tesis Trazabilidad Logística 2026';
+    'Fichas de las jornadas posteriores a la implementación — Tesis Trazabilidad Logística 2026';
   ws.getCell('A5').font = { size: 9, italic: true, color: { argb: 'FF475569' } };
   ws.getCell('A5').alignment = { horizontal: 'center' };
 

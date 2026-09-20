@@ -1,0 +1,101 @@
+// Vista completa — Sistema operativo + DataMart (cierre Sprint 6)
+// Sin instrumentos de investigación (fichas / medición)
+
+Project trazabilidad_completo {
+  database_type: 'MySQL'
+  Note: '''
+    Modelo de datos del producto
+    OLTP: operación diaria | DataMart: análisis y Power BI
+  '''
+}
+
+TableGroup operacional {
+  roles
+  usuarios
+  clientes
+  estados_envio
+  envios
+  historial_estados
+  incidencias
+  evidencias
+  errores_registro
+  reportes
+  auditoria
+}
+
+TableGroup datamart {
+  dim_fecha
+  dim_cliente
+  dim_estado
+  dim_operador
+  fact_operaciones_logisticas
+  etl_ejecuciones
+}
+
+Table roles { id_rol int [pk] nombre varchar(50) [unique] }
+Table usuarios { id_usuario int [pk] id_rol int [ref: > roles.id_rol] nombres varchar(100) apellidos varchar(100) email varchar(150) [unique] activo tinyint }
+Table clientes { id_cliente int [pk] razon_social varchar(200) dni varchar(8) activo tinyint }
+Table estados_envio { id_estado int [pk] codigo varchar(30) [unique] nombre varchar(80) es_final tinyint }
+
+Table envios {
+  id_envio int [pk]
+  codigo_envio varchar(30) [unique]
+  id_cliente int [ref: > clientes.id_cliente]
+  id_estado_actual int [ref: > estados_envio.id_estado]
+  id_responsable int [ref: > usuarios.id_usuario]
+  origen varchar(255)
+  destino varchar(255)
+  fecha_registro date
+  tipo_carga varchar(100)
+  peso_kg decimal(10,2)
+  numero_paquetes int
+  tiempo_registro_min decimal(8,2)
+  registro_correcto tinyint
+  activo tinyint
+}
+
+Table historial_estados { id_historial int [pk] id_envio int [ref: > envios.id_envio] id_estado int [ref: > estados_envio.id_estado] id_usuario int [ref: > usuarios.id_usuario] fecha_hora datetime }
+
+Table incidencias {
+  id_incidencia int [pk]
+  codigo_incidencia varchar(30)
+  id_envio int [ref: > envios.id_envio]
+  tipo varchar
+  area varchar(100)
+  titulo varchar(200)
+  descripcion text
+  fuente_principal varchar(120)
+  informacion_completa tinyint
+  observacion text
+  estado_incidencia varchar
+}
+
+Table evidencias { id_evidencia int [pk] id_envio int [ref: > envios.id_envio] id_incidencia int [ref: > incidencias.id_incidencia] nombre_archivo varchar(255) ruta_archivo varchar(500) }
+Table errores_registro { id_error int [pk] id_envio int [ref: > envios.id_envio] tipo_error varchar(80) campo_afectado varchar(80) }
+Table reportes { id_reporte int [pk] id_usuario int [ref: > usuarios.id_usuario] tipo_reporte varchar(80) formato varchar titulo varchar(200) }
+Table auditoria { id_auditoria bigint [pk] id_usuario int [ref: > usuarios.id_usuario] accion varchar created_at timestamp }
+
+Table dim_fecha { id_fecha int [pk] fecha date [unique] anio smallint mes tinyint nombre_mes varchar(20) }
+Table dim_cliente { id_dim_cliente int [pk] id_cliente_origen int razon_social varchar(200) es_actual tinyint }
+Table dim_estado { id_dim_estado int [pk] id_estado_origen int codigo varchar(30) es_actual tinyint }
+Table dim_operador { id_dim_operador int [pk] id_usuario_origen int nombre_completo varchar(200) es_actual tinyint }
+
+Table fact_operaciones_logisticas {
+  id_fact bigint [pk]
+  id_envio int [unique]
+  id_fecha_registro int [ref: > dim_fecha.id_fecha]
+  id_fecha_entrega int [ref: > dim_fecha.id_fecha]
+  id_dim_cliente int [ref: > dim_cliente.id_dim_cliente]
+  id_dim_estado int [ref: > dim_estado.id_dim_estado]
+  id_dim_operador int [ref: > dim_operador.id_dim_operador]
+  codigo_envio varchar(30)
+  dias_transito int
+  cantidad_incidencias int
+  entregado_a_tiempo tinyint
+  peso_kg decimal(10,2)
+}
+
+Table etl_ejecuciones { id_ejecucion int [pk] proceso varchar(80) fecha_inicio datetime estado varchar registros_cargados int }
+
+// Linaje ETL
+Ref: fact_operaciones_logisticas.id_envio - envios.id_envio

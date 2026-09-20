@@ -18,7 +18,7 @@ const HERRAMIENTAS = [
     icon: FlaskConical,
     titulo: 'Medición de indicadores',
     descripcion:
-      'Consulta los cuatro indicadores del postest como promedio diario de las 20 jornadas.',
+      'Consulta TPDRE, PDRE, PDEEA y PDIOIC como promedio diario de las jornadas disponibles.',
     detalle: 'TPDRE · PDRE · PDEEA · PDIOIC',
     color: 'border-slate-200 bg-white hover:border-salazar-300 hover:shadow-md',
     iconWrap: 'bg-slate-100 text-slate-700',
@@ -29,7 +29,7 @@ const InvestigacionPage = () => (
   <div className="page-shell">
     <PageHeader
       title="Investigación"
-      subtitle="Extracción de datos del postest para la tesis"
+      subtitle="Extracción de fichas e indicadores de las jornadas posteriores a la implementación"
       compact
     />
 
@@ -37,8 +37,8 @@ const InvestigacionPage = () => (
       <p className="flex items-start gap-2">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-salazar-700" />
         <span>
-          Estas herramientas no forman parte de la operación diaria. Sirven para obtener las fichas
-          y los indicadores del postest (20 jornadas, promedio por día) desde la misma base de datos.
+          Estas herramientas no forman parte de la operación diaria. Solo leen, agrupan por jornada,
+          calculan y exportan. La preprueba no se muestra ni se compara en el software.
         </span>
       </p>
     </div>

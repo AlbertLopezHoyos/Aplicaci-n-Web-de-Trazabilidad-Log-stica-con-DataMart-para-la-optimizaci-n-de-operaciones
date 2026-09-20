@@ -94,8 +94,8 @@ Las cuentas de acceso se dan de alta en el sistema (rol Administrador). No se pu
 | CRUD | /api/incidencias | Incidencias |
 | POST | /api/evidencias/upload | Subir evidencia |
 | POST | /api/reportes/generar | PDF/Excel |
-| GET | /api/observacion/indicadores | Indicadores TPRE, PER, PEEA, PIOIC (`?alcance=MUESTRA\|TODOS`, `?grupo=PREPRUEBA\|POSPRUEBA`) |
-| GET | /api/observacion/medicion | Preprueba y posprueba por separado (**solo Administrador**) |
+| GET | /api/observacion/indicadores | Indicadores TPDRE, PDRE, PDEEA, PDIOIC (postest, solo lectura) |
+| GET | /api/observacion/medicion | Indicadores de las jornadas posteriores a la implementación (**solo Administrador**) |
 | GET | /api/observacion/ficha/:1-4 | Datos ficha por dimensión |
 | GET | /api/observacion/ficha/:dim/export | Excel ficha observación |
 | GET | /api/datamart/preview | Conteo de hechos, dimensiones y últimas corridas del ETL |
@@ -104,30 +104,20 @@ Las cuentas de acceso se dan de alta en el sistema (rol Administrador). No se pu
 | GET | /api/datamart/etl/ejecuciones | Bitácora de ejecuciones del ETL |
 | CRUD | /api/usuarios | Gestión de usuarios (**solo Administrador**) |
 
-Por defecto los indicadores usan `alcance=MUESTRA`: solo registros con `origen_dato = 'REAL'` y
-`grupo_muestra IN ('PREPRUEBA','POSPRUEBA')`. El modo `TODOS` existe para inspección operativa,
-marca la respuesta con `incluyeDatosSinteticos: true` y **no debe usarse para la tesis**.
+Los indicadores de investigación leen únicamente registros `origen_dato = 'REAL'` de las jornadas
+1–20 set 2026, excluyen `PREPRUEBA` y los datos `SINTETICO`, y no modifican la base de datos.
 
 ## Muestra de investigación
 
-50 registros de preprueba + 50 de posprueba = 100 registros reales, no pareados. Se etiquetan con:
-
-```bash
-npm run db:muestra -- --estado                                          # distribución actual
-npm run db:muestra -- --grupo=PREPRUEBA --desde=AAAA-MM-DD --hasta=AAAA-MM-DD   # simulación
-npm run db:muestra -- --grupo=PREPRUEBA --desde=AAAA-MM-DD --hasta=AAAA-MM-DD --aplicar
-npm run db:muestra -- --grupo=POSPRUEBA --codigos=GLS-2026-00120 --aplicar
-```
-
-El script solo clasifica registros existentes; nunca genera datos ni admite registros sintéticos.
+Unidad de análisis: jornada operativa (20 días, 1–20 set 2026). Una fila de ficha = un día.
+Se usan todos los registros reales de esa fecha. La preprueba no se calcula en el software.
 
 ## Reglas de cálculo de los indicadores
 
 Centralizadas en `src/utils/reglasIndicadores.js`. Ahí se define, entre otras cosas, qué campos hacen
-que una incidencia se considere completa para PIOIC (`tipo`, `area`, `titulo`, `descripcion`,
-`fuente_principal`). La ficha 4 muestra además `observacion` como campo opcional de evidencia;
-ese texto **no** entra en PIOIC. La expresión SQL equivalente se genera desde la misma constante, de modo que
-backend, fichas y reportes no puedan divergir. Ver [../docs/ALINEACION_TESIS.md](../docs/ALINEACION_TESIS.md).
+que una incidencia se considere completa para PDIOIC (`tipo`, `area`, `titulo`, `descripcion`,
+`fuente_principal`). La ficha 4 agrupa por `DATE(i.fecha_reporte)`. Si TID = 0 el día muestra N/A.
+Ver [../docs/ALINEACION_TESIS.md](../docs/ALINEACION_TESIS.md).
 
 ## Pruebas
 
@@ -136,7 +126,7 @@ npm test          # Jest + Supertest
 npm run test:watch
 ```
 
-Cobertura funcional: cálculo de TPRE, PER, PEEA y PIOIC, exclusión de datos sintéticos, idempotencia
+Cobertura funcional: cálculo de TPDRE, PDRE, PDEEA y PDIOIC, exclusión de datos sintéticos, idempotencia
 del ETL, bitácora de ejecución y autorización de las rutas de administración. Detalle en
 [../docs/PRUEBAS.md](../docs/PRUEBAS.md).
 
