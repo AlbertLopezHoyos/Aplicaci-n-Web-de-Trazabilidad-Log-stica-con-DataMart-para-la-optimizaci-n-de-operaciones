@@ -22,10 +22,10 @@ cp .env.example .env
 ### Base de datos
 
 1. Ejecutar `database/scripts/01_schema_completo.sql`
-2. Ejecutar `database/scripts/02_medicion_fichas.sql` (campos fichas observación)
+2. Ejecutar `database/scripts/02_medicion_fichas.sql` (campos operativos de tiempos y validación)
 3. Ejecutar `database/scripts/03_dimension4_gestion_informacion.sql` (dimensión 4, PDIOIC)
 4. Ejecutar `database/scripts/07_muestra_investigacion.sql` (separación muestra / datos sintéticos y bitácora ETL)
-5. Ejecutar `database/scripts/08_incidencia_observacion.sql` (campo opcional `observacion` de la ficha 4; no altera PDIOIC)
+5. Ejecutar `database/scripts/08_incidencia_observacion.sql` (campo opcional `observacion`; no altera PDIOIC)
 6. Ejecutar seeder:
 
 ```bash
@@ -94,30 +94,14 @@ Las cuentas de acceso se dan de alta en el sistema (rol Administrador). No se pu
 | CRUD | /api/incidencias | Incidencias |
 | POST | /api/evidencias/upload | Subir evidencia |
 | POST | /api/reportes/generar | PDF/Excel |
-| GET | /api/observacion/indicadores | Indicadores TPDRE, PDRE, PDEEA, PDIOIC (postest, solo lectura) |
-| GET | /api/observacion/medicion | Indicadores de las jornadas posteriores a la implementación (**solo Administrador**) |
-| GET | /api/observacion/ficha/:1-4 | Datos ficha por dimensión |
-| GET | /api/observacion/ficha/:dim/export | Excel ficha observación |
-| GET | /api/observacion/errores-registro | Consulta de errores de registro (solo lectura) |
 | GET | /api/datamart/preview | Conteo de hechos, dimensiones y últimas corridas del ETL |
 | GET | /api/datamart/analytics | KPIs OTIF, lead time, incidencias |
 | POST | /api/datamart/etl/run | Ejecutar ETL (idempotente) |
 | GET | /api/datamart/etl/ejecuciones | Bitácora de ejecuciones del ETL |
 | CRUD | /api/usuarios | Gestión de usuarios (**solo Administrador**) |
 
-Los indicadores de investigación leen únicamente registros `origen_dato = 'REAL'` de las jornadas
-1–20 set 2026, excluyen `PREPRUEBA` y los datos `SINTETICO`, y no modifican la base de datos.
-
-## Muestra de investigación
-
-Unidad de análisis: jornada operativa (20 días, 1–20 set 2026). Una fila de ficha = un día.
-Se usan todos los registros reales de esa fecha. La preprueba no se calcula en el software.
-
-## Reglas de cálculo de los indicadores
-
-Centralizadas en `src/utils/reglasIndicadores.js`. Ahí se define, entre otras cosas, qué campos hacen
-que una incidencia se considere completa para PDIOIC (`tipo`, `area`, `titulo`, `descripcion`,
-`fuente_principal`). La ficha 4 agrupa por `DATE(i.fecha_reporte)`. Si TID = 0 el día muestra N/A.
+Los indicadores de investigación (TPDRE, PDRE, PDEEA, PDIOIC) se operacionalizan desde datos
+operativos. Las reglas están en `src/utils/reglasIndicadores.js`. No son módulos del Product Backlog.
 Ver [../docs/ALINEACION_TESIS.md](../docs/ALINEACION_TESIS.md).
 
 ## Pruebas

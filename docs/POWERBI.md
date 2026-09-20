@@ -159,7 +159,7 @@ Copie desde `powerbi/medidas-ejemplo.dax` o cree en Power BI:
 
 ---
 
-## 9. Evidencia para la tesis (HU-21)
+## 9. Evidencia para la tesis (H.U.18 — explotación analítica)
 
 1. Captura de **Power BI Desktop** conectado al servidor Railway.
 2. Vista de modelo con relaciones del esquema estrella.

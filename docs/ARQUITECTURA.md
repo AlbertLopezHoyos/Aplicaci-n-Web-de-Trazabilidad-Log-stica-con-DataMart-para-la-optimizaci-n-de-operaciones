@@ -4,9 +4,8 @@ Aplicación web de trazabilidad logística con DataMart — Grupo Logístico Sal
 
 ## 1. Visión general
 
-Arquitectura cliente-servidor de tres capas, con una única base de datos MySQL que aloja tanto el
-modelo transaccional (OLTP) como el modelo dimensional del DataMart en esquemas lógicos separados
-por convención de nombres (`dim_*`, `fact_*`).
+Arquitectura cliente-servidor de tres capas, con **dos modelos lógicos** (operacional y dimensional)
+en una **única base de datos física** MySQL `trazabilidad_logistica`.
 
 ```mermaid
 flowchart TB
@@ -38,6 +37,11 @@ flowchart TB
     DM -->|conexión directa o CSV| BI
 ```
 
+Scrum cubre el desarrollo funcional de la aplicación web. Kimball cubre el DataMart.
+La integración funcional es H.U.18 (Sprint 5). Ver [SCRUM.md](./SCRUM.md) y [KIMBALL.md](./KIMBALL.md).
+
+---
+
 ## 2. Frontend
 
 | Aspecto | Implementación |
@@ -51,11 +55,11 @@ flowchart TB
 | Identidad visual | Logos oficiales (`BrandLogo`) y paleta institucional (rojo ladrillo / grafito) |
 | Alcance de registros | Filtro «todos / solo mis registros» en envíos, seguimiento e incidencias |
 
-Protección de rutas: `PrivateRoute` exige sesión y `AdminRoute` exige rol Administrador. Son rutas
-solo para Administrador `/medicion` y `/datamart`. El modo demostración (`VITE_DEMO_MODE`) permanece
-en el código por compatibilidad local y **está desactivado** en el entorno de uso.
+Protección de rutas: `PrivateRoute` exige sesión y `AdminRoute` exige rol Administrador.
+La ruta de producto reservada al Administrador es `/datamart` (análisis de operaciones).
+El modo demostración (`VITE_DEMO_MODE`) permanece en el código por compatibilidad local y **está desactivado** en el entorno de uso.
 
-### Páginas
+### Páginas de la solución tecnológica
 
 | Ruta | Pantalla | Rol |
 |---|---|---|
@@ -65,9 +69,9 @@ en el código por compatibilidad local y **está desactivado** en el entorno de 
 | `/seguimiento`, `/seguimiento/:id` | Trazabilidad y cambios de estado | Autenticado |
 | `/incidencias` | Registro de incidencias operativas | Autenticado |
 | `/reportes` | Reportes operativos y exportaciones | Autenticado |
-| `/observacion` | Fichas de evidencia por dimensión | Autenticado |
-| `/medicion` | Medición de investigación (preprueba/posprueba) | **Administrador** |
-| `/datamart` | DataMart, ETL y KPIs analíticos | **Administrador** |
+| `/datamart` | Análisis de operaciones, ETL y KPIs analíticos | **Administrador** |
+
+---
 
 ## 3. Backend
 
@@ -98,8 +102,10 @@ Flujo de una petición: `ruta → validador → autenticación → autorización
 - **Roles:** Administrador y Operador logístico.
 - **Contraseñas:** hash bcrypt.
 - **Validación de entrada:** `express-validator`; los fallos de validación se persisten en
-  `errores_registro`, insumo del indicador PER.
+  `errores_registro`.
 - **Auditoría:** tabla `auditoria` con `datos_anteriores` / `datos_nuevos` en JSON.
+
+---
 
 ## 4. API REST
 
@@ -109,19 +115,19 @@ Prefijo común `/api`. Respuesta normalizada `{ success, message, data }`.
 |---|---|---|
 | `/auth` | login, perfil | Emite y valida el JWT |
 | `/dashboard` | KPIs operativos | |
-| `/envios` | CRUD, cambio de estado, historial | Captura de tiempos de registro (TPRE) |
-| `/incidencias` | CRUD | Evalúa "información completa" (PIOIC) al guardar |
+| `/envios` | CRUD, cambio de estado, historial | Captura de tiempos de registro |
+| `/incidencias` | CRUD | Registro operativo de incidencias |
 | `/evidencias` | Carga de archivos | `multer` |
 | `/reportes` | Generación y exportación | |
 | `/catalogos` | Clientes, estados, roles | |
 | `/usuarios` | CRUD de cuentas | Solo Administrador |
-| `/observacion` | Indicadores, medición, fichas 1-4 y exportación | `/medicion` solo Administrador |
-| `/datamart` | design, preview, analytics, etl/run, etl/ejecuciones | Todo solo Administrador salvo `design` |
+| `/datamart` | design, preview, analytics, etl/run, etl/ejecuciones | Administración del componente analítico |
+
+---
 
 ## 5. Base de datos
 
-Una sola base de datos: **`trazabilidad_logistica`**, con juego de caracteres `utf8mb4` y
-colación `utf8mb4_unicode_ci`.
+Una sola base de datos: **`trazabilidad_logistica`**, `utf8mb4` / `utf8mb4_unicode_ci`.
 
 ### Modelo operacional (OLTP)
 
@@ -138,22 +144,14 @@ erDiagram
     usuarios ||--o{ auditoria : audita
 ```
 
-Columnas de control de la investigación en `envios` e `incidencias`: `origen_dato`
-(`REAL` \| `SINTETICO`) y `grupo_muestra` (`PREPRUEBA` \| `POSPRUEBA` \| `NO_MUESTRA`).
+Columnas de control técnico en `envios` e `incidencias`: `origen_dato` (`REAL` \| `SINTETICO`) y
+`grupo_muestra`. Permiten aislar datos sintéticos de prueba del DataMart.
 
 ### Modelo dimensional (DataMart)
 
-Esquema estrella descrito en detalle en [KIMBALL.md](./KIMBALL.md).
+Esquema estrella descrito en [KIMBALL.md](./KIMBALL.md).
 
-### Vistas de apoyo
-
-`vw_ficha_eficiencia`, `vw_ficha_calidad`, `vw_ficha_control`, `vw_ficha_informacion_operativa` y
-`vw_ficha_reportes` exponen las fichas de observación con las columnas `origen_dato` y
-`grupo_muestra`, para consulta directa desde MySQL Workbench o Power BI. La vista de la dimensión 4
-expone `titulo`, `descripcion` y `observacion` por separado; PIOIC no usa `observacion`.
-La API no depende de ellas:
-`observacion.service.js` construye su propio SQL parametrizado, de modo que una base sin vistas sigue
-funcionando.
+---
 
 ## 6. Flujo de la información
 
@@ -171,22 +169,23 @@ sequenceDiagram
     FE->>FE: Marca hora_inicio_registro
     O->>FE: Completa y guarda
     FE->>API: POST /api/envios (Bearer JWT)
-    API->>API: Valida; los fallos van a errores_registro (PER)
-    API->>DB: INSERT envio + tiempo_registro_min (TPRE)
-    API->>DB: INSERT historial_estados (hito inicial, PEEA)
+    API->>API: Valida; los fallos van a errores_registro
+    API->>DB: INSERT envio + tiempo_registro_min
+    API->>DB: INSERT historial_estados (hito inicial)
     API-->>FE: 201 Created
 
     O->>API: POST /api/incidencias
-    API->>API: Evalúa esIncidenciaCompleta() (PIOIC)
     API->>DB: INSERT incidencia
 
-    Note over API,DM: Proceso analítico (Administrador)
+    Note over API,DM: Análisis de operaciones (Administrador)
     API->>ETL: POST /api/datamart/etl/run
     ETL->>DB: Extrae operaciones
     ETL->>DM: Carga dimensiones y hechos (idempotente)
     ETL->>DM: Registra la corrida en etl_ejecuciones
     BI->>DM: Consulta el esquema estrella
 ```
+
+---
 
 ## 7. Despliegue
 
@@ -195,11 +194,7 @@ sequenceDiagram
 | Base de datos | MySQL 8 local | Railway (MySQL) |
 | Backend | `npm run dev` (nodemon) | Render |
 | Frontend | `npm run dev` (Vite) | Vercel |
-| BI | Power BI Desktop sobre MySQL local o CSV exportado | — |
+| BI | Power BI Desktop sobre MySQL o CSV | — |
 
 Variables de entorno del backend en `backend/.env` (`DB_*`, `JWT_SECRET`, `PORT`) y del frontend en
 `frontend/.env` (`VITE_API_URL`). Detalle operativo en `DEPLOY.md`.
-
-> **[PENDIENTE DE CONFIRMAR]** El entorno cloud descrito quedó fuera de servicio al expirar el
-> período de prueba de Railway. El estado vigente del despliegue debe confirmarse antes de la
-> sustentación.

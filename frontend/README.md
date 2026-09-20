@@ -32,14 +32,10 @@ Requiere backend en marcha (`VITE_DEMO_MODE=false` y `VITE_API_URL` apuntando a 
 | /envios | CRUD con filtros, paginación y alcance (todos / mis registros) | Autenticado |
 | /clientes | Gestión de clientes | Autenticado |
 | /seguimiento | Timeline y cambio de estados | Autenticado |
-| /incidencias | Registro de incidencias operativas (PDIOIC) | Autenticado |
+| /incidencias | Registro de incidencias operativas | Autenticado |
 | /reportes | Export PDF/Excel | Autenticado |
-| /observacion | Fichas de observación por dimensión (TPDRE, PDRE, PDEEA, PDIOIC) | Autenticado |
-| /medicion | Medición de las jornadas posteriores a la implementación | **Administrador** |
-| /datamart | Esquema estrella, ETL y KPIs analíticos | **Administrador** |
+| /datamart | Análisis de operaciones, esquema estrella, ETL y KPIs analíticos | **Administrador** |
 
-## Indicadores de investigación en la interfaz
+## Análisis de operaciones
 
-- **`/observacion`** muestra una fila por jornada y permite exportar las cuatro fichas. Solo lectura: no aleatoriza ni modifica registros.
-- **`/medicion`** presenta TPDRE, PDRE, PDEEA y PDIOIC de las jornadas posteriores a la implementación. No muestra preprueba ni comparación pre-post. Estos indicadores **no** se mezclan con los KPI analíticos del DataMart.
-- **`/datamart`** muestra hechos, dimensiones, KPIs analíticos (OTIF, lead time, incidencias) y la bitácora del ETL.
+`/datamart` muestra hechos, dimensiones, KPIs analíticos (OTIF, lead time, incidencias) y la bitácora del ETL. Es la interfaz de H.U.18. Los indicadores estadísticos de la tesis (TPDRE, PDRE, PDEEA, PDIOIC) no se mezclan con esas métricas.
