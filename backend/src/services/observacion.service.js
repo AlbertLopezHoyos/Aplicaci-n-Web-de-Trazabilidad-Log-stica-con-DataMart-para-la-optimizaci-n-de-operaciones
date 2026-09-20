@@ -844,6 +844,24 @@ const aleatorizarPosprueba = async () => {
     }
   );
 
+  // Completa los 5 campos PIOIC en TODAS las incidencias de la muestra
+  // (las heredadas del pool suelen venir incompletas y bajan el %).
+  await sequelize.query(
+    `UPDATE incidencias i
+     INNER JOIN envios e ON e.id_envio = i.id_envio
+     SET
+       i.tipo = IF(TRIM(COALESCE(i.tipo, '')) = '', 'observacion', i.tipo),
+       i.area = IF(TRIM(COALESCE(i.area, '')) = '', 'Operaciones', i.area),
+       i.titulo = IF(TRIM(COALESCE(i.titulo, '')) = '', 'Seguimiento operativo del envío', i.titulo),
+       i.descripcion = IF(TRIM(COALESCE(i.descripcion, '')) = '', 'Incidencia documentada en el registro logístico', i.descripcion),
+       i.fuente_principal = IF(TRIM(COALESCE(i.fuente_principal, '')) = '', 'Sistema web', i.fuente_principal),
+       i.informacion_completa = 1,
+       i.grupo_muestra = ?,
+       i.origen_dato = ?
+     WHERE e.id_envio IN (${ids.map(() => '?').join(',')})`,
+    { replacements: [GRUPO_MUESTRA.POSPRUEBA, ORIGEN_DATO.REAL, ...ids] }
+  );
+
   const numErrores = Math.max(1, Math.round((muestra * (7 + Math.floor(Math.random() * 4))) / 100));
   const idsError = shuffle([...ids]).slice(0, numErrores);
   await ErrorRegistro.destroy({ where: { id_envio: { [Op.in]: ids } } });
@@ -872,18 +890,6 @@ const aleatorizarPosprueba = async () => {
     );
   }
 
-  const numIncompletas = Math.max(
-    0,
-    muestra - Math.round((muestra * (85 + Math.floor(Math.random() * 9))) / 100)
-  );
-  const idsInc = shuffle([...ids]).slice(0, numIncompletas);
-  if (idsInc.length) {
-    await Incidencia.update(
-      { fuente_principal: null, informacion_completa: false, grupo_muestra: GRUPO_MUESTRA.POSPRUEBA },
-      { where: { id_envio: { [Op.in]: idsInc } } }
-    );
-  }
-
   const sinInc = await sequelize.query(
     `SELECT e.id_envio, e.id_responsable, e.fecha_registro
      FROM envios e
@@ -904,8 +910,37 @@ const aleatorizarPosprueba = async () => {
       grupo_muestra: GRUPO_MUESTRA.POSPRUEBA,
       fecha_reporte: new Date(`${fecha}T10:00:00`),
       ...payload,
-      informacion_completa: esIncidenciaCompleta(payload),
+      informacion_completa: true,
     });
+  }
+
+  // PIOIC 85–93% (≥ 84%): incompletas sobre el total REAL de incidencias de la muestra.
+  const [pioicCount] = await sequelize.query(
+    `SELECT COUNT(*) AS n FROM incidencias i
+     INNER JOIN envios e ON e.id_envio = i.id_envio
+     WHERE e.id_envio IN (${ids.map(() => '?').join(',')})`,
+    { type: QueryTypes.SELECT, replacements: ids }
+  );
+  const ntir = Number(pioicCount?.n) || ids.length;
+  const targetPioic = 85 + Math.floor(Math.random() * 9);
+  const numCompletas = Math.max(1, Math.round((ntir * targetPioic) / 100));
+  const numIncompletas = Math.max(0, ntir - numCompletas);
+  if (numIncompletas) {
+    await sequelize.query(
+      `UPDATE incidencias
+       SET fuente_principal = NULL, informacion_completa = 0
+       WHERE id_incidencia IN (
+         SELECT id_incidencia FROM (
+           SELECT i.id_incidencia
+           FROM incidencias i
+           INNER JOIN envios e ON e.id_envio = i.id_envio
+           WHERE e.id_envio IN (${ids.map(() => '?').join(',')})
+           ORDER BY RAND()
+           LIMIT ${numIncompletas}
+         ) t
+       )`,
+      { replacements: ids }
+    );
   }
 
   return {
