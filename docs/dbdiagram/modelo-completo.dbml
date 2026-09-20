@@ -5,7 +5,7 @@ Project trazabilidad_completo {
   database_type: 'MySQL'
   Note: '''
     Vista integrada del sistema
-    OLTP: operación diaria | DataMart: análisis y Power BI
+    OLTP: operación diaria | DataMart: análisis de operaciones
     Las refs punteadas representan linaje ETL (no FK física en MySQL)
   '''
 }

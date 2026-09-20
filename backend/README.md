@@ -44,7 +44,7 @@ En Windows, todo el pipeline en un solo comando: `npm run db:phase-b`.
 > generan artificialmente porque los datos históricos reales están sujetos a restricciones de
 > confidencialidad. Quedan marcados como `origen_dato = 'SINTETICO'` y `grupo_muestra = 'NO_MUESTRA'`,
 > y **están excluidos de los indicadores de investigación y del contraste de hipótesis**. Sirven para
-> probar el ETL, el esquema estrella, las consultas analíticas, los dashboards y el volumen.
+> pruebas del ETL, esquema estrella, consultas analíticas y volumen.
 
 ```bash
 npm run db:seed          # 8 envíos de demostración (también sintéticos)

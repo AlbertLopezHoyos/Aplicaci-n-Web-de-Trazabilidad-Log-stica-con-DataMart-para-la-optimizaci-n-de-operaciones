@@ -12,7 +12,7 @@ Para el personal operativo y administrativo del área de operaciones de una empr
 
 **Product Goal.** Desarrollar una aplicación web que permita centralizar la gestión y trazabilidad de las operaciones logísticas, facilitando el registro de envíos, seguimiento de estados, gestión de incidencias, generación de reportes y consulta de información consolidada para el análisis de las operaciones.
 
-A diferencia del registro manual en hojas de cálculo, el sistema autentica usuarios, valida la información capturada, mantiene el historial de estados y consolida las operaciones en un DataMart explotable con Power BI.
+A diferencia del registro manual en hojas de cálculo, el sistema autentica usuarios, valida la información capturada, mantiene el historial de estados y consolida las operaciones en un DataMart consultable desde el módulo Análisis de operaciones.
 
 ---
 
@@ -96,7 +96,7 @@ Prioridad MoSCoW: **M** Must Have, **S** Should Have.
 | H.U.17 | RF17 Auditoría | Auditoría | S | 5 |
 | H.U.18 | RF18 Análisis de operaciones | Análisis de operaciones | M | 13 |
 
-No forman parte del Product Backlog original: fichas de investigación, separación preprueba/posprueba, ETL o Power BI como historias independientes, ni carga sintética. El ETL y Power BI son actividades técnicas del componente analítico documentadas en Kimball; la integración funcional se cubre con H.U.18.
+No forman parte del Product Backlog original: fichas de investigación, separación preprueba/posprueba, ETL como historia independiente ni carga sintética. El ETL es una actividad técnica del componente analítico documentada en Kimball; la integración funcional se cubre con H.U.18.
 
 ---
 

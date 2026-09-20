@@ -5,7 +5,7 @@ Project trazabilidad_completo {
   database_type: 'MySQL'
   Note: '''
     Modelo de datos del producto
-    OLTP: operación diaria | DataMart: análisis y Power BI
+    OLTP: operación diaria | DataMart: análisis de operaciones
   '''
 }
 

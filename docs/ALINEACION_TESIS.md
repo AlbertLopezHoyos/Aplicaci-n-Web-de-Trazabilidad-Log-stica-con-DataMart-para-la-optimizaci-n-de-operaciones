@@ -56,4 +56,4 @@ Los indicadores de investigación no se mezclan con las métricas del DataMart (
 
 Columnas de control en `envios` e `incidencias`: `origen_dato` (`REAL` \| `SINTETICO`) y `grupo_muestra` (`PREPRUEBA` \| `POSPRUEBA` \| `NO_MUESTRA`).
 
-Los seeders marcan lo generado como `SINTETICO` / `NO_MUESTRA`. Esos registros sirven para pruebas técnicas del ETL, volumen, esquema estrella y Power BI. **No participan** en TPDRE, PDRE, PDEEA ni PDIOIC.
+Los seeders marcan lo generado como `SINTETICO` / `NO_MUESTRA`. Esos registros sirven para pruebas técnicas del ETL, volumen, esquema estrella y consultas analíticas. **No participan** en TPDRE, PDRE, PDEEA ni PDIOIC.

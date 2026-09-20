@@ -4,7 +4,7 @@
 Project trazabilidad_datamart {
   database_type: 'MySQL'
   Note: '''
-    DataMart dimensional para análisis y Power BI
+    DataMart dimensional para análisis de operaciones
     Grano: 1 fila en fact_operaciones_logisticas = 1 operación de envío
     dim_fecha role-playing: fecha de registro y fecha de entrega
   '''

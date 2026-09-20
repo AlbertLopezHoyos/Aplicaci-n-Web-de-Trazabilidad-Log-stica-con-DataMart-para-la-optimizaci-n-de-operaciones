@@ -26,15 +26,13 @@ flowchart TB
         DM[("DataMart<br/>dim_fecha, dim_cliente,<br/>dim_estado, dim_operador,<br/>fact_operaciones_logisticas,<br/>etl_ejecuciones")]
     end
 
-    BI["Power BI Desktop"]
-
     FE -->|HTTPS · JSON · Bearer JWT| API
     API --> MW --> SRV --> ORM --> OLTP
     SRV --> ETL
     ETL -->|extrae| OLTP
     ETL -->|carga| DM
-    SRV -->|consultas analíticas| DM
-    DM -->|conexión directa o CSV| BI
+    SRV -->|GET /api/datamart| DM
+    API -->|módulo Análisis de operaciones| FE
 ```
 
 Scrum cubre el desarrollo funcional de la aplicación web. Kimball cubre el DataMart.
@@ -158,12 +156,12 @@ Esquema estrella descrito en [KIMBALL.md](./KIMBALL.md).
 ```mermaid
 sequenceDiagram
     participant O as Operador logístico
+    participant A as Administrador
     participant FE as Frontend React
     participant API as API Express
     participant DB as MySQL (OLTP)
     participant ETL as Servicio ETL
     participant DM as DataMart
-    participant BI as Power BI
 
     O->>FE: Abre el formulario de envío
     FE->>FE: Marca hora_inicio_registro
@@ -178,11 +176,15 @@ sequenceDiagram
     API->>DB: INSERT incidencia
 
     Note over API,DM: Análisis de operaciones (Administrador)
-    API->>ETL: POST /api/datamart/etl/run
+    A->>FE: Abre Análisis de operaciones
+    FE->>API: POST /api/datamart/etl/run
+    API->>ETL: Ejecuta el ETL
     ETL->>DB: Extrae operaciones
     ETL->>DM: Carga dimensiones y hechos (idempotente)
     ETL->>DM: Registra la corrida en etl_ejecuciones
-    BI->>DM: Consulta el esquema estrella
+    FE->>API: GET /api/datamart/analytics
+    API->>DM: Consulta el esquema estrella
+    API-->>FE: KPIs y hechos consolidados
 ```
 
 ---
@@ -194,7 +196,6 @@ sequenceDiagram
 | Base de datos | MySQL 8 local | Railway (MySQL) |
 | Backend | `npm run dev` (nodemon) | Render |
 | Frontend | `npm run dev` (Vite) | Vercel |
-| BI | Power BI Desktop sobre MySQL o CSV | — |
 
 Variables de entorno del backend en `backend/.env` (`DB_*`, `JWT_SECRET`, `PORT`) y del frontend en
 `frontend/.env` (`VITE_API_URL`). Detalle operativo en `DEPLOY.md`.

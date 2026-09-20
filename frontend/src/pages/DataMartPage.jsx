@@ -180,7 +180,7 @@ const DataMartPage = () => {
         <div className="card-panel min-h-[240px]">
           <h3 className="panel-title">Qué puede consultar</h3>
           <p className="mb-3 text-xs text-slate-500">
-            Estos paneles se explotan aquí y en Power BI, conectado al mismo análisis.
+            Estos paneles permiten consultar la información consolidada del DataMart desde la aplicación.
           </p>
           <ul className="grid flex-1 gap-2">
             {(design?.dashboardsBI || [
@@ -247,7 +247,7 @@ const DataMartPage = () => {
           className="flex w-full items-center justify-between px-4 py-3 text-left"
         >
           <span>
-            <span className="font-semibold text-salazar-900">Vista técnica (tesis / Power BI)</span>
+            <span className="font-semibold text-salazar-900">Vista técnica del DataMart</span>
             <span className="mt-0.5 block text-xs font-normal text-slate-500">
               Esquema estrella, DataMart y proceso ETL — no lo usa el personal operativo
             </span>

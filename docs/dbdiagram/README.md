@@ -27,7 +27,7 @@ Describen el modelo operacional y el DataMart de la solución tecnológica.
 | 3 | `sprint-03-trazabilidad.dbml` | `historial_estados`, `incidencias`, `evidencias` | SeguimientoPage, IncidenciasPage |
 | 4 | `sprint-04-reportes.dbml` | `dashboard_operativo`, `reportes` | DashboardPage, ReportesPage |
 | 5 | `sprint-05-analisis-operaciones.dbml` | `aplicacion_web`, `etl_ejecuciones`, `componente_analitico`, `analisis_operaciones` | DataMartPage, RF18 |
-| Kimball | `sprint-06-datamart.dbml` | `dim_*`, `fact_*` | ETL, Power BI (nombre de archivo histórico; **no** es un Sprint 6 de Scrum) |
+| Kimball | `sprint-06-datamart.dbml` | `dim_*`, `fact_*` | ETL y análisis de operaciones (nombre de archivo histórico; **no** es un Sprint 6 de Scrum) |
 | — | `sprint-06-vista-completa.dbml` | Modelo integrado OLTP + DataMart | Arquitectura de datos |
 
 ## Sprint 5 (RF18)

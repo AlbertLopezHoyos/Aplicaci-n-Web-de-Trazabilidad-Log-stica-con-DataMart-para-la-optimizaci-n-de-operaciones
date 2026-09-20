@@ -142,7 +142,7 @@ erDiagram
 | RA05 | Peso transportado | `peso_kg` |
 | RA06 | Análisis por fecha, cliente, estado y operador | claves dimensionales |
 
-Consultas: `GET /api/datamart/analytics` y Power BI sobre el esquema estrella.
+Consultas: `GET /api/datamart/analytics` y módulo Análisis de operaciones de la aplicación web.
 
 ---
 
@@ -209,7 +209,7 @@ Los datos sintéticos se usan **solo** para:
 - pruebas de volumen
 - demostración del esquema estrella
 - consultas analíticas
-- dashboards / Power BI
+- validación del DataMart
 
 Quedan marcados `origen_dato = 'SINTETICO'` y `grupo_muestra = 'NO_MUESTRA'`.
 **No fueron proporcionados por la empresa** y **no participan** en los indicadores de investigación
@@ -217,11 +217,22 @@ Quedan marcados `origen_dato = 'SINTETICO'` y `grupo_muestra = 'NO_MUESTRA'`.
 
 ---
 
-## 10. Power BI
+## 10. Explotación analítica
 
-Power BI es la **herramienta de explotación y visualización** del DataMart.
-Power BI **no** es el DataMart. El DataMart existe físicamente en MySQL; Power BI consume esa
-información. Detalle de conexión en [POWERBI.md](./POWERBI.md).
+El DataMart se consume desde el módulo **Análisis de operaciones** (H.U.18) de la aplicación web,
+mediante `/api/datamart`.
+
+```
+Aplicación web
+  → modelo operacional
+  → ETL
+  → DataMart
+  → API /api/datamart
+  → módulo Análisis de operaciones
+```
+
+La interfaz (`/datamart`) consulta hechos, dimensiones, KPIs analíticos y la bitácora del ETL.
+No forma parte de la solución tecnológica una herramienta BI externa.
 
 ---
 

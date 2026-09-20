@@ -10,7 +10,7 @@ Referencia corporativa: [Grupo Logístico Salazar S.A.C.](https://www.gruposalaz
 - Seguimiento logístico con línea de tiempo (recibido → en tránsito → entregado / retrasado / cancelado)
 - Reducir errores mediante incidencias y evidencias documentales
 - Reportes operativos exportables (PDF / Excel)
-- Consolidar las operaciones en un **DataMart** en esquema estrella explotable con Power BI
+- Consolidar las operaciones en un **DataMart** en esquema estrella para su análisis mediante la aplicación web
 
 ## Alineación con la investigación
 
@@ -29,7 +29,7 @@ Referencia corporativa: [Grupo Logístico Salazar S.A.C.](https://www.gruposalaz
 
 Estos indicadores operacionalizan la variable dependiente a partir de datos operativos ya capturados (envíos, validación, historial e incidencias). **No son módulos ni historias de usuario del producto.** El detalle está en [docs/ALINEACION_TESIS.md](docs/ALINEACION_TESIS.md).
 
-La carga masiva (`npm run db:seed-bulk`) genera datos sintéticos para pruebas técnicas del ETL, el esquema estrella, consultas analíticas y Power BI. Quedan como `origen_dato = 'SINTETICO'` y `grupo_muestra = 'NO_MUESTRA'`. **No participan** en TPDRE, PDRE, PDEEA ni PDIOIC.
+La carga masiva (`npm run db:seed-bulk`) genera datos sintéticos para pruebas técnicas del ETL, el esquema estrella, volumen y consultas analíticas. Quedan como `origen_dato = 'SINTETICO'` y `grupo_muestra = 'NO_MUESTRA'`. **No participan** en TPDRE, PDRE, PDEEA ni PDIOIC.
 
 ## Estructura del proyecto
 
@@ -143,11 +143,8 @@ Documentación técnica de la tesis en [`docs/`](docs/):
 | [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) | Frontend, backend, API REST, MySQL, OLTP, DataMart y flujo de información |
 | [docs/SCRUM.md](docs/SCRUM.md) | Visión, Product Backlog, historias, criterios de aceptación, sprints y DoD |
 | [docs/PRUEBAS.md](docs/PRUEBAS.md) | Casos de prueba, resultados y evidencias pendientes |
-| [docs/POWERBI.md](docs/POWERBI.md) | Conexión remota de Power BI Desktop al MySQL (Railway) y modelo estrella |
 
 Otros:
-
-- [powerbi/](powerbi/) — plantilla `.pbids`, medidas DAX de ejemplo  
 
 - [backend/README.md](backend/README.md)  
 - [frontend/README.md](frontend/README.md)  
