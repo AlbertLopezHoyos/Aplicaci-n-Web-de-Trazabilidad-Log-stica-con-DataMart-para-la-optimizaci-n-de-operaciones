@@ -38,6 +38,9 @@ const getDimension = async (req, res, next) => {
       grupo: 'POSPRUEBA',
       data,
       total,
+      jornadasEsperadas: observacionService.JORNADAS_FICHA,
+      jornadasDisponibles: total,
+      completa: total === observacionService.JORNADAS_FICHA,
       limite: observacionService.limiteFichaGrupo(),
     });
   } catch (err) {

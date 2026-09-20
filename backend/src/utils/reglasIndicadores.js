@@ -48,7 +48,8 @@ const limiteFichaGrupo = (_grupo) => TAMANIO_GRUPO_MUESTRA;
 
 /**
  * Periodos de observación declarados en los instrumentos de la tesis.
- * Un registro fuera de su ventana invalida la ficha correspondiente.
+ * Las fichas leen jornadas operativas con envíos reales dentro de la ventana.
+ * Operaciones reales posteriores al periodo no invalidan el postest.
  */
 const VENTANAS_MEDICION = Object.freeze({
   [GRUPO_MUESTRA.PREPRUEBA]: Object.freeze({

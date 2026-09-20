@@ -68,6 +68,7 @@ const ObservacionPage = () => {
   const [columnas, setColumnas] = useState([]);
   const [labels, setLabels] = useState([]);
   const [tituloDim, setTituloDim] = useState('');
+  const [jornadasDisponibles, setJornadasDisponibles] = useState(null);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
 
@@ -88,6 +89,7 @@ const ObservacionPage = () => {
         setColumnas(payload.columnas || (payload.data?.[0] ? Object.keys(payload.data[0]) : []));
         setLabels(payload.labels || []);
         setTituloDim(payload.titulo || DIMENSIONES.find((d) => d.id === dim)?.titulo || '');
+        setJornadasDisponibles(payload.jornadasDisponibles ?? payload.data?.length ?? 0);
       })
       .catch(() => toastError('Error', 'No se pudo cargar la ficha'))
       .finally(() => setLoading(false));
@@ -128,6 +130,8 @@ const ObservacionPage = () => {
   const dimActual = DIMENSIONES.find((d) => d.id === dimensionActiva);
   const valorIndicador = valorIndicadorDe(indicadores, dimensionActiva);
   const labelCol = (key, idx) => labels[idx] || key.replace(/_/g, ' ');
+  const disponibles = jornadasDisponibles ?? datos.length;
+  const faltanJornadas = !loading && jornadasDisponibles != null && disponibles < JORNADAS_POSPRUEBA;
 
   return (
     <div className="page-shell">
@@ -140,7 +144,7 @@ const ObservacionPage = () => {
       </Link>
       <PageHeader
         title="Fichas de observación"
-        subtitle={`${JORNADAS_POSPRUEBA} jornadas posteriores a la implementación · 1 al 20 set 2026`}
+        subtitle={`Jornadas posteriores a la implementación · 1 al 20 set 2026`}
         compact
         action={
           <button
@@ -163,20 +167,29 @@ const ObservacionPage = () => {
         <p className="flex items-start gap-2">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-salazar-700" />
           <span>
-            Cada fila es <strong>una jornada operativa</strong> ({JORNADAS_POSPRUEBA} días del{' '}
-            {VENTANA_POSPRUEBA.desde} al {VENTANA_POSPRUEBA.hasta}). Se leen todos los registros
-            reales ya almacenados para esa fecha. TPDRE, PDRE, PDEEA y PDIOIC se calculan y se
-            exportan; no se modifican datos. Si un día no tiene incidencias, PDIOIC se muestra como
-            N/A.
+            Cada fila es <strong>una jornada operativa</strong> con al menos un envío real
+            ({VENTANA_POSPRUEBA.desde} al {VENTANA_POSPRUEBA.hasta}). Se leen los registros ya
+            almacenados. TPDRE, PDRE, PDEEA y PDIOIC se calculan y se exportan; no se modifican
+            datos. Si un día no tiene incidencias, PDIOIC se muestra como N/A.
           </span>
         </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="rounded-full bg-salazar-50 px-3 py-1.5 text-xs font-medium text-salazar-800 ring-1 ring-salazar-200">
-          Postest · {VENTANA_POSPRUEBA.desde} a {VENTANA_POSPRUEBA.hasta} · {JORNADAS_POSPRUEBA} jornadas
+          Postest · {VENTANA_POSPRUEBA.desde} a {VENTANA_POSPRUEBA.hasta} · {disponibles} de {JORNADAS_POSPRUEBA} jornadas
         </span>
       </div>
+      {faltanJornadas && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <p className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              Se encontraron {disponibles} de {JORNADAS_POSPRUEBA} jornadas operativas requeridas.
+            </span>
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         {DIMENSIONES.map((d) => {
@@ -221,7 +234,7 @@ const ObservacionPage = () => {
           </div>
           <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200">
             <ClipboardList className="mr-1 inline h-3 w-3" />
-            {JORNADAS_POSPRUEBA} días · {VENTANA_POSPRUEBA.desde} a {VENTANA_POSPRUEBA.hasta}
+            {disponibles} de {JORNADAS_POSPRUEBA} jornadas · {VENTANA_POSPRUEBA.desde} a {VENTANA_POSPRUEBA.hasta}
           </span>
         </div>
         {loading ? (

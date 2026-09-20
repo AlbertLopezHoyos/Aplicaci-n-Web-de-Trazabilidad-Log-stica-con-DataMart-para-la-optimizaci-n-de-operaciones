@@ -38,6 +38,10 @@ describe('calcularIndicadores — exclusión de datos sintéticos y de preprueba
     const resultado = await observacionService.calcularIndicadores();
 
     expect(sequelize.query).toHaveBeenCalledTimes(4);
+    expect(sqlDeLlamada(0)).toContain('COUNT(CASE WHEN');
+    expect(sqlDeLlamada(0)).toContain('tiempo_registro_min IS NOT NULL');
+    expect(sqlDeLlamada(0)).toContain('tiempo_registro_min >= 0');
+    expect(sqlDeLlamada(0)).not.toMatch(/COUNT\(\*\) AS nerd/);
     expect(resultado.incluyeDatosSinteticos).toBe(false);
     expect(resultado.grupo).toBe('POSPRUEBA');
     expect(resultado.alcance).toBe('MUESTRA');
@@ -45,7 +49,7 @@ describe('calcularIndicadores — exclusión de datos sintéticos y de preprueba
     for (let i = 0; i < 3; i += 1) {
       expect(sqlDeLlamada(i)).toContain('origen_dato = :origenReal');
       expect(sqlDeLlamada(i)).toContain('grupo_muestra <> :grupoPre');
-      expect(sqlDeLlamada(i)).toContain('e.fecha_registro BETWEEN :ventanaDesde AND :ventanaHasta');
+      expect(sqlDeLlamada(i)).toContain('DATE(e.fecha_registro) BETWEEN :ventanaDesde AND :ventanaHasta');
       expect(sqlDeLlamada(i)).toContain('GROUP BY DATE(e.fecha_registro)');
       expect(replacementsDeLlamada(i)).toEqual({
         origenReal: 'REAL',
@@ -167,32 +171,38 @@ describe('criterio PDIOIC en SQL', () => {
 });
 
 describe('fichas de observación diarias', () => {
-  it('una fila representa una jornada y usa todos los registros reales del día', async () => {
-    sequelize.query.mockResolvedValueOnce([]);
-    const filas = await observacionService.getDatosDimension(1, { limit: 50, grupo: 'POSPRUEBA' });
-    const sql = sqlDeLlamada(0);
-    expect(sql).toContain('origen_dato = :origenReal');
-    expect(sql).toContain('grupo_muestra <> :grupoPre');
-    expect(sql).toContain('fecha_registro BETWEEN :ventanaDesde AND :ventanaHasta');
-    expect(sql).toContain('GROUP BY DATE(e.fecha_registro)');
-    expect(sql).not.toContain('ORDER BY RAND()');
-    expect(sql).not.toContain('LIMIT 50');
-    expect(replacementsDeLlamada(0)).toEqual({
-      origenReal: 'REAL',
-      grupoPre: 'PREPRUEBA',
-      ventanaDesde: '2026-09-01',
-      ventanaHasta: '2026-09-20',
-    });
-    expect(filas).toHaveLength(20);
+  it('una jornada operativa se obtiene de una fecha con al menos una operación válida', async () => {
+    sequelize.query
+      .mockResolvedValueOnce([{ fecha: '2026-09-01' }, { fecha: '2026-09-02' }])
+      .mockResolvedValueOnce([
+        { fecha: '2026-09-01', nerd: 4, suma_tre: 20 },
+        { fecha: '2026-09-02', nerd: 2, suma_tre: 8 },
+      ]);
+    const filas = await observacionService.getDatosDimension(1);
+    expect(sqlDeLlamada(0)).toContain('SELECT DISTINCT DATE(e.fecha_registro)');
+    expect(sqlDeLlamada(0)).toContain('origen_dato = :origenReal');
+    expect(sqlDeLlamada(0)).toContain('grupo_muestra <> :grupoPre');
+    expect(sqlDeLlamada(0)).not.toContain('ORDER BY RAND()');
+    expect(sqlDeLlamada(0)).not.toContain('LIMIT 50');
+    expect(filas).toHaveLength(2);
     expect(filas[0].fecha).toBe('01/09/2026');
-    expect(filas[19].fecha).toBe('20/09/2026');
-    expect(filas[0].tpdre).toBe('N/A');
+    expect(filas[0].nerd).toBe(4);
+    expect(filas[0].tpdre).toBe(5);
+  });
+
+  it('no crea filas de días sin operaciones únicamente para completar 20', async () => {
+    sequelize.query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    const filas = await observacionService.getDatosDimension(1);
+    expect(filas).toHaveLength(0);
+    expect(filas).not.toHaveLength(20);
   });
 
   it('la dimensión 4 agrupa y filtra por DATE(i.fecha_reporte)', async () => {
-    sequelize.query.mockResolvedValueOnce([]);
+    sequelize.query
+      .mockResolvedValueOnce([{ fecha: '2026-09-10' }])
+      .mockResolvedValueOnce([]);
     await observacionService.getDatosDimension(4);
-    const sql = sqlDeLlamada(0);
+    const sql = sqlDeLlamada(1);
     expect(sql).toContain('FROM incidencias i');
     expect(sql).toContain('origen_dato = :origenReal');
     expect(sql).toContain('GROUP BY DATE(i.fecha_reporte)');
@@ -202,9 +212,13 @@ describe('fichas de observación diarias', () => {
     expect(sql).not.toContain('ORDER BY RAND()');
   });
 
-  it('PDIOIC de ficha es N/A cuando TID = 0', async () => {
-    sequelize.query.mockResolvedValueOnce([]);
+  it('D4 conserva N/A cuando una jornada válida no tiene incidencias', async () => {
+    sequelize.query
+      .mockResolvedValueOnce([{ fecha: '2026-09-10' }])
+      .mockResolvedValueOnce([]);
     const filas = await observacionService.getDatosDimension(4);
+    expect(filas).toHaveLength(1);
+    expect(filas[0].fecha).toBe('10/09/2026');
     expect(filas[0].tid).toBe(0);
     expect(filas[0].pdioic).toBe('N/A');
     expect(filas[0].pdioic).not.toBe(0);
@@ -237,27 +251,105 @@ describe('fichas de observación diarias', () => {
     await observacionService.getDatosDimension(1);
     await observacionService.getDatosDimension(2);
     await observacionService.getDatosDimension(3);
-    expect(sqlDeLlamada(0)).toContain('FROM envios e');
     expect(sqlDeLlamada(1)).toContain('FROM envios e');
-    expect(sqlDeLlamada(2)).toContain('FROM envios e');
-    expect(sqlDeLlamada(0)).not.toContain('FROM incidencias');
-    expect(sqlDeLlamada(1)).toContain('AS trd');
-    expect(sqlDeLlamada(2)).toContain('AS ted');
+    expect(sqlDeLlamada(3)).toContain('FROM envios e');
+    expect(sqlDeLlamada(5)).toContain('FROM envios e');
+    expect(sqlDeLlamada(1)).toContain('AS nerd');
+    expect(sqlDeLlamada(3)).toContain('AS trd');
+    expect(sqlDeLlamada(5)).toContain('AS ted');
   });
 
-  it('la exportación de la ficha 4 usa columnas diarias y marca N/A si no hay incidencias', async () => {
-    sequelize.query.mockResolvedValue([]);
+  it('TPDRE usa el mismo conjunto de registros válidos en ΣTRE y NERD', async () => {
+    sequelize.query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    await observacionService.getDatosDimension(1);
+    const sql = sqlDeLlamada(1);
+    expect(sql).toContain('tiempo_registro_min IS NOT NULL');
+    expect(sql).toContain('tiempo_registro_min >= 0');
+    expect(sql).toContain(`COUNT(CASE WHEN ${observacionService.SQL_TIEMPO_VALIDO} THEN 1 END) AS nerd`);
+    expect(sql).toContain(`SUM(CASE WHEN ${observacionService.SQL_TIEMPO_VALIDO} THEN e.tiempo_registro_min END)`);
+    expect(sql).not.toMatch(/COUNT\(\*\) AS nerd/);
+  });
+
+  it('un tiempo_registro_min nulo no aumenta el denominador de TPDRE', async () => {
+    sequelize.query
+      .mockResolvedValueOnce([{ fecha: '2026-09-01' }])
+      .mockResolvedValueOnce([{ fecha: '2026-09-01', nerd: 19, suma_tre: 95 }]);
+    const filas = await observacionService.getDatosDimension(1);
+    expect(filas).toHaveLength(1);
+    expect(filas[0].nerd).toBe(19);
+    expect(filas[0].suma_tre).toBe(95);
+    expect(filas[0].tpdre).toBe(5);
+    expect(filas[0].tpdre).not.toBe(4.75);
+  });
+
+  it('TPDRE es N/A si la jornada tiene envíos pero ningún tiempo válido', async () => {
+    sequelize.query
+      .mockResolvedValueOnce([{ fecha: '2026-09-01' }])
+      .mockResolvedValueOnce([{ fecha: '2026-09-01', nerd: 0, suma_tre: 0 }]);
+    const filas = await observacionService.getDatosDimension(1);
+    expect(filas).toHaveLength(1);
+    expect(filas[0].nerd).toBe(0);
+    expect(filas[0].tpdre).toBe('N/A');
+  });
+
+  it('si hay más de 20 jornadas en el periodo, usa las primeras 20 cronológicas', async () => {
+    const fechas = Array.from({ length: 22 }, (_, i) => ({
+      fecha: `2026-09-${String(i + 1).padStart(2, '0')}`,
+    }));
+    sequelize.query.mockResolvedValueOnce(fechas).mockResolvedValueOnce([]);
+    const filas = await observacionService.getDatosDimension(1);
+    expect(filas).toHaveLength(20);
+    expect(filas[0].fecha).toBe('01/09/2026');
+    expect(filas[19].fecha).toBe('20/09/2026');
+  });
+
+  it('la exportación utiliza las mismas jornadas que la ficha', async () => {
+    const jornadas = [{ fecha: '2026-09-01' }, { fecha: '2026-09-10' }];
+    sequelize.query.mockImplementation((sql) => {
+      if (String(sql).includes('SELECT DISTINCT DATE(e.fecha_registro)')) {
+        return Promise.resolve(jornadas);
+      }
+      return Promise.resolve([]);
+    });
+    const ficha = await observacionService.getDatosDimension(4);
     const payload = await observacionService.buildExportPayload(4);
-    expect(payload.headers.map((h) => h.key)).toEqual(observacionService.DIMENSIONES[4].columnas);
-    expect(payload.headers.map((h) => h.label)).toEqual(observacionService.DIMENSIONES[4].labels);
-    expect(payload.filas).toHaveLength(20);
-    expect(payload.filas[0].pdioic).toBe('N/A');
-    expect(payload.exportados).toBe(20);
-    expect(payload.incluyeDatosSinteticos).toBe(false);
+    expect(ficha.map((f) => f.fecha)).toEqual(['01/09/2026', '10/09/2026']);
+    expect(payload.filas.map((f) => f.fecha)).toEqual(ficha.map((f) => f.fecha));
+    expect(payload.exportados).toBe(ficha.length);
+    expect(payload.jornadasDisponibles).toBe(2);
+    expect(payload.jornadasEsperadas).toBe(20);
   });
 
   it('rechaza dimensiones fuera del rango 1-4', async () => {
     await expect(observacionService.getDatosDimension(9)).rejects.toThrow('Dimensión no válida');
+  });
+});
+
+describe('cobertura de jornadas operativas', () => {
+  it('si existen menos de 20 jornadas, informa el faltante sin generar datos', async () => {
+    sequelize.query
+      .mockResolvedValueOnce([{ fecha: '2026-09-01' }])
+      .mockResolvedValueOnce([{ total: 40 }]);
+    const cob = await observacionService.getCoberturaVentana();
+    expect(cob.jornadasEsperadas).toBe(20);
+    expect(cob.jornadasDisponibles).toBe(1);
+    expect(cob.faltantes).toBe(19);
+    expect(cob.completa).toBe(false);
+    expect(cob.operacionesFueraDelPeriodo).toBe(40);
+  });
+
+  it('operaciones reales posteriores al periodo no invalidan la muestra', async () => {
+    const veinte = Array.from({ length: 20 }, (_, i) => ({
+      fecha: `2026-09-${String(i + 1).padStart(2, '0')}`,
+    }));
+    sequelize.query
+      .mockResolvedValueOnce(veinte)
+      .mockResolvedValueOnce([{ total: 120 }]);
+    const cob = await observacionService.getCoberturaVentana();
+    expect(cob.jornadasDisponibles).toBe(20);
+    expect(cob.completa).toBe(true);
+    expect(cob.operacionesFueraDelPeriodo).toBe(120);
+    expect(cob.completa).not.toBe(cob.operacionesFueraDelPeriodo === 0);
   });
 });
 
@@ -285,11 +377,15 @@ describe('módulo de investigación — solo lectura', () => {
     expect(fuente).not.toMatch(/85\s*[–-]\s*93/);
   });
 
-  it('getMedicionInvestigacion no calcula ni expone preprueba', async () => {
+  it('getMedicionInvestigacion no calcula ni expone preprueba y no usa fueraDeVentana para completar', async () => {
     sequelize.query.mockResolvedValue([]);
     const medicion = await observacionService.getMedicionInvestigacion();
     expect(medicion).not.toHaveProperty('preprueba');
     expect(medicion.posprueba).toBeDefined();
     expect(medicion.ventanas.preprueba).toBeUndefined();
+    expect(medicion.muestra.completa).toBe(false);
+    expect(medicion.muestra.jornadasEsperadas).toBe(20);
+    expect(medicion.muestra.jornadasDisponibles).toBe(0);
+    expect(medicion.muestra).not.toHaveProperty('fueraDeVentana');
   });
 });

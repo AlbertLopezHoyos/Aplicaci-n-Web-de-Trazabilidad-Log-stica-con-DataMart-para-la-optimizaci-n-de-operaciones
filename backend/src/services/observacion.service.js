@@ -91,19 +91,26 @@ const SQL_INCIDENCIA_COMPLETA = CAMPOS_INCIDENCIA_COMPLETA
   .map((campo) => `TRIM(COALESCE(i.\`${campo}\`, '')) <> ''`)
   .join(' AND ');
 
-const listarDiasISO = (desde, hasta) => {
-  const dias = [];
-  const cursor = new Date(`${desde}T12:00:00`);
-  const fin = new Date(`${hasta}T12:00:00`);
-  while (cursor <= fin) {
-    dias.push(aFechaISO(cursor));
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  return dias;
-};
+const SQL_TIEMPO_VALIDO = 'e.tiempo_registro_min IS NOT NULL AND e.tiempo_registro_min >= 0';
 
-/** 20 jornadas del postest (1–20 set 2026). La preprueba no forma parte del software. */
-const jornadasFichaGrupo = () => listarDiasISO(VENTANA_POSTEST.desde, VENTANA_POSTEST.hasta);
+/**
+ * Jornadas operativas reales del postest: fechas con al menos un envío REAL válido.
+ * No rellena días calendario vacíos. Si hay más de 20, toma las primeras en orden cronológico.
+ */
+const listarJornadasOperativas = async () => {
+  const filtro = filtroInvestigacion(1);
+  const filas = await sequelize.query(
+    `SELECT DISTINCT DATE(e.fecha_registro) AS fecha
+     FROM envios e
+     WHERE e.activo = 1 AND ${filtro.sql}
+     ORDER BY DATE(e.fecha_registro) ASC`,
+    { type: QueryTypes.SELECT, replacements: filtro.replacements }
+  );
+  return filas
+    .map((fila) => aFechaISO(fila.fecha))
+    .filter(Boolean)
+    .slice(0, JORNADAS_FICHA);
+};
 
 const formatoFechaFicha = (iso) => {
   const valor = aFechaISO(iso);
@@ -165,7 +172,7 @@ const filtroInvestigacion = (dimension) => {
     };
   }
   return {
-    sql: `${base} AND e.fecha_registro BETWEEN :ventanaDesde AND :ventanaHasta`,
+    sql: `${base} AND DATE(e.fecha_registro) BETWEEN :ventanaDesde AND :ventanaHasta`,
     replacements,
   };
 };
@@ -191,8 +198,8 @@ const SQL_ULTIMO_HISTORIAL = `
 const sqlFicha = (dimension, filtro) => {
   if (dimension === 1) {
     return `SELECT DATE(e.fecha_registro) AS fecha,
-                   COUNT(*) AS nerd,
-                   COALESCE(SUM(e.tiempo_registro_min), 0) AS suma_tre
+                   COUNT(CASE WHEN ${SQL_TIEMPO_VALIDO} THEN 1 END) AS nerd,
+                   COALESCE(SUM(CASE WHEN ${SQL_TIEMPO_VALIDO} THEN e.tiempo_registro_min END), 0) AS suma_tre
             FROM envios e
             WHERE e.activo = 1 AND ${filtro.sql}
             GROUP BY DATE(e.fecha_registro)
@@ -273,6 +280,7 @@ const armarFilaDiaria = (dimension, fechaISO, raw) => {
 const getDatosDimension = async (dimension) => {
   const config = DIMENSIONES[dimension];
   if (!config) throw Object.assign(new Error('Dimensión no válida'), { statusCode: 400 });
+  const jornadas = await listarJornadasOperativas();
   const filtro = filtroInvestigacion(dimension);
   const sql = sqlFicha(dimension, filtro);
   const filas = await sequelize.query(sql, {
@@ -284,14 +292,13 @@ const getDatosDimension = async (dimension) => {
     const iso = aFechaISO(fila.fecha);
     if (iso) porFecha.set(iso, fila);
   }
-  return jornadasFichaGrupo().map((iso) =>
-    armarFilaDiaria(dimension, iso, porFecha.get(iso))
-  );
+  return jornadas.map((iso) => armarFilaDiaria(dimension, iso, porFecha.get(iso)));
 };
 
 const countDatosDimension = async (dimension) => {
   if (!DIMENSIONES[dimension]) return 0;
-  return jornadasFichaGrupo().length;
+  const jornadas = await listarJornadasOperativas();
+  return jornadas.length;
 };
 
 const indicadoresDesdeFilas = (diasTpdre, diasPdre, diasPdeea, diasPdioic) => {
@@ -305,7 +312,8 @@ const indicadoresDesdeFilas = (diasTpdre, diasPdre, diasPdeea, diasPdioic) => {
     grupo: GRUPO_MUESTRA.POSPRUEBA,
     incluyeDatosSinteticos: false,
     unidadObservacion: 'jornada',
-    nJornadas: JORNADAS_FICHA,
+    jornadasEsperadas: JORNADAS_FICHA,
+    nJornadas: tpdre.nDias,
     nJornadasConDatos: tpdre.nDias,
     tpdre: tpdre.valor,
     pdre: pdre.valor,
@@ -332,8 +340,8 @@ const calcularIndicadores = async () => {
 
   const diasTpdre = await sequelize.query(
     `SELECT DATE(e.fecha_registro) AS fecha,
-            COUNT(*) AS nerd,
-            COALESCE(SUM(e.tiempo_registro_min), 0) AS suma_tre
+            COUNT(CASE WHEN ${SQL_TIEMPO_VALIDO} THEN 1 END) AS nerd,
+            COALESCE(SUM(CASE WHEN ${SQL_TIEMPO_VALIDO} THEN e.tiempo_registro_min END), 0) AS suma_tre
      FROM envios e
      WHERE e.activo = 1 AND ${filtroEnvios.sql}
      GROUP BY DATE(e.fecha_registro)`,
@@ -387,14 +395,17 @@ const getCoberturaVentana = async () => {
   };
   const desde = VENTANA_POSTEST.desde;
   const hasta = VENTANA_POSTEST.hasta;
+  const jornadas = await listarJornadasOperativas();
+  const disponibles = jornadas.length;
+  const faltantes = Math.max(0, JORNADAS_FICHA - disponibles);
 
-  const [row] = await sequelize.query(
-    `SELECT COUNT(*) AS total,
-            SUM(CASE WHEN e.fecha_registro BETWEEN :desde AND :hasta THEN 1 ELSE 0 END) AS dentro,
-            COUNT(DISTINCT CASE WHEN e.fecha_registro BETWEEN :desde AND :hasta
-                                THEN DATE(e.fecha_registro) END) AS dias
+  const [fuera] = await sequelize.query(
+    `SELECT COUNT(*) AS total
      FROM envios e
-     WHERE e.activo = 1 AND e.origen_dato = :real AND e.grupo_muestra <> :pre`,
+     WHERE e.activo = 1
+       AND e.origen_dato = :real
+       AND e.grupo_muestra <> :pre
+       AND DATE(e.fecha_registro) NOT BETWEEN :desde AND :hasta`,
     {
       type: QueryTypes.SELECT,
       replacements: {
@@ -406,28 +417,17 @@ const getCoberturaVentana = async () => {
     }
   );
 
-  const total = Number(row?.total) || 0;
-  const dentro = Number(row?.dentro) || 0;
-  const dias = Number(row?.dias) || 0;
-  const hoy = aFechaISO(new Date());
-  const msPorDia = 86400000;
-  const diasRestantes = hoy > hasta
-    ? 0
-    : Math.round((new Date(`${hasta}T12:00:00`) - new Date(`${(hoy < desde ? desde : hoy)}T12:00:00`)) / msPorDia);
-
   return {
     ...ventana,
     desde,
     hasta,
-    registrados: total,
-    enviosDentro: dentro,
-    jornadasObservadas: dias,
+    jornadasEsperadas: JORNADAS_FICHA,
+    jornadasDisponibles: disponibles,
+    jornadasObservadas: disponibles,
     esperadoJornadas: JORNADAS_FICHA,
-    dentroDeVentana: dias,
-    fueraDeVentana: total - dentro,
-    faltantes: Math.max(0, JORNADAS_FICHA - dias),
-    abierta: hoy <= hasta,
-    diasRestantes,
+    faltantes,
+    completa: disponibles === JORNADAS_FICHA,
+    operacionesFueraDelPeriodo: Number(fuera?.total) || 0,
   };
 };
 
@@ -441,23 +441,23 @@ const getMedicionInvestigacion = async () => {
   const [cobertura] = await sequelize.query(
     `SELECT
        SUM(CASE WHEN origen_dato = 'SINTETICO' THEN 1 ELSE 0 END) AS sinteticos,
-       SUM(CASE WHEN origen_dato = 'REAL' AND grupo_muestra <> 'PREPRUEBA' THEN 1 ELSE 0 END) AS realesPostest,
        COUNT(*) AS total
      FROM envios WHERE activo = 1`,
     { type: QueryTypes.SELECT }
   );
 
-  const jornadasPos = ventanaPos?.jornadasObservadas || 0;
+  const disponibles = ventanaPos?.jornadasDisponibles || 0;
 
   return {
     posprueba,
     ventanas: { posprueba: ventanaPos },
     muestra: {
+      jornadasEsperadas: JORNADAS_FICHA,
+      jornadasDisponibles: disponibles,
+      faltantes: Math.max(0, JORNADAS_FICHA - disponibles),
       esperadoPorGrupo: JORNADAS_FICHA,
-      registradoPosprueba: jornadasPos,
-      enviosPosprueba: Number(cobertura?.realesPostest) || 0,
-      fueraDeVentana: ventanaPos?.fueraDeVentana || 0,
-      completa: jornadasPos === JORNADAS_FICHA && (ventanaPos?.fueraDeVentana || 0) === 0,
+      registradoPosprueba: disponibles,
+      completa: disponibles === JORNADAS_FICHA,
       unidadObservacion: 'jornada',
     },
     datosSinteticos: {
@@ -490,6 +490,8 @@ const buildExportPayload = async (dimension) => {
     filas,
     total: totalBd,
     exportados: filas.length,
+    jornadasEsperadas: JORNADAS_FICHA,
+    jornadasDisponibles: filas.length,
     limite: JORNADAS_FICHA,
     indicadores: {
       tpdre: indicadores.tpdre,
@@ -517,6 +519,8 @@ module.exports = {
   filtroMuestra,
   filtroInvestigacion,
   SQL_INCIDENCIA_COMPLETA,
+  SQL_TIEMPO_VALIDO,
+  listarJornadasOperativas,
   JORNADAS_FICHA,
   FICHA_MUESTRA,
   limiteFichaGrupo,

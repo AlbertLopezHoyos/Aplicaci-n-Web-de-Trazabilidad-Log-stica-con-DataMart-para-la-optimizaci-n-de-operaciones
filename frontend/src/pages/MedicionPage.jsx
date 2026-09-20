@@ -74,16 +74,19 @@ const formatoFecha = (iso) => {
   return `${d}/${m}/${y}`;
 };
 
-const VentanaCard = ({ etiqueta, ventana }) => {
-  if (!ventana) return null;
-  const completa = ventana.faltantes === 0 && ventana.fueraDeVentana === 0;
+const VentanaCard = ({ etiqueta, ventana, muestra }) => {
+  if (!ventana && !muestra) return null;
+  const esperadas = muestra?.jornadasEsperadas ?? ventana?.jornadasEsperadas ?? 20;
+  const disponibles = muestra?.jornadasDisponibles ?? ventana?.jornadasDisponibles ?? 0;
+  const faltantes = Math.max(0, esperadas - disponibles);
+  const completa = disponibles === esperadas;
   return (
     <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-slate-800">{etiqueta}</p>
           <p className="text-xs text-slate-500">
-            {ventana.anexo} · {formatoFecha(ventana.desde)} — {formatoFecha(ventana.hasta)}
+            {ventana?.anexo} · {formatoFecha(ventana?.desde)} — {formatoFecha(ventana?.hasta)}
           </p>
         </div>
         <span
@@ -91,27 +94,16 @@ const VentanaCard = ({ etiqueta, ventana }) => {
             completa ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
           }`}
         >
-          {ventana.dentroDeVentana} / {ventana.esperadoJornadas ?? 20}
+          {completa ? 'Completo' : `Faltan ${faltantes}`}
         </span>
       </div>
-      <p className="mt-2 text-xs text-slate-500">{ventana.fuente}</p>
-      <div className="mt-2 space-y-1 text-xs">
-        {ventana.fueraDeVentana > 0 && (
-          <p className="flex items-center gap-1.5 text-red-700">
-            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-            {ventana.fueraDeVentana} envío(s) marcados fuera del periodo declarado
-          </p>
-        )}
-        {ventana.faltantes > 0 && (
-          <p className="flex items-center gap-1.5 text-amber-700">
-            <CalendarClock className="h-3.5 w-3.5 shrink-0" />
-            Faltan {ventana.faltantes} jornada(s)
-            {ventana.abierta
-              ? ` · quedan ${ventana.diasRestantes} día(s) de observación`
-              : ' · el periodo de observación ya cerró'}
-          </p>
-        )}
-      </div>
+      <p className="mt-2 text-xs text-slate-500">{ventana?.fuente}</p>
+      {faltantes > 0 && (
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-amber-700">
+          <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+          Se encontraron {disponibles} de {esperadas} jornadas operativas requeridas.
+        </p>
+      )}
     </div>
   );
 };
@@ -188,23 +180,23 @@ const MedicionPage = () => {
         </p>
       </div>
 
-      <VentanaCard etiqueta="Periodo posterior a la implementación" ventana={ventanaPos} />
+      <VentanaCard etiqueta="Periodo posterior a la implementación" ventana={ventanaPos} muestra={muestra} />
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
         <StatChip
-          label="Jornadas observadas"
-          value={`${muestra?.registradoPosprueba ?? 0} / ${muestra?.esperadoPorGrupo ?? 20}`}
+          label="Jornadas requeridas"
+          value={muestra?.jornadasEsperadas ?? 20}
           accent="salazar"
         />
         <StatChip
-          label="Dentro de ventana"
-          value={ventanaPos?.dentroDeVentana ?? 0}
-          accent={ventanaPos?.fueraDeVentana ? 'amber' : 'green'}
+          label="Jornadas disponibles"
+          value={muestra?.jornadasDisponibles ?? 0}
+          accent={muestra?.completa ? 'green' : 'amber'}
         />
         <StatChip
-          label="Fuera de ventana"
-          value={ventanaPos?.fueraDeVentana ?? 0}
-          accent={ventanaPos?.fueraDeVentana ? 'amber' : 'slate'}
+          label="Estado"
+          value={muestra?.completa ? 'Completo' : `Faltan ${muestra?.faltantes ?? 20} jornadas operativas`}
+          accent={muestra?.completa ? 'green' : 'amber'}
         />
       </div>
 
