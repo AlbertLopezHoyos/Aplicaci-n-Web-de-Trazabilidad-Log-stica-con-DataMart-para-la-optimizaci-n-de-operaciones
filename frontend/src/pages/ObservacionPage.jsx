@@ -144,7 +144,7 @@ const ObservacionPage = () => {
       </Link>
       <PageHeader
         title="Fichas de observación"
-        subtitle={`Jornadas posteriores a la implementación · 1 al 20 set 2026`}
+        subtitle="Jornadas operativas posteriores a la implementación (setiembre de 2026)"
         compact
         action={
           <button
@@ -168,9 +168,9 @@ const ObservacionPage = () => {
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-salazar-700" />
           <span>
             Cada fila es <strong>una jornada operativa</strong> con al menos un envío real
-            ({VENTANA_POSPRUEBA.desde} al {VENTANA_POSPRUEBA.hasta}). Se leen los registros ya
-            almacenados. TPDRE, PDRE, PDEEA y PDIOIC se calculan y se exportan; no se modifican
-            datos. Si un día no tiene incidencias, PDIOIC se muestra como N/A.
+            en el periodo de observación. Se leen los registros ya almacenados. TPDRE, PDRE, PDEEA
+            y PDIOIC se calculan y se exportan; no se modifican datos. Si una jornada operativa no
+            tiene incidencias, PDIOIC se muestra como N/A.
           </span>
         </p>
       </div>
@@ -228,7 +228,7 @@ const ObservacionPage = () => {
               {tituloDim || dimActual?.titulo}
             </h3>
             <p className="text-xs text-slate-500">
-              {datos.length} jornadas · media diaria {dimActual?.indicador}:{' '}
+              {datos.length} jornadas operativas · media de {dimActual?.indicador}:{' '}
               <strong>{valorIndicador ?? '—'}{dimActual?.unidad === '%' ? '%' : ' min'}</strong>
             </p>
           </div>
@@ -258,7 +258,7 @@ const ObservacionPage = () => {
                 {datos.length === 0 && (
                   <tr>
                     <td colSpan={columnas.length + 1} className="px-4 py-10 text-center text-slate-500">
-                      Sin jornadas en la ventana {VENTANA_POSPRUEBA.desde} a {VENTANA_POSPRUEBA.hasta}.
+                      Sin jornadas operativas en el periodo de observación.
                     </td>
                   </tr>
                 )}

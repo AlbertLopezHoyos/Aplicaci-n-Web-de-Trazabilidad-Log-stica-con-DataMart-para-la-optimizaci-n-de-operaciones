@@ -22,7 +22,7 @@ const INDICADORES = [
     clave: 'tpdre',
     nombre: 'TPDRE',
     dimension: 'Eficiencia operativa',
-    descripcion: 'Tiempo promedio diario de registro de envíos (media de 20 jornadas)',
+    descripcion: 'Tiempo promedio diario de registro de envíos (media de las jornadas válidas)',
     formula: 'TPDRE = ΣTRE / NERD',
     unidad: 'min',
     icon: Timer,
@@ -33,7 +33,7 @@ const INDICADORES = [
     clave: 'pdre',
     nombre: 'PDRE',
     dimension: 'Calidad de la información logística',
-    descripcion: 'Porcentaje diario de registros con error (media de 20 jornadas)',
+    descripcion: 'Porcentaje diario de registros con error (media de las jornadas válidas)',
     formula: 'PDRE = (RCE / TRD) × 100',
     unidad: '%',
     icon: AlertTriangle,
@@ -44,7 +44,7 @@ const INDICADORES = [
     clave: 'pdeea',
     nombre: 'PDEEA',
     dimension: 'Control y seguimiento de envíos',
-    descripcion: 'Porcentaje diario de envíos con estado actualizado (media de 20 jornadas)',
+    descripcion: 'Porcentaje diario de envíos con estado actualizado (media de las jornadas válidas)',
     formula: 'PDEEA = (EEA / TED) × 100',
     unidad: '%',
     icon: MapPin,
@@ -55,7 +55,7 @@ const INDICADORES = [
     clave: 'pdioic',
     nombre: 'PDIOIC',
     dimension: 'Gestión de la información operativa',
-    descripcion: 'Porcentaje diario de incidencias con información completa (media de 20 jornadas)',
+    descripcion: 'Porcentaje diario de incidencias con información completa (media de las jornadas válidas con incidencias)',
     formula: 'PDIOIC = (NIOC / TID) × 100',
     unidad: '%',
     icon: ClipboardCheck,
@@ -165,7 +165,7 @@ const MedicionPage = () => {
       </Link>
       <PageHeader
         title="Medición de investigación"
-        subtitle="TPDRE, PDRE, PDEEA y PDIOIC sobre las 20 jornadas posteriores a la implementación (1–20 set 2026)"
+        subtitle="TPDRE, PDRE, PDEEA y PDIOIC sobre las jornadas operativas posteriores a la implementación (setiembre de 2026)"
         compact
       />
 
@@ -173,9 +173,9 @@ const MedicionPage = () => {
         <p className="flex items-start gap-2">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-salazar-700" />
           <span>
-            Este módulo solo extrae los indicadores de las jornadas posteriores a la implementación.
-            Cada observación es un día (20 jornadas, 1–20 set 2026). Los valores se calculan sobre
-            los registros reales ya almacenados. No se modifican datos.
+            La investigación contempla 20 jornadas operativas posteriores a la implementación.
+            Cada observación corresponde a una jornada operativa. Los valores se calculan con los
+            registros reales ya almacenados y el módulo no modifica datos.
           </span>
         </p>
       </div>
@@ -204,7 +204,7 @@ const MedicionPage = () => {
         <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
           <h3 className="font-semibold text-salazar-900">Indicadores por dimensión</h3>
           <p className="text-xs text-slate-500">
-            Media de los promedios diarios de las jornadas disponibles (1–20 set 2026)
+            Media de los valores diarios obtenidos en las jornadas válidas de cada indicador
           </p>
         </div>
         <div className="table-panel-body">
@@ -248,7 +248,7 @@ const MedicionPage = () => {
       <div className="card">
         <h3 className="panel-title">Exportar fichas</h3>
         <p className="mb-3 text-xs text-slate-500">
-          Cada Excel incluye las jornadas disponibles (una fila = un día). Solo lectura.
+          Cada Excel incluye las jornadas operativas disponibles (una fila = una jornada operativa). Solo lectura.
         </p>
         <div className="grid gap-2 sm:grid-cols-2">
           {[1, 2, 3, 4].map((dim) => (
