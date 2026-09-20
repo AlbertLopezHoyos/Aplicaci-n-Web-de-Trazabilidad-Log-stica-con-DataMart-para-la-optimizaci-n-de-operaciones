@@ -1,5 +1,4 @@
-// Vista completa — Sistema operativo + DataMart (cierre Sprint 6)
-// Sin instrumentos de investigación (fichas / medición)
+// Vista completa — modelo operacional + DataMart (Kimball)
 
 Project trazabilidad_completo {
   database_type: 'MySQL'

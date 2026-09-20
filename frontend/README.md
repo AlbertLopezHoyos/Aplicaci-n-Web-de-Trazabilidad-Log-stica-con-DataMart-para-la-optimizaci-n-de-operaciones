@@ -38,4 +38,4 @@ Requiere backend en marcha (`VITE_DEMO_MODE=false` y `VITE_API_URL` apuntando a 
 
 ## Análisis de operaciones
 
-`/datamart` muestra hechos, dimensiones, KPIs analíticos (OTIF, lead time, incidencias) y la bitácora del ETL. Es la interfaz de H.U.18. Los indicadores estadísticos de la tesis (TPDRE, PDRE, PDEEA, PDIOIC) no se mezclan con esas métricas.
+`/datamart` muestra hechos, dimensiones, KPIs analíticos (OTIF, lead time, incidencias) y la bitácora del ETL. Es la interfaz de H.U.18.

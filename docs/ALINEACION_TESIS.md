@@ -7,10 +7,10 @@
 | **Variable independiente** | Aplicación web de trazabilidad logística con DataMart |
 | **Variable dependiente** | Optimización de operaciones logísticas |
 | **Unidad de análisis** | Jornada operativa |
-| **Dimensiones** | Eficiencia operativa, calidad de la información, control y seguimiento, gestión de la información operativa |
+| **Muestra** | 40 jornadas operativas (20 preprueba y 20 posprueba) |
 | **Indicadores** | TPDRE, PDRE, PDEEA, PDIOIC |
 
-Los indicadores siguientes operacionalizan la variable dependiente. **No son módulos, historias de usuario ni requerimientos funcionales del producto.** Se calculan a partir de datos que ya genera la operación diaria (envíos, validación, historial de estados e incidencias).
+Los indicadores siguientes operacionalizan la variable dependiente. **No son módulos, historias de usuario ni requerimientos funcionales del producto.** Se calculan a partir de datos que ya genera la operación diaria (envíos, validación, historial de estados e incidencias). La contrastación estadística se realiza en SPSS, fuera de la aplicación.
 
 ---
 
@@ -46,7 +46,9 @@ Criterio centralizado en `backend/src/utils/reglasIndicadores.js`.
 
 ## 2. Unidad de análisis
 
-La unidad de análisis es la **jornada operativa** (fecha con al menos una operación de envío real válida). No equivale automáticamente a 20 días calendario consecutivos.
+La unidad de análisis es la **jornada operativa** (fecha con al menos una operación de envío real válida). Los envíos individuales son datos dentro de cada jornada; no constituyen el *n* estadístico.
+
+La muestra de la investigación es de **40 jornadas operativas** (20 de preprueba y 20 de posprueba). La preprueba no se calcula ni se gestiona como funcionalidad del software.
 
 Los indicadores de investigación no se mezclan con las métricas del DataMart (`peso_kg`, `dias_transito`, `cantidad_incidencias`, `tuvo_retraso`, `entregado_a_tiempo`). Ver [KIMBALL.md](./KIMBALL.md).
 

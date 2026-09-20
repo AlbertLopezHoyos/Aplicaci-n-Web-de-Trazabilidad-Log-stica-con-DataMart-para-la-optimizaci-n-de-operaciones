@@ -1,7 +1,7 @@
 // SPRINT 5 — Integración analítica y cierre (último sprint)
 // HU-18 RF18 Análisis de operaciones
 // Scrum: solo integración funcional app web ↔ componente analítico
-// Kimball: dim_* y fact_* documentados aparte (sprint-06-datamart.dbml)
+// Kimball: dim_* y fact_* documentados aparte (kimball-datamart.dbml)
 
 Project trazabilidad_sprint_5 {
   database_type: 'MySQL'

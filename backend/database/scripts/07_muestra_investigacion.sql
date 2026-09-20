@@ -57,7 +57,7 @@ CALL sp_add_column_if_missing('incidencias', 'grupo_muestra',
 CALL sp_add_column_if_missing('incidencias', 'observacion',
   "TEXT NULL COMMENT 'Observacion de ficha Dim. 4. No interviene en PIOIC'");
 
--- La tabla de hechos arrastra el origen para que Power BI pueda separar
+-- La tabla de hechos arrastra el origen para separar
 -- los datos sintéticos de prueba de los datos reales.
 CALL sp_add_column_if_missing('fact_operaciones_logisticas', 'origen_dato',
   "ENUM('REAL','SINTETICO') NOT NULL DEFAULT 'SINTETICO' COMMENT 'Procedencia del envio de origen'");

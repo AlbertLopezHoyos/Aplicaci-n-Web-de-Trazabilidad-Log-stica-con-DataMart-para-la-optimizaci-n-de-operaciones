@@ -1,6 +1,6 @@
 /**
- * Definiciones de métricas y KPIs para capa analítica / BI
- * Referencia para implementación futura en Power BI, Metabase, etc.
+ * Definiciones de métricas y KPIs del DataMart.
+ * Consumidas por GET /api/datamart/analytics y el módulo Análisis de operaciones.
  */
 module.exports = {
   kpis: [

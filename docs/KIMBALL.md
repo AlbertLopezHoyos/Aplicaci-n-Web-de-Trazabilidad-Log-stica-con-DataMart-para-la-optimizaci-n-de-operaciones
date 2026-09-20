@@ -18,7 +18,7 @@ Scrum y Kimball son metodologías complementarias, no dos proyectos independient
 
 La integración funcional ocurrió en el **Sprint 5**, historia **H.U.18 – Análisis de operaciones**.
 Scrum no describe el grano, las dimensiones ni el ETL; esos aspectos corresponden a Kimball.
-No existe un Sprint 6 de DataMart.
+La integración funcional se documenta en Scrum (Sprint 5, H.U.18). Kimball no constituye un sprint adicional.
 
 ---
 
@@ -38,26 +38,25 @@ estado y operador.
 
 ---
 
-## 3. Indicadores de investigación ≠ métricas del DataMart
+## 3. Diferenciación entre métricas analíticas e indicadores de investigación
 
-Los indicadores estadísticos de la tesis **no** son métricas del esquema estrella.
-
-| Tipo | Indicador | Finalidad |
-|---|---|---|
-| Investigación | **TPDRE** — Tiempo promedio diario de registro de envíos | Operacionalización de la eficiencia operativa |
-| Investigación | **PDRE** — Porcentaje diario de registros con error | Calidad de la información logística |
-| Investigación | **PDEEA** — Porcentaje diario de envíos con estado actualizado | Control y seguimiento |
-| Investigación | **PDIOIC** — Porcentaje diario de incidencias operativas con información completa | Gestión de la información operativa |
-| DataMart | `peso_kg` | Peso transportado |
-| DataMart | `dias_transito` | Duración del tránsito |
-| DataMart | `cantidad_incidencias` | Incidencias por operación |
-| DataMart | `tuvo_retraso` | Operaciones con incidencia de retraso |
-| DataMart | `entregado_a_tiempo` | Cumplimiento de la fecha estimada |
+Los indicadores **TPDRE**, **PDRE**, **PDEEA** y **PDIOIC** pertenecen a la operacionalización
+de la variable dependiente de la investigación. **No forman parte de las métricas analíticas
+del DataMart** ni de los requerimientos analíticos de Kimball.
 
 La unidad de análisis de la investigación es la **jornada operativa**. El grano del DataMart es
 la **operación de envío**. Son conceptos distintos.
 
-Kimball no desarrolla preprueba ni posprueba como funcionalidad del producto.
+El detalle metodológico está en [ALINEACION_TESIS.md](./ALINEACION_TESIS.md). Kimball documenta
+únicamente las métricas del esquema estrella:
+
+| Campo | Rol analítico |
+|---|---|
+| `peso_kg` | Peso transportado |
+| `dias_transito` | Duración del tránsito |
+| `cantidad_incidencias` | Incidencias por operación |
+| `tuvo_retraso` | Operaciones con incidencia de retraso |
+| `entregado_a_tiempo` | Cumplimiento de la fecha estimada |
 
 ---
 
@@ -111,10 +110,10 @@ no hay un requerimiento analítico que justifique una dimensión independiente.
 | `id_dim_cliente` | FK a `dim_cliente` |
 | `id_dim_estado` | FK a `dim_estado` |
 | `id_dim_operador` | FK a `dim_operador` (nullable) |
-| `codigo_envio` | **Dimensión degenerada** |
+| `codigo_envio` | **Dimensión degenerada** (identificador transaccional sin dimensión propia) |
 | `peso_kg` | Métrica aditiva |
-| `tipo_carga` | Atributo degenerado / descriptivo |
-| `dias_transito` | Métrica semiaditiva (`NULL` si no hay entrega) |
+| `tipo_carga` | Atributo descriptivo de la tabla de hechos |
+| `dias_transito` | Métrica derivada de duración (`NULL` si no hay entrega) |
 | `cantidad_incidencias` | Métrica aditiva |
 | `tuvo_retraso` | Bandera (incidencia tipo retraso) |
 | `entregado_a_tiempo` | Bandera (`NULL` si faltan fechas) |
@@ -212,8 +211,7 @@ Los datos sintéticos se usan **solo** para:
 - validación del DataMart
 
 Quedan marcados `origen_dato = 'SINTETICO'` y `grupo_muestra = 'NO_MUESTRA'`.
-**No fueron proporcionados por la empresa** y **no participan** en los indicadores de investigación
-(TPDRE, PDRE, PDEEA, PDIOIC).
+**No fueron proporcionados por la empresa** y **no participan** en los indicadores de investigación.
 
 ---
 

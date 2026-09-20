@@ -702,7 +702,7 @@ export const mockHandlers = {
             grain: 'Una fila de la tabla de hechos representa una operación de envío',
             metricas: {
               peso_kg: { aditividad: 'aditiva' },
-              dias_transito: { aditividad: 'semiaditiva' },
+              dias_transito: { clasificacion: 'métrica derivada de duración' },
               cantidad_incidencias: { aditividad: 'aditiva' },
             },
           },

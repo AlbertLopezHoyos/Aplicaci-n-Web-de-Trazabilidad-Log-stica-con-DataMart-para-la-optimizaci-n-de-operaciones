@@ -19,32 +19,34 @@ cp .env.example .env
 # Editar .env con credenciales MySQL
 ```
 
-### Base de datos
+### A. Scripts de infraestructura / producto
 
-1. Ejecutar `database/scripts/01_schema_completo.sql`
-2. Ejecutar `database/scripts/02_medicion_fichas.sql` (campos operativos de tiempos y validación)
-3. Ejecutar `database/scripts/03_dimension4_gestion_informacion.sql` (dimensión 4, PDIOIC)
-4. Ejecutar `database/scripts/07_muestra_investigacion.sql` (separación muestra / datos sintéticos y bitácora ETL)
-5. Ejecutar `database/scripts/08_incidencia_observacion.sql` (campo opcional `observacion`; no altera PDIOIC)
-6. Ejecutar seeder:
+1. Ejecutar `database/scripts/01_schema_completo.sql` (modelo operacional + DataMart)
+
+Scripts complementarios que añaden columnas operativas usadas por el producto (tiempos de registro, campos de incidencias, `origen_dato`, `etl_ejecuciones`). Los nombres de archivo son históricos:
+
+2. `database/scripts/02_medicion_fichas.sql` — tiempos de registro y validación (H.U.5, H.U.9)
+3. `database/scripts/03_dimension4_gestion_informacion.sql` — campos de incidencia (`area`, `titulo`, `fuente_principal`)
+4. `database/scripts/07_muestra_investigacion.sql` — `origen_dato`, bitácora ETL y `UNIQUE(id_envio)`
+5. `database/scripts/08_incidencia_observacion.sql` — campo opcional `observacion` en incidencias
 
 ```bash
 npm run db:seed
 ```
 
-El script 07 es **idempotente** y **no elimina registros**: añade `origen_dato` y `grupo_muestra` a
-`envios` e `incidencias`, `origen_dato` a la tabla de hechos, crea `etl_ejecuciones`, garantiza el
-grano con `UNIQUE(id_envio)` y clasifica los registros ya existentes.
+El script 07 es **idempotente** y **no elimina registros**.
 
-En Windows, todo el pipeline en un solo comando: `npm run db:phase-b`.
+En Windows, el pipeline local: `npm run db:phase-b`.
+
+### B. Utilidades auxiliares de investigación
+
+Los scripts de etiquetado de muestra, volumen de jornadas o captura de posprueba **no** son el flujo funcional del backend. Se conservan en `database/scripts/` por compatibilidad. No son módulos del Product Backlog.
 
 ### Carga masiva para pruebas técnicas del DataMart (≥ 5 000 registros)
 
-> ⚠️ **Los registros generados son DATOS SINTÉTICOS.** No fueron proporcionados por la empresa: se
-> generan artificialmente porque los datos históricos reales están sujetos a restricciones de
-> confidencialidad. Quedan marcados como `origen_dato = 'SINTETICO'` y `grupo_muestra = 'NO_MUESTRA'`,
-> y **están excluidos de los indicadores de investigación y del contraste de hipótesis**. Sirven para
-> pruebas del ETL, esquema estrella, consultas analíticas y volumen.
+> ⚠️ **Los registros generados son DATOS SINTÉTICOS.** No fueron proporcionados por la empresa.
+> Quedan marcados como `origen_dato = 'SINTETICO'` y `grupo_muestra = 'NO_MUESTRA'`.
+> Sirven para pruebas del ETL, esquema estrella, consultas analíticas y volumen.
 
 ```bash
 npm run db:seed          # 8 envíos de demostración (también sintéticos)
@@ -52,26 +54,7 @@ npm run db:seed-bulk     # hasta 5,500 envíos sintéticos (configurable)
 npm run db:etl           # ETL → fact_operaciones_logisticas
 ```
 
-Variables opcionales:
-
-| Variable | Default | Descripción |
-|----------|---------|-------------|
-| `BULK_COUNT` | 5500 | Total objetivo de envíos activos |
-| `BULK_BATCH` | 500 | Tamaño de lote de inserción |
-| `BULK_INCIDENCIA_RATE` | 0.18 | % envíos con incidencia |
-
-Ejemplo: `BULK_COUNT=6000 npm run db:seed-bulk`
-
-Si ya cargaste datos con estados poco realistas, recalcular según fecha:
-
-```bash
-npm run db:fix-estados   # entregado/cancelado para envíos antiguos
-npm run db:etl
-```
-
-La fecha de referencia operativa es `2026-05-31` (variable `BULK_REF_DATE`).
-
-Luego en la web (admin): **DataMart → Ejecutar ETL** y verificar KPIs (OTIF, lead time, tasa incidencias).
+Luego en la web (Administrador): **Análisis de operaciones → Actualizar indicadores**.
 
 ### Iniciar servidor
 
@@ -100,10 +83,6 @@ Las cuentas de acceso se dan de alta en el sistema (rol Administrador). No se pu
 | GET | /api/datamart/etl/ejecuciones | Bitácora de ejecuciones del ETL |
 | CRUD | /api/usuarios | Gestión de usuarios (**solo Administrador**) |
 
-Los indicadores de investigación (TPDRE, PDRE, PDEEA, PDIOIC) se operacionalizan desde datos
-operativos. Las reglas están en `src/utils/reglasIndicadores.js`. No son módulos del Product Backlog.
-Ver [../docs/ALINEACION_TESIS.md](../docs/ALINEACION_TESIS.md).
-
 ## Pruebas
 
 ```bash
@@ -111,9 +90,7 @@ npm test          # Jest + Supertest
 npm run test:watch
 ```
 
-Cobertura funcional: cálculo de TPDRE, PDRE, PDEEA y PDIOIC, exclusión de datos sintéticos, idempotencia
-del ETL, bitácora de ejecución y autorización de las rutas de administración. Detalle en
-[../docs/PRUEBAS.md](../docs/PRUEBAS.md).
+Cobertura de producto: autorización, ETL idempotente, bitácora y anonimización. Detalle en [../docs/PRUEBAS.md](../docs/PRUEBAS.md).
 
 ## Estructura MVC
 

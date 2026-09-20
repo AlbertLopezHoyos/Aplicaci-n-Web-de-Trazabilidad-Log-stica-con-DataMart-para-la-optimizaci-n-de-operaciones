@@ -34,7 +34,7 @@ El desarrollo se organizó en **cinco sprints** consecutivos de 10 días.
 | Sprint 4 | 17/08/2026 – 26/08/2026 |
 | Sprint 5 | 27/08/2026 – 05/09/2026 |
 
-No existe un Sprint 6. La integración funcional del componente analítico se realizó en el Sprint 5 (H.U.18).
+La integración funcional del componente analítico se realizó en el Sprint 5 (H.U.18).
 
 ---
 
@@ -200,7 +200,7 @@ Tabla `auditoria` con datos anteriores y nuevos.
 
 **Condición.** Debe existir información operacional disponible para su procesamiento. **Restricción.** La actualización de la información analítica no debe duplicar operaciones ya procesadas.
 
-Desde Scrum, H.U.18 es la integración funcional con el componente analítico (consulta consolidada, ejecución del ETL y explotación). El modelo dimensional, el grano, las dimensiones y el ETL se documentan en Kimball.
+Desde Scrum, H.U.18 es la integración funcional con el componente analítico: ejecución controlada del ETL, consulta de dimensiones y hechos, KPIs analíticos y bitácora. El modelo dimensional, el grano, las dimensiones y el ETL se documentan en Kimball.
 
 ---
 

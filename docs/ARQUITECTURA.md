@@ -4,8 +4,9 @@ Aplicación web de trazabilidad logística con DataMart — Grupo Logístico Sal
 
 ## 1. Visión general
 
-Arquitectura cliente-servidor de tres capas, con **dos modelos lógicos** (operacional y dimensional)
-en una **única base de datos física** MySQL `trazabilidad_logistica`.
+Arquitectura cliente-servidor de tres capas. Se implementaron **dos modelos lógicos de datos
+dentro de una única base de datos física MySQL** (`trazabilidad_logistica`): el modelo operacional
+y el modelo dimensional (DataMart).
 
 ```mermaid
 flowchart TB
