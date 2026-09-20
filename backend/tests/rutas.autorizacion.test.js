@@ -97,4 +97,12 @@ describe('Validación de parámetros de las fichas', () => {
       .set('Authorization', `Bearer ${tokenDe(1)}`);
     expect(res.status).toBe(404);
   });
+
+  it('no permite escribir errores desde el módulo de observación', async () => {
+    const res = await request(app)
+      .post('/api/observacion/errores-registro')
+      .set('Authorization', `Bearer ${tokenDe(1)}`)
+      .send({ tipo_error: 'validacion', campo_afectado: 'peso' });
+    expect(res.status).toBe(404);
+  });
 });

@@ -49,7 +49,7 @@ funcionalidad en el repositorio.
 | HU-13 | Reportes operativos con exportación a Excel y PDF | M | `services/reporte.service.js`, `pages/ReportesPage.jsx` |
 | HU-14 | Fichas de observación por dimensión con exportación | A | `services/observacion.service.js`, `pages/ObservacionPage.jsx` |
 | HU-15 | Separación entre muestra de investigación y datos sintéticos | A | `07_muestra_investigacion.sql`, `marcar-muestra.js` |
-| HU-16 | Pantalla de medición de investigación (preprueba/posprueba) | A | `pages/MedicionPage.jsx`, `GET /api/observacion/medicion` |
+| HU-16 | Pantalla de medición de indicadores posteriores a la implementación | A | `pages/MedicionPage.jsx`, `GET /api/observacion/medicion` |
 | HU-17 | Carga masiva de datos sintéticos para pruebas del DataMart | M | `database/seeders/seed-bulk.js` |
 | HU-18 | ETL idempotente hacia el esquema estrella | A | `datamart/etl.service.js` |
 | HU-19 | Bitácora de ejecuciones del ETL | M | tabla `etl_ejecuciones`, `GET /api/datamart/etl/ejecuciones` |
@@ -66,7 +66,7 @@ Se detallan las historias directamente vinculadas a los indicadores de la invest
 ### HU-04 — Registro de envíos con medición del tiempo de registro
 
 > Como **operador logístico** quiero **registrar un envío capturando el tiempo que me toma hacerlo**
-> para que **la organización pueda medir la eficiencia del proceso de registro (TPRE)**.
+> para que **la organización pueda medir la eficiencia del proceso de registro (TPDRE)**.
 
 **Criterios de aceptación**
 
@@ -82,7 +82,7 @@ Se detallan las historias directamente vinculadas a los indicadores de la invest
 
 > Como **operador logístico** quiero **registrar incidencias indicando su tipo, área, fuente,
 > título y descripción** para que **la organización pueda medir la completitud de la información
-> operativa (PIOIC)**.
+> operativa (PDIOIC)**.
 
 **Criterios de aceptación**
 
@@ -91,25 +91,25 @@ Se detallan las historias directamente vinculadas a los indicadores de la invest
 3. Al guardar, el sistema evalúa si la información está completa según los cinco campos
    obligatorios definidos en `reglasIndicadores.js`.
 4. La interfaz indica al usuario qué campos determinan la completitud.
-5. El indicador PIOIC se calcula sobre el total de incidencias registradas, no sobre los envíos.
+5. El indicador PDIOIC se calcula sobre las incidencias de cada jornada (TID), no sobre el total de envíos.
 
 ### HU-11 — Registro automático de errores de validación
 
 > Como **administrador** quiero **que el sistema registre los errores detectados al capturar
-> información** para que **pueda medir objetivamente la calidad del registro (PER)**.
+> información** para que **pueda medir objetivamente la calidad del registro (PDRE)**.
 
 **Criterios de aceptación**
 
 1. Todo fallo de validación en el alta de envíos genera una fila en `errores_registro` con tipo de
    error y campo afectado.
-2. Un envío con varios errores cuenta una sola vez en el indicador PER.
+2. Un envío con varios errores cuenta una sola vez en el indicador PDRE.
 3. El indicador nunca supera el 100 %.
 4. Los errores son consultables mediante `GET /api/observacion/errores-registro`.
 
 ### HU-07 — Cambio de estado con registro en historial
 
 > Como **operador logístico** quiero **actualizar el estado del envío dejando traza del cambio**
-> para que **la organización pueda medir el control y seguimiento (PEEA)**.
+> para que **la organización pueda medir el control y seguimiento (PDEEA)**.
 
 **Criterios de aceptación**
 

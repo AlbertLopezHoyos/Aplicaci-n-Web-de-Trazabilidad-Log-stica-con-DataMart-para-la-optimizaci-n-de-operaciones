@@ -21,15 +21,16 @@ Referencia corporativa: [Grupo Logístico Salazar S.A.C.](https://www.gruposalaz
 
 | Dimensión | Indicador | Fórmula |
 |---|---|---|
-| Eficiencia operativa | **TPRE** — Tiempo promedio de registro de envíos | `TPRE = ΣTRE / NER` |
-| Calidad de la información logística | **PER** — Porcentaje de errores en los registros | `PER = (RCE / TREg) × 100` |
-| Control y seguimiento de envíos | **PEEA** — Porcentaje de envíos con estado actualizado | `PEEA = (EEA / TEE) × 100` |
-| Gestión de la información operativa | **PIOIC** — Porcentaje de incidencias operativas con información completa | `PIOIC = (NIOC / NTIR) × 100` |
+| Eficiencia operativa | **TPDRE** — Tiempo promedio diario de registro de envíos | `TPDRE = ΣTRE / NERD` |
+| Calidad de la información logística | **PDRE** — Porcentaje diario de registros con error | `PDRE = (RCE / TRD) × 100` |
+| Control y seguimiento de envíos | **PDEEA** — Porcentaje diario de envíos con estado actualizado | `PDEEA = (EEA / TED) × 100` |
+| Gestión de la información operativa | **PDIOIC** — Porcentaje diario de incidencias operativas con información completa | `PDIOIC = (NIOC / TID) × 100` |
 
-### Datos: muestra de investigación vs. datos sintéticos
+### Datos: jornadas de investigación vs. datos sintéticos
 
-> **Muestra de investigación: 100 registros reales, 50 de preprueba y 50 de posprueba.**
-> Los grupos son **diferentes entre sí** y **no constituyen muestras pareadas**.
+> **El módulo de observación utiliza jornadas operativas posteriores a la implementación.**
+> Cada fila de las fichas representa una jornada y los indicadores se calculan con los
+> registros reales existentes en la base de datos. **La preprueba no es gestionada por el software.**
 >
 > **Carga del DataMart: más de 5 000 registros para pruebas técnicas, que son datos sintéticos.**
 > Se generan artificialmente con `npm run db:seed-bulk` porque los datos históricos reales de la
@@ -42,7 +43,8 @@ Referencia corporativa: [Grupo Logístico Salazar S.A.C.](https://www.gruposalaz
 
 La separación es explícita en la base de datos: las tablas `envios` e `incidencias` tienen las
 columnas `origen_dato` (`REAL` | `SINTETICO`) y `grupo_muestra` (`PREPRUEBA` | `POSPRUEBA` |
-`NO_MUESTRA`). Los indicadores de investigación filtran siempre los registros reales de la muestra.
+`NO_MUESTRA`). Los indicadores de investigación filtran registros reales de las jornadas
+posteriores a la implementación y no mezclan datos sintéticos.
 
 Detalle completo en [docs/ALINEACION_TESIS.md](docs/ALINEACION_TESIS.md).
 
@@ -72,7 +74,7 @@ Ejecutar en MySQL Workbench, en este orden:
 2. `backend/database/scripts/02_medicion_fichas.sql`
 3. `backend/database/scripts/03_dimension4_gestion_informacion.sql`
 4. `backend/database/scripts/07_muestra_investigacion.sql`
-5. `backend/database/scripts/08_incidencia_observacion.sql` (ficha 4: Título, Descripción y Observación por separado; PIOIC no usa Observación)
+5. `backend/database/scripts/08_incidencia_observacion.sql` (ficha 4: Título, Descripción y Observación por separado; PDIOIC no usa Observación)
 
 O bien, en Windows con el cliente de MySQL instalado, todo el pipeline de una vez:
 
@@ -114,23 +116,21 @@ Web: `http://localhost:5173`
 6. **Incidencias** — Errores, retrasos, severidad, estados  
 7. **Reportes** — envios_estado, tiempos, incidencias, productividad (PDF/Excel)  
 8. **Evidencias** — Multer: imágenes, PDF, comprobantes  
-9. **Fichas de evidencia** — Una ficha por dimensión (TPRE, PER, PEEA, PIOIC), exportables a Excel. La ficha 4 incluye Título, Descripción y Observación por separado; PIOIC solo usa los cinco campos obligatorios.  
-10. **Medición de investigación** — Preprueba y posprueba por separado (solo Administrador)  
+9. **Fichas de observación** — TPDRE, PDRE, PDEEA y PDIOIC, una fila por jornada, exportables a Excel.  
+10. **Medición de investigación** — Consolidación de indicadores de las jornadas posteriores a la implementación (solo Administrador)  
 11. **DataMart** — Esquema estrella, ETL idempotente con bitácora, KPIs analíticos  
 
-## Marcado de la muestra de investigación
+## Clasificación histórica de registros
 
-Los registros reales capturados desde la aplicación se etiquetan con una herramienta que **no genera
-datos**, solo clasifica los existentes:
+Existe una herramienta de etiquetado que **no genera datos** y solo clasifica registros existentes.
+El software de fichas no gestiona la preprueba; el script se conserva por compatibilidad histórica:
 
 ```bash
 cd backend
-npm run db:muestra -- --estado                                          # ver distribución
-npm run db:muestra -- --grupo=PREPRUEBA --desde=AAAA-MM-DD --hasta=AAAA-MM-DD --aplicar
-npm run db:muestra -- --grupo=POSPRUEBA --codigos=GLS-2026-00120,GLS-2026-00121 --aplicar
+npm run db:muestra -- --estado
 ```
 
-El script rechaza cualquier intento de incluir registros sintéticos en la muestra.
+El script rechaza cualquier intento de incluir registros sintéticos en esa clasificación.
 
 ## Base de datos
 

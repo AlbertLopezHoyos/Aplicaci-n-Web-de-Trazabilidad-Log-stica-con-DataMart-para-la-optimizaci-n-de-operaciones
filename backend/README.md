@@ -23,9 +23,9 @@ cp .env.example .env
 
 1. Ejecutar `database/scripts/01_schema_completo.sql`
 2. Ejecutar `database/scripts/02_medicion_fichas.sql` (campos fichas observación)
-3. Ejecutar `database/scripts/03_dimension4_gestion_informacion.sql` (dimensión 4, PIOIC)
+3. Ejecutar `database/scripts/03_dimension4_gestion_informacion.sql` (dimensión 4, PDIOIC)
 4. Ejecutar `database/scripts/07_muestra_investigacion.sql` (separación muestra / datos sintéticos y bitácora ETL)
-5. Ejecutar `database/scripts/08_incidencia_observacion.sql` (campo opcional `observacion` de la ficha 4; no altera PIOIC)
+5. Ejecutar `database/scripts/08_incidencia_observacion.sql` (campo opcional `observacion` de la ficha 4; no altera PDIOIC)
 6. Ejecutar seeder:
 
 ```bash
@@ -98,6 +98,7 @@ Las cuentas de acceso se dan de alta en el sistema (rol Administrador). No se pu
 | GET | /api/observacion/medicion | Indicadores de las jornadas posteriores a la implementación (**solo Administrador**) |
 | GET | /api/observacion/ficha/:1-4 | Datos ficha por dimensión |
 | GET | /api/observacion/ficha/:dim/export | Excel ficha observación |
+| GET | /api/observacion/errores-registro | Consulta de errores de registro (solo lectura) |
 | GET | /api/datamart/preview | Conteo de hechos, dimensiones y últimas corridas del ETL |
 | GET | /api/datamart/analytics | KPIs OTIF, lead time, incidencias |
 | POST | /api/datamart/etl/run | Ejecutar ETL (idempotente) |

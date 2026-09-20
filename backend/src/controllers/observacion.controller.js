@@ -64,23 +64,10 @@ const listErrores = async (req, res, next) => {
   }
 };
 
-const logErrorCliente = async (req, res, next) => {
-  try {
-    const registro = await errorRegistroService.logError({
-      ...req.body,
-      id_usuario: req.user.id_usuario,
-    });
-    return success(res, registro, 'Error registrado', 201);
-  } catch (err) {
-    next(err);
-  }
-};
-
 module.exports = {
   getIndicadores,
   getMedicion,
   getDimension,
   exportarFicha,
   listErrores,
-  logErrorCliente,
 };

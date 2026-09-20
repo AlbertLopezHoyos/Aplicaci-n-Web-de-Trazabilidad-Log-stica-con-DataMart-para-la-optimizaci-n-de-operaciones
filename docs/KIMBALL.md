@@ -249,7 +249,7 @@ poder probar técnicamente el DataMart se generan **datos sintéticos** mediante
 | **Naturaleza** | Generados artificialmente por el seeder. **No fueron proporcionados por la empresa.** |
 | **Marca en base de datos** | `envios.origen_dato = 'SINTETICO'`, `grupo_muestra = 'NO_MUESTRA'`; propagado a `incidencias` y a `fact_operaciones_logisticas.origen_dato` |
 | **Usos permitidos** | Pruebas del ETL, demostración del esquema estrella, consultas analíticas, dashboards, pruebas de volumen |
-| **Usos prohibidos** | Cualquier cálculo de TPRE, PER, PEEA o PIOIC de la investigación; contraste de hipótesis |
+| **Usos prohibidos** | Cualquier cálculo de TPDRE, PDRE, PDEEA o PDIOIC de la investigación; contraste de hipótesis |
 | **Dónde se documenta** | Cabecera del seeder, `star-schema.design.js`, `reglasIndicadores.js`, README técnico |
 
 Los indicadores de investigación filtran `origen_dato = 'REAL'` en las cuatro consultas, verificado

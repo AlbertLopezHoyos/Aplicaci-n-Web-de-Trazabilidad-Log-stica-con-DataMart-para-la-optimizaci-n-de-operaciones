@@ -1,5 +1,5 @@
 const express = require('express');
-const { body, param } = require('express-validator');
+const { param } = require('express-validator');
 const observacionController = require('../controllers/observacion.controller');
 const validate = require('../middlewares/validate.middleware');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
@@ -24,15 +24,5 @@ router.get(
   observacionController.exportarFicha
 );
 router.get('/errores-registro', observacionController.listErrores);
-router.post(
-  '/errores-registro',
-  [
-    body('tipo_error').notEmpty(),
-    body('campo_afectado').notEmpty(),
-    body('descripcion').optional(),
-  ],
-  validate,
-  observacionController.logErrorCliente
-);
 
 module.exports = router;

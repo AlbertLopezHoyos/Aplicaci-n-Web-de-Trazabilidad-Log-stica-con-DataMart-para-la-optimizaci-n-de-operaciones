@@ -1,6 +1,6 @@
 /**
  * Reglas de cálculo de los indicadores de investigación.
- * TPRE = ΣTRE / NER · PER = (RCE/TREg)×100 · PEEA = (EEA/TEE)×100 · PIOIC = (NIOC/NTIR)×100
+ * TPDRE = ΣTRE / NERD · PDRE = (RCE/TRD)×100 · PDEEA = (EEA/TED)×100 · PDIOIC = (NIOC/TID)×100
  */
 const {
   CAMPOS_INCIDENCIA_COMPLETA,
@@ -8,39 +8,38 @@ const {
   camposFaltantesIncidencia,
   esRegistroConError,
   tieneEstadoActualizado,
-  calcularTPRE,
-  calcularPER,
-  calcularPEEA,
-  calcularPIOIC,
+  calcularTPDRE,
+  calcularPDRE,
+  calcularPDEEA,
+  calcularPDIOIC,
 } = require('../src/utils/reglasIndicadores');
 
-describe('TPRE — tiempo promedio de registro de envíos', () => {
-  it('promedia los tiempos de registro en minutos', () => {
-    const { valor, numerador, denominador } = calcularTPRE([4, 6, 8, 2]);
+describe('TPDRE — tiempo promedio diario de registro de envíos', () => {
+  it('si ΣTRE = 20 y NERD = 4, TPDRE = 5', () => {
+    const { valor, numerador, denominador } = calcularTPDRE([4, 6, 8, 2]);
     expect(valor).toBe(5);
     expect(numerador).toBe(20);
     expect(denominador).toBe(4);
   });
 
   it('ignora valores no numéricos o nulos sin romper el promedio', () => {
-    expect(calcularTPRE([3, null, undefined, 'x', 5]).valor).toBe(4);
+    expect(calcularTPDRE([3, null, undefined, 'x', 5]).valor).toBe(4);
   });
 
   it('devuelve 0 cuando no hay registros evaluables', () => {
-    expect(calcularTPRE([]).valor).toBe(0);
+    expect(calcularTPDRE([]).valor).toBe(0);
   });
 });
 
-describe('PER — porcentaje de errores en los registros', () => {
-  it('aplica la fórmula (RCE / TREg) × 100', () => {
-    expect(calcularPER(7, 50).valor).toBe(14);
+describe('PDRE — porcentaje diario de registros con error', () => {
+  it('si RCE = 2 y TRD = 20, PDRE = 10 %', () => {
+    expect(calcularPDRE(2, 20).valor).toBe(10);
   });
 
   it('cuenta una sola vez un envío con varios errores asociados', () => {
     const envio = { registro_correcto: false, total_errores: 3 };
     expect(esRegistroConError(envio)).toBe(true);
-    // el indicador recibe conteos de envíos, no de errores
-    expect(calcularPER(1, 50).valor).toBe(2);
+    expect(calcularPDRE(1, 20).valor).toBe(5);
   });
 
   it('marca error cuando existe al menos un error asociado aunque el envío esté marcado correcto', () => {
@@ -52,11 +51,11 @@ describe('PER — porcentaje de errores en los registros', () => {
   });
 
   it('nunca puede superar el 100 % con datos coherentes', () => {
-    expect(calcularPER(50, 50).valor).toBe(100);
+    expect(calcularPDRE(20, 20).valor).toBe(100);
   });
 });
 
-describe('PEEA — porcentaje de envíos con estado actualizado', () => {
+describe('PDEEA — porcentaje diario de envíos con estado actualizado', () => {
   it('considera actualizado el envío cuyo estado coincide con el último historial', () => {
     expect(tieneEstadoActualizado({ id_estado_actual: 3, id_ultimo_estado_historial: 3 })).toBe(true);
   });
@@ -69,12 +68,12 @@ describe('PEEA — porcentaje de envíos con estado actualizado', () => {
     expect(tieneEstadoActualizado({ id_estado_actual: 3, id_ultimo_estado_historial: null })).toBe(false);
   });
 
-  it('aplica la fórmula (EEA / TEE) × 100', () => {
-    expect(calcularPEEA(41, 50).valor).toBe(82);
+  it('si EEA = 18 y TED = 20, PDEEA = 90 %', () => {
+    expect(calcularPDEEA(18, 20).valor).toBe(90);
   });
 });
 
-describe('PIOIC — porcentaje de incidencias con información completa', () => {
+describe('PDIOIC — porcentaje diario de incidencias con información completa', () => {
   const incidenciaCompleta = {
     tipo: 'retraso',
     area: 'Transporte',
@@ -111,15 +110,17 @@ describe('PIOIC — porcentaje de incidencias con información completa', () => 
     expect(faltantes).toEqual(['area', 'descripcion']);
   });
 
-  it('se calcula sobre incidencias, no sobre los 50 envíos de la muestra', () => {
-    // 12 incidencias registradas en los envíos seleccionados, 9 completas
-    const resultado = calcularPIOIC(9, 12);
+  it('si NIOC = 9 y TID = 12, PDIOIC = 75 %', () => {
+    const resultado = calcularPDIOIC(9, 12);
     expect(resultado.valor).toBe(75);
     expect(resultado.denominador).toBe(12);
-    expect(resultado.denominador).not.toBe(50);
   });
 
-  it('devuelve 0 si no hay incidencias registradas', () => {
-    expect(calcularPIOIC(0, 0).valor).toBe(0);
+  it('si TID = 0, el 0 numérico no se interpreta como 0 % metodológico', () => {
+    const resultado = calcularPDIOIC(0, 0);
+    expect(resultado.denominador).toBe(0);
+    // Compatibilidad numérica de la función genérica. La ficha muestra N/A
+    // cuando TID = 0 (observacion.service.js).
+    expect(resultado.valor).toBe(0);
   });
 });

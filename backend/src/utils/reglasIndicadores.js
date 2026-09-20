@@ -2,11 +2,15 @@
  * Reglas únicas de cálculo de los indicadores de la investigación.
  *
  * Variable dependiente: "Optimización de operaciones logísticas".
+ * Unidad de análisis: jornada operativa. El software trabaja únicamente
+ * con jornadas posteriores a la implementación. Una fila de ficha = un día.
+ * Los datos ya existen; el módulo de investigación solo lee y calcula.
  *
- *  D1 Eficiencia operativa            → TPRE  = ΣTRE / NER
- *  D2 Calidad de la información       → PER   = (RCE / TREg) × 100
- *  D3 Control y seguimiento           → PEEA  = (EEA / TEE) × 100
- *  D4 Gestión de la información       → PIOIC = (NIOC / NTIR) × 100
+ *  D1 Eficiencia operativa            → TPDRE  = ΣTRE / NERD
+ *  D2 Calidad de la información       → PDRE   = (RCE / TRD) × 100
+ *  D3 Control y seguimiento           → PDEEA  = (EEA / TED) × 100
+ *  D4 Gestión de la información       → PDIOIC = (NIOC / TID) × 100
+ *     Si TID = 0, la ficha muestra N/A (no 0 %).
  *
  * Este módulo es la ÚNICA fuente de verdad de los criterios. Cualquier
  * consulta SQL, servicio o reporte debe reutilizarlo para no producir
@@ -24,17 +28,22 @@ const GRUPO_MUESTRA = Object.freeze({
   NO_MUESTRA: 'NO_MUESTRA',
 });
 
-/** Grupos que forman parte de la muestra estadística de la tesis. */
+/**
+ * Valores históricos de `grupo_muestra`. El software de fichas no gestiona la preprueba;
+ * la columna se conserva por compatibilidad con scripts históricos.
+ */
 const GRUPOS_MUESTRA_VALIDOS = [GRUPO_MUESTRA.PREPRUEBA, GRUPO_MUESTRA.POSPRUEBA];
 
-/** Tamaño esperado de cada grupo (50 preprueba + 50 posprueba = 100). */
+/**
+ * Compatibilidad con scripts históricos. No representa la metodología actual
+ * de las fichas de investigación (una fila = una jornada; volumen variable).
+ */
 const TAMANIO_GRUPO_MUESTRA = 50;
 
 /**
- * Pool de envíos REALES capturados en posprueba (1 set – ayer). Crece conforme pasan días.
- * Las fichas muestran solo TAMANIO_GRUPO_MUESTRA (50) elegidos al azar de este pool.
+ * Compatibilidad con scripts históricos de captura. No limita las fichas actuales:
+ * el módulo de investigación lee todos los registros reales de cada jornada.
  */
-/** Registros visibles en fichas de preprueba y posprueba. */
 const limiteFichaGrupo = (_grupo) => TAMANIO_GRUPO_MUESTRA;
 
 /**
@@ -126,7 +135,9 @@ const capturaHastaPosprueba = (referencia = new Date()) => {
   return iso;
 };
 
-/** ~7–8 envíos por día hábil; escala con días laborables 1 set – capturaHasta. */
+/**
+ * Compatibilidad con scripts históricos de captura. No determina el NERD de las fichas.
+ */
 const tamanioPoolPosprueba = (capturaHasta = capturaHastaPosprueba()) => {
   const ventana = VENTANAS_MEDICION[GRUPO_MUESTRA.POSPRUEBA];
   const diasLaborables = listarDiasLaborablesPosprueba(ventana.desde, capturaHasta).length;
@@ -134,6 +145,10 @@ const tamanioPoolPosprueba = (capturaHasta = capturaHastaPosprueba()) => {
   return Math.max(TAMANIO_GRUPO_MUESTRA + 10, Math.round((86 / base) * Math.max(1, diasLaborables)));
 };
 
+/**
+ * Compatibilidad con scripts históricos. No representa un sorteo de fichas:
+ * las fichas actuales no seleccionan un subconjunto fijo de envíos.
+ */
 const POSPRUEBA_POOL = Object.freeze({
   get tamanio() {
     return tamanioPoolPosprueba();
@@ -162,7 +177,7 @@ const estaEnVentana = (grupo, fecha) => {
 };
 
 /**
- * Campos que determinan que una incidencia operativa está COMPLETA (PIOIC).
+ * Campos que determinan que una incidencia operativa está COMPLETA (PDIOIC).
  * Se corresponden uno a uno con columnas reales de la tabla `incidencias`.
  */
 const CAMPOS_INCIDENCIA_COMPLETA = Object.freeze([
@@ -179,7 +194,7 @@ const tieneValor = (valor) => {
 };
 
 /**
- * PIOIC — criterio de "información completa" de una incidencia.
+ * PDIOIC — criterio de "información completa" de una incidencia.
  * Una incidencia está completa cuando todos los campos de
  * CAMPOS_INCIDENCIA_COMPLETA tienen contenido no vacío.
  */
@@ -197,7 +212,7 @@ const camposFaltantesIncidencia = (incidencia) => {
 };
 
 /**
- * PER — criterio de "registro con error".
+ * PDRE — criterio de "registro con error".
  * Un envío se considera erróneo si la validación del formulario lo marcó como
  * incorrecto (`registro_correcto = 0`) o si tiene al menos un error asociado
  * en `errores_registro`. Un envío con varios errores cuenta UNA sola vez.
@@ -211,7 +226,7 @@ const esRegistroConError = (envio) => {
 };
 
 /**
- * PEEA — criterio de "estado actualizado".
+ * PDEEA — criterio de "estado actualizado".
  * El estado del envío está actualizado cuando el `id_estado_actual` coincide
  * con el estado del último movimiento de `historial_estados`. Un envío sin
  * historial no puede considerarse actualizado.
@@ -228,8 +243,8 @@ const redondear = (valor, decimales = 2) => {
   return Math.round((Number(valor) || 0) * factor) / factor;
 };
 
-/** TPRE = ΣTRE / NER (minutos). Ignora envíos sin tiempo registrado. */
-const calcularTPRE = (tiemposEnMinutos = []) => {
+/** TPDRE = ΣTRE / NERD (minutos). Ignora envíos sin tiempo registrado. */
+const calcularTPDRE = (tiemposEnMinutos = []) => {
   const validos = tiemposEnMinutos
     .filter((t) => t !== null && t !== undefined && String(t).trim() !== '')
     .map((t) => Number(t))
@@ -239,21 +254,31 @@ const calcularTPRE = (tiemposEnMinutos = []) => {
   return { valor: redondear(suma / validos.length), numerador: redondear(suma), denominador: validos.length };
 };
 
-/** Porcentaje genérico usado por PER, PEEA y PIOIC. */
+/**
+ * Porcentaje genérico usado por PDRE, PDEEA y PDIOIC.
+ * Si el denominador es 0 devuelve 0 por compatibilidad numérica; las fichas
+ * muestran N/A cuando TID = 0 (observacion.service.js).
+ */
 const calcularPorcentaje = (numerador, denominador) => {
   const n = Number(numerador) || 0;
   const d = Number(denominador) || 0;
   return { valor: d ? redondear((n / d) * 100) : 0, numerador: n, denominador: d };
 };
 
-const calcularPER = (registrosConError, totalRegistros) =>
+const calcularPDRE = (registrosConError, totalRegistros) =>
   calcularPorcentaje(registrosConError, totalRegistros);
 
-const calcularPEEA = (enviosActualizados, totalEnvios) =>
+const calcularPDEEA = (enviosActualizados, totalEnvios) =>
   calcularPorcentaje(enviosActualizados, totalEnvios);
 
-const calcularPIOIC = (incidenciasCompletas, totalIncidencias) =>
+const calcularPDIOIC = (incidenciasCompletas, totalIncidencias) =>
   calcularPorcentaje(incidenciasCompletas, totalIncidencias);
+
+/** Alias internos para scripts y pruebas históricas. No son la nomenclatura oficial. */
+const calcularTPRE = calcularTPDRE;
+const calcularPER = calcularPDRE;
+const calcularPEEA = calcularPDEEA;
+const calcularPIOIC = calcularPDIOIC;
 
 module.exports = {
   ORIGEN_DATO,
@@ -278,6 +303,10 @@ module.exports = {
   camposFaltantesIncidencia,
   esRegistroConError,
   tieneEstadoActualizado,
+  calcularTPDRE,
+  calcularPDRE,
+  calcularPDEEA,
+  calcularPDIOIC,
   calcularTPRE,
   calcularPER,
   calcularPEEA,

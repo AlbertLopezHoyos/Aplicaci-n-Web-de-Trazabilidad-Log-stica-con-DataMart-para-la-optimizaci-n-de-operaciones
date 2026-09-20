@@ -84,17 +84,11 @@ La ficha de la Dimensión 4 agrupa por jornada (`DATE(i.fecha_reporte)`). Cada f
 
 | Columna de la ficha | Origen |
 |---|---|
-| Fecha | `incidencias.fecha_reporte` |
-| Código de incidencia | `incidencias.codigo_incidencia` |
-| Tipo de incidencia | `incidencias.tipo` |
-| Área | `incidencias.area` |
-| Código de envío | `envios.codigo_envio` |
-| Estado de incidencia | `incidencias.estado_incidencia` |
-| Título | `incidencias.titulo` |
-| Descripción | `incidencias.descripcion` |
-| Información completa (Sí/No) | Recalculado con la regla PDIOIC (cinco campos) |
-| Fuente principal de información | `incidencias.fuente_principal` |
-| Observación | `incidencias.observacion` (opcional; no entra en PDIOIC) |
+| Fecha | `DATE(incidencias.fecha_reporte)` |
+| TID | Total de incidencias evaluadas en la jornada |
+| NIOC | Incidencias con información completa (cinco campos) |
+| Incidencias incompletas | TID − NIOC |
+| PDIOIC | `(NIOC / TID) × 100`; si TID = 0 se muestra N/A |
 
 ---
 
@@ -132,7 +126,6 @@ Reglas aplicadas:
 | GET | `/api/observacion/ficha/:1-4` | Autenticado | Una fila por jornada de la dimensión indicada |
 | GET | `/api/observacion/ficha/:1-4/export` | Autenticado | Payload de exportación a Excel (cabeceras + filas + indicadores) |
 | GET | `/api/observacion/errores-registro` | Autenticado | Errores de validación registrados (insumo de PDRE) |
-| POST | `/api/observacion/errores-registro` | Autenticado | Alta operativa de un error detectado (no forma parte del cálculo de fichas) |
 
 ---
 
