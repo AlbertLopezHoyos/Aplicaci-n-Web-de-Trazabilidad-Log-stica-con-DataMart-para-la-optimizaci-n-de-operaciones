@@ -27,7 +27,7 @@ const INDICADORES = [
     unidad: 'min',
     icon: Timer,
     color: 'text-blue-600',
-    detalle: (d) => `Media de ${d?.tpdre?.n_jornadas ?? 0} días · ΣTRE ${d?.tpdre?.suma_tre ?? 0} min`,
+    detalle: (d) => `Media de ${d?.tpdre?.n_jornadas ?? 0} jornadas válidas · ΣTRE ${d?.tpdre?.suma_tre ?? 0} min`,
   },
   {
     clave: 'pdre',
@@ -38,7 +38,7 @@ const INDICADORES = [
     unidad: '%',
     icon: AlertTriangle,
     color: 'text-red-600',
-    detalle: (d) => `Media de ${d?.pdre?.n_jornadas ?? 0} días · RCE ${d?.pdre?.rce ?? 0}`,
+    detalle: (d) => `Media de ${d?.pdre?.n_jornadas ?? 0} jornadas válidas · RCE ${d?.pdre?.rce ?? 0}`,
   },
   {
     clave: 'pdeea',
@@ -49,7 +49,7 @@ const INDICADORES = [
     unidad: '%',
     icon: MapPin,
     color: 'text-green-600',
-    detalle: (d) => `Media de ${d?.pdeea?.n_jornadas ?? 0} días · EEA ${d?.pdeea?.eea ?? 0}`,
+    detalle: (d) => `Media de ${d?.pdeea?.n_jornadas ?? 0} jornadas válidas · EEA ${d?.pdeea?.eea ?? 0}`,
   },
   {
     clave: 'pdioic',
@@ -60,7 +60,7 @@ const INDICADORES = [
     unidad: '%',
     icon: ClipboardCheck,
     color: 'text-amber-600',
-    detalle: (d) => `Media de ${d?.pdioic?.n_jornadas ?? 0} días · NIOC ${d?.pdioic?.nioc ?? 0}`,
+    detalle: (d) => `Media de ${d?.pdioic?.n_jornadas ?? 0} jornadas válidas · NIOC ${d?.pdioic?.nioc ?? 0}`,
   },
 ];
 

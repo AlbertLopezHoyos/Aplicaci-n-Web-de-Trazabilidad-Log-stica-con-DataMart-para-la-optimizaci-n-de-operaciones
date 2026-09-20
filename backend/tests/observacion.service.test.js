@@ -11,12 +11,46 @@ const observacionService = require('../src/services/observacion.service');
 const fs = require('fs');
 const path = require('path');
 
-const mockIndicadores = ({ tpdre, pdre, pdeea, pdioic }) => {
+const mockEstudio = ({
+  jornadas = [{ fecha: '2026-09-01' }],
+  tpdre = [],
+  pdre = [],
+  pdeea = [],
+  pdioic = [],
+}) => {
   sequelize.query
+    .mockResolvedValueOnce(jornadas)
     .mockResolvedValueOnce(Array.isArray(tpdre) ? tpdre : [tpdre])
     .mockResolvedValueOnce(Array.isArray(pdre) ? pdre : [pdre])
     .mockResolvedValueOnce(Array.isArray(pdeea) ? pdeea : [pdeea])
     .mockResolvedValueOnce(Array.isArray(pdioic) ? pdioic : [pdioic]);
+};
+
+const sqlPorContenido = (fragmento) => {
+  const llamada = sequelize.query.mock.calls.find(([sql]) => String(sql).includes(fragmento));
+  return llamada ? llamada[0].replace(/\s+/g, ' ') : '';
+};
+
+const mockPorSql = ({ jornadas, tpdre = [], pdre = [], pdeea = [], pdioic = [] }) => {
+  sequelize.query.mockImplementation((sql) => {
+    const texto = String(sql);
+    if (texto.includes('SELECT DISTINCT DATE(e.fecha_registro)')) {
+      return Promise.resolve(jornadas);
+    }
+    if (texto.includes('FROM incidencias i')) {
+      return Promise.resolve(pdioic);
+    }
+    if (texto.includes('AS nerd')) {
+      return Promise.resolve(tpdre);
+    }
+    if (texto.includes('AS trd')) {
+      return Promise.resolve(pdre);
+    }
+    if (texto.includes('AS ted')) {
+      return Promise.resolve(pdeea);
+    }
+    return Promise.resolve([]);
+  });
 };
 
 const sqlDeLlamada = (i) => sequelize.query.mock.calls[i][0].replace(/\s+/g, ' ');
@@ -28,25 +62,28 @@ beforeEach(() => {
 
 describe('calcularIndicadores — exclusión de datos sintéticos y de preprueba', () => {
   it('filtra origen REAL, excluye PREPRUEBA y usa la ventana de postest', async () => {
-    mockIndicadores({
-      tpdre: [{ nerd: 5, suma_tre: 25 }],
-      pdre: [{ trd: 5, rce: 1 }],
-      pdeea: [{ ted: 5, eea: 4 }],
-      pdioic: [{ tid: 2, nioc: 2 }],
+    mockEstudio({
+      jornadas: [{ fecha: '2026-09-01' }],
+      tpdre: [{ fecha: '2026-09-01', nerd: 5, suma_tre: 25 }],
+      pdre: [{ fecha: '2026-09-01', trd: 5, rce: 1 }],
+      pdeea: [{ fecha: '2026-09-01', ted: 5, eea: 4 }],
+      pdioic: [{ fecha: '2026-09-01', tid: 2, nioc: 2 }],
     });
 
     const resultado = await observacionService.calcularIndicadores();
 
-    expect(sequelize.query).toHaveBeenCalledTimes(4);
-    expect(sqlDeLlamada(0)).toContain('COUNT(CASE WHEN');
-    expect(sqlDeLlamada(0)).toContain('tiempo_registro_min IS NOT NULL');
-    expect(sqlDeLlamada(0)).toContain('tiempo_registro_min >= 0');
-    expect(sqlDeLlamada(0)).not.toMatch(/COUNT\(\*\) AS nerd/);
+    expect(sequelize.query).toHaveBeenCalledTimes(5);
+    expect(sqlDeLlamada(0)).toContain('SELECT DISTINCT DATE(e.fecha_registro)');
+    expect(sqlDeLlamada(1)).toContain('COUNT(CASE WHEN');
+    expect(sqlDeLlamada(1)).toContain('tiempo_registro_min IS NOT NULL');
+    expect(sqlDeLlamada(1)).toContain('tiempo_registro_min >= 0');
+    expect(sqlDeLlamada(1)).not.toMatch(/COUNT\(\*\) AS nerd/);
     expect(resultado.incluyeDatosSinteticos).toBe(false);
     expect(resultado.grupo).toBe('POSPRUEBA');
     expect(resultado.alcance).toBe('MUESTRA');
+    expect(resultado.jornadasDisponibles).toBe(1);
 
-    for (let i = 0; i < 3; i += 1) {
+    for (let i = 1; i <= 3; i += 1) {
       expect(sqlDeLlamada(i)).toContain('origen_dato = :origenReal');
       expect(sqlDeLlamada(i)).toContain('grupo_muestra <> :grupoPre');
       expect(sqlDeLlamada(i)).toContain('DATE(e.fecha_registro) BETWEEN :ventanaDesde AND :ventanaHasta');
@@ -61,11 +98,11 @@ describe('calcularIndicadores — exclusión de datos sintéticos y de preprueba
   });
 
   it('ignora alcance TODOS y nunca mezcla datos sintéticos', async () => {
-    mockIndicadores({
-      tpdre: [{ nerd: 100, suma_tre: 500 }],
-      pdre: [{ trd: 100, rce: 8 }],
-      pdeea: [{ ted: 100, eea: 60 }],
-      pdioic: [{ tid: 20, nioc: 18 }],
+    mockEstudio({
+      tpdre: [{ fecha: '2026-09-01', nerd: 100, suma_tre: 500 }],
+      pdre: [{ fecha: '2026-09-01', trd: 100, rce: 8 }],
+      pdeea: [{ fecha: '2026-09-01', ted: 100, eea: 60 }],
+      pdioic: [{ fecha: '2026-09-01', tid: 20, nioc: 18 }],
     });
 
     const resultado = await observacionService.calcularIndicadores({ alcance: 'TODOS' });
@@ -75,11 +112,11 @@ describe('calcularIndicadores — exclusión de datos sintéticos y de preprueba
   });
 
   it('no depende funcionalmente de la preprueba', async () => {
-    mockIndicadores({
-      tpdre: [{ nerd: 3, suma_tre: 9 }],
-      pdre: [{ trd: 3, rce: 0 }],
-      pdeea: [{ ted: 3, eea: 3 }],
-      pdioic: [{ tid: 1, nioc: 1 }],
+    mockEstudio({
+      tpdre: [{ fecha: '2026-09-01', nerd: 3, suma_tre: 9 }],
+      pdre: [{ fecha: '2026-09-01', trd: 3, rce: 0 }],
+      pdeea: [{ fecha: '2026-09-01', ted: 3, eea: 3 }],
+      pdioic: [{ fecha: '2026-09-01', tid: 1, nioc: 1 }],
     });
 
     const resultado = await observacionService.calcularIndicadores({ grupo: 'PREPRUEBA' });
@@ -93,22 +130,23 @@ describe('calcularIndicadores — exclusión de datos sintéticos y de preprueba
 
 describe('calcularIndicadores — fórmulas por jornada', () => {
   it('calcula TPDRE, PDRE, PDEEA y PDIOIC como media de las jornadas', async () => {
-    mockIndicadores({
+    mockEstudio({
+      jornadas: [{ fecha: '2026-09-01' }, { fecha: '2026-09-02' }],
       tpdre: [
-        { nerd: 2, suma_tre: 10 },
-        { nerd: 2, suma_tre: 6 },
+        { fecha: '2026-09-01', nerd: 2, suma_tre: 10 },
+        { fecha: '2026-09-02', nerd: 2, suma_tre: 6 },
       ],
       pdre: [
-        { trd: 4, rce: 1 },
-        { trd: 4, rce: 0 },
+        { fecha: '2026-09-01', trd: 4, rce: 1 },
+        { fecha: '2026-09-02', trd: 4, rce: 0 },
       ],
       pdeea: [
-        { ted: 4, eea: 4 },
-        { ted: 4, eea: 2 },
+        { fecha: '2026-09-01', ted: 4, eea: 4 },
+        { fecha: '2026-09-02', ted: 4, eea: 2 },
       ],
       pdioic: [
-        { tid: 2, nioc: 2 },
-        { tid: 2, nioc: 1 },
+        { fecha: '2026-09-01', tid: 2, nioc: 2 },
+        { fecha: '2026-09-02', tid: 2, nioc: 1 },
       ],
     });
 
@@ -119,6 +157,7 @@ describe('calcularIndicadores — fórmulas por jornada', () => {
     expect(r.pdeea).toBe(75);
     expect(r.pdioic).toBe(75);
     expect(r.unidadObservacion).toBe('jornada');
+    expect(r.jornadasDisponibles).toBe(2);
     expect(r.detalle.pdioic).toEqual({
       nioc: 3, tid: 4, n_jornadas: 2, media_diaria: true,
     });
@@ -129,34 +168,41 @@ describe('calcularIndicadores — fórmulas por jornada', () => {
   });
 
   it('PDIOIC omite del promedio los días sin incidencias (N/A, no 0%)', async () => {
-    mockIndicadores({
-      tpdre: [{ nerd: 3, suma_tre: 9 }],
-      pdre: [{ trd: 3, rce: 0 }],
-      pdeea: [{ ted: 3, eea: 3 }],
+    mockEstudio({
+      jornadas: [{ fecha: '2026-09-01' }, { fecha: '2026-09-02' }],
+      tpdre: [
+        { fecha: '2026-09-01', nerd: 3, suma_tre: 9 },
+        { fecha: '2026-09-02', nerd: 3, suma_tre: 9 },
+      ],
+      pdre: [
+        { fecha: '2026-09-01', trd: 3, rce: 0 },
+        { fecha: '2026-09-02', trd: 3, rce: 0 },
+      ],
+      pdeea: [
+        { fecha: '2026-09-01', ted: 3, eea: 3 },
+        { fecha: '2026-09-02', ted: 3, eea: 3 },
+      ],
       pdioic: [
-        { tid: 0, nioc: 0 },
-        { tid: 4, nioc: 3 },
+        { fecha: '2026-09-01', tid: 0, nioc: 0 },
+        { fecha: '2026-09-02', tid: 4, nioc: 3 },
       ],
     });
 
     const r = await observacionService.calcularIndicadores();
     expect(r.pdioic).toBe(75);
     expect(r.detalle.pdioic.n_jornadas).toBe(1);
-    expect(sqlDeLlamada(3)).toContain('FROM incidencias i');
-    expect(sqlDeLlamada(3)).toContain('GROUP BY DATE(i.fecha_reporte)');
-    expect(sqlDeLlamada(3)).toContain('DATE(i.fecha_reporte) BETWEEN :ventanaDesde AND :ventanaHasta');
+    expect(r.jornadasDisponibles).toBe(2);
+    expect(sqlPorContenido('FROM incidencias i')).toContain('FROM incidencias i');
+    expect(sqlPorContenido('FROM incidencias i')).toContain('GROUP BY DATE(i.fecha_reporte)');
+    expect(sqlPorContenido('FROM incidencias i')).toContain('DATE(i.fecha_reporte) BETWEEN :ventanaDesde AND :ventanaHasta');
   });
 
   it('no divide entre cero cuando no hay jornadas con datos', async () => {
-    mockIndicadores({
-      tpdre: [],
-      pdre: [],
-      pdeea: [],
-      pdioic: [],
-    });
-
+    sequelize.query.mockResolvedValueOnce([]);
     const r = await observacionService.calcularIndicadores();
     expect([r.tpdre, r.pdre, r.pdeea, r.pdioic]).toEqual([0, 0, 0, 0]);
+    expect(r.jornadasDisponibles).toBe(0);
+    expect(sequelize.query).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -322,6 +368,122 @@ describe('fichas de observación diarias', () => {
 
   it('rechaza dimensiones fuera del rango 1-4', async () => {
     await expect(observacionService.getDatosDimension(9)).rejects.toThrow('Dimensión no válida');
+  });
+});
+
+describe('lista única de jornadas entre fichas e indicadores', () => {
+  const jornadas = [{ fecha: '2026-09-01' }, { fecha: '2026-09-02' }];
+
+  it('calcularIndicadores utiliza exactamente las mismas jornadas que las fichas', async () => {
+    mockPorSql({
+      jornadas,
+      tpdre: [
+        { fecha: '2026-09-01', nerd: 2, suma_tre: 8 },
+        { fecha: '2026-09-02', nerd: 2, suma_tre: 8 },
+      ],
+      pdre: [
+        { fecha: '2026-09-01', trd: 2, rce: 0 },
+        { fecha: '2026-09-02', trd: 2, rce: 0 },
+      ],
+      pdeea: [
+        { fecha: '2026-09-01', ted: 2, eea: 2 },
+        { fecha: '2026-09-02', ted: 2, eea: 2 },
+      ],
+      pdioic: [{ fecha: '2026-09-01', tid: 2, nioc: 2 }],
+    });
+    const ficha = await observacionService.getDatosDimension(4);
+    const indicadores = await observacionService.calcularIndicadores();
+    expect(ficha.map((f) => f.fecha)).toEqual(['01/09/2026', '02/09/2026']);
+    expect(indicadores.jornadasDisponibles).toBe(ficha.length);
+    expect(indicadores.jornadasEsperadas).toBe(20);
+  });
+
+  it('una incidencia en una fecha ajena a las jornadas operativas no entra en PDIOIC', async () => {
+    mockPorSql({
+      jornadas,
+      tpdre: [
+        { fecha: '2026-09-01', nerd: 2, suma_tre: 8 },
+        { fecha: '2026-09-02', nerd: 2, suma_tre: 8 },
+      ],
+      pdre: [
+        { fecha: '2026-09-01', trd: 2, rce: 0 },
+        { fecha: '2026-09-02', trd: 2, rce: 0 },
+      ],
+      pdeea: [
+        { fecha: '2026-09-01', ted: 2, eea: 2 },
+        { fecha: '2026-09-02', ted: 2, eea: 2 },
+      ],
+      pdioic: [
+        { fecha: '2026-09-01', tid: 2, nioc: 2 },
+        { fecha: '2026-09-03', tid: 5, nioc: 5 },
+      ],
+    });
+    const ficha = await observacionService.getDatosDimension(4);
+    const indicadores = await observacionService.calcularIndicadores();
+    expect(ficha.map((f) => f.fecha)).toEqual(['01/09/2026', '02/09/2026']);
+    expect(ficha.map((f) => f.fecha)).not.toContain('03/09/2026');
+    expect(ficha.find((f) => f.fecha === '02/09/2026').tid).toBe(0);
+    expect(ficha.find((f) => f.fecha === '02/09/2026').pdioic).toBe('N/A');
+    expect(indicadores.pdioic).toBe(100);
+    expect(indicadores.detalle.pdioic.n_jornadas).toBe(1);
+    expect(indicadores.detalle.pdioic.tid).toBe(2);
+    expect(indicadores.totalIncidencias).toBe(2);
+  });
+
+  it('jornadasDisponibles no depende de TPDRE y n_jornadas puede ser menor', async () => {
+    mockPorSql({
+      jornadas,
+      tpdre: [{ fecha: '2026-09-01', nerd: 4, suma_tre: 20 }],
+      pdre: [
+        { fecha: '2026-09-01', trd: 4, rce: 0 },
+        { fecha: '2026-09-02', trd: 4, rce: 0 },
+      ],
+      pdeea: [
+        { fecha: '2026-09-01', ted: 4, eea: 4 },
+        { fecha: '2026-09-02', ted: 4, eea: 4 },
+      ],
+      pdioic: [{ fecha: '2026-09-01', tid: 2, nioc: 1 }],
+    });
+    const indicadores = await observacionService.calcularIndicadores();
+    expect(indicadores.jornadasDisponibles).toBe(2);
+    expect(indicadores.nJornadas).toBe(2);
+    expect(indicadores.detalle.tpdre.n_jornadas).toBe(1);
+    expect(indicadores.detalle.tpdre.n_jornadas).toBeLessThan(indicadores.jornadasDisponibles);
+    expect(indicadores.detalle.pdre.n_jornadas).toBe(2);
+    expect(indicadores.detalle.pdioic.n_jornadas).toBe(1);
+    expect(indicadores.detalle.pdioic.n_jornadas).toBeLessThan(indicadores.jornadasDisponibles);
+  });
+
+  it('ficha, Excel y resumen utilizan las mismas fechas', async () => {
+    mockPorSql({
+      jornadas,
+      tpdre: [
+        { fecha: '2026-09-01', nerd: 2, suma_tre: 8 },
+        { fecha: '2026-09-02', nerd: 0, suma_tre: 0 },
+      ],
+      pdre: [
+        { fecha: '2026-09-01', trd: 2, rce: 0 },
+        { fecha: '2026-09-02', trd: 2, rce: 0 },
+      ],
+      pdeea: [
+        { fecha: '2026-09-01', ted: 2, eea: 2 },
+        { fecha: '2026-09-02', ted: 2, eea: 2 },
+      ],
+      pdioic: [
+        { fecha: '2026-09-01', tid: 2, nioc: 2 },
+        { fecha: '2026-09-03', tid: 5, nioc: 5 },
+      ],
+    });
+    const ficha = await observacionService.getDatosDimension(4);
+    const excel = await observacionService.buildExportPayload(4);
+    const resumen = await observacionService.calcularIndicadores();
+    const fechas = ['01/09/2026', '02/09/2026'];
+    expect(ficha.map((f) => f.fecha)).toEqual(fechas);
+    expect(excel.filas.map((f) => f.fecha)).toEqual(fechas);
+    expect(excel.jornadasDisponibles).toBe(2);
+    expect(resumen.jornadasDisponibles).toBe(2);
+    expect(excel.indicadores.pdioic).toBe(resumen.pdioic);
+    expect(resumen.pdioic).toBe(100);
   });
 });
 

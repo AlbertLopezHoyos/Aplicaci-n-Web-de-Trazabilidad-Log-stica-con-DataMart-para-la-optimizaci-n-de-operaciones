@@ -277,10 +277,11 @@ const armarFilaDiaria = (dimension, fechaISO, raw) => {
   };
 };
 
-const getDatosDimension = async (dimension) => {
-  const config = DIMENSIONES[dimension];
-  if (!config) throw Object.assign(new Error('Dimensión no válida'), { statusCode: 400 });
-  const jornadas = await listarJornadasOperativas();
+/**
+ * Consulta una dimensión y la recorta a las jornadas operativas ya seleccionadas.
+ * Fechas extra del SQL (p. ej. incidencias en un día sin envíos) no generan fila.
+ */
+const consultarDimension = async (dimension, jornadas) => {
   const filtro = filtroInvestigacion(dimension);
   const sql = sqlFicha(dimension, filtro);
   const filas = await sequelize.query(sql, {
@@ -295,13 +296,20 @@ const getDatosDimension = async (dimension) => {
   return jornadas.map((iso) => armarFilaDiaria(dimension, iso, porFecha.get(iso)));
 };
 
+const getDatosDimension = async (dimension) => {
+  const config = DIMENSIONES[dimension];
+  if (!config) throw Object.assign(new Error('Dimensión no válida'), { statusCode: 400 });
+  const jornadas = await listarJornadasOperativas();
+  return consultarDimension(dimension, jornadas);
+};
+
 const countDatosDimension = async (dimension) => {
   if (!DIMENSIONES[dimension]) return 0;
   const jornadas = await listarJornadasOperativas();
   return jornadas.length;
 };
 
-const indicadoresDesdeFilas = (diasTpdre, diasPdre, diasPdeea, diasPdioic) => {
+const indicadoresDesdeFilas = (diasTpdre, diasPdre, diasPdeea, diasPdioic, jornadasDisponibles = 0) => {
   const tpdre = mediaDeRatiosDiarios(diasTpdre, 'suma_tre', 'nerd');
   const pdre = mediaDeRatiosDiarios(diasPdre, 'rce', 'trd', { porcentaje: true });
   const pdeea = mediaDeRatiosDiarios(diasPdeea, 'eea', 'ted', { porcentaje: true });
@@ -313,8 +321,9 @@ const indicadoresDesdeFilas = (diasTpdre, diasPdre, diasPdeea, diasPdioic) => {
     incluyeDatosSinteticos: false,
     unidadObservacion: 'jornada',
     jornadasEsperadas: JORNADAS_FICHA,
-    nJornadas: tpdre.nDias,
-    nJornadasConDatos: tpdre.nDias,
+    jornadasDisponibles,
+    nJornadas: jornadasDisponibles,
+    nJornadasConDatos: jornadasDisponibles,
     tpdre: tpdre.valor,
     pdre: pdre.valor,
     pdeea: pdeea.valor,
@@ -331,59 +340,43 @@ const indicadoresDesdeFilas = (diasTpdre, diasPdre, diasPdeea, diasPdioic) => {
 };
 
 /**
- * Calcula TPDRE, PDRE, PDEEA y PDIOIC como media de los promedios diarios
- * sobre los registros REALES existentes del postest. Solo lectura.
+ * Una sola lectura del estudio: mismas jornadas para fichas, indicadores y Excel.
+ */
+const obtenerEstudio = async () => {
+  const jornadas = await listarJornadasOperativas();
+  const filasVacias = { 1: [], 2: [], 3: [], 4: [] };
+  if (!jornadas.length) {
+    return {
+      jornadas,
+      filas: filasVacias,
+      indicadores: indicadoresDesdeFilas([], [], [], [], 0),
+    };
+  }
+  const [diasTpdre, diasPdre, diasPdeea, diasPdioic] = await Promise.all([
+    consultarDimension(1, jornadas),
+    consultarDimension(2, jornadas),
+    consultarDimension(3, jornadas),
+    consultarDimension(4, jornadas),
+  ]);
+  return {
+    jornadas,
+    filas: { 1: diasTpdre, 2: diasPdre, 3: diasPdeea, 4: diasPdioic },
+    indicadores: indicadoresDesdeFilas(
+      diasTpdre,
+      diasPdre,
+      diasPdeea,
+      diasPdioic,
+      jornadas.length
+    ),
+  };
+};
+
+/**
+ * Calcula TPDRE, PDRE, PDEEA y PDIOIC sobre las mismas jornadas de las fichas.
  */
 const calcularIndicadores = async () => {
-  const filtroEnvios = filtroInvestigacion(1);
-  const filtroIncidencias = filtroInvestigacion(4);
-
-  const diasTpdre = await sequelize.query(
-    `SELECT DATE(e.fecha_registro) AS fecha,
-            COUNT(CASE WHEN ${SQL_TIEMPO_VALIDO} THEN 1 END) AS nerd,
-            COALESCE(SUM(CASE WHEN ${SQL_TIEMPO_VALIDO} THEN e.tiempo_registro_min END), 0) AS suma_tre
-     FROM envios e
-     WHERE e.activo = 1 AND ${filtroEnvios.sql}
-     GROUP BY DATE(e.fecha_registro)`,
-    { type: QueryTypes.SELECT, replacements: filtroEnvios.replacements }
-  );
-
-  const diasPdre = await sequelize.query(
-    `SELECT DATE(e.fecha_registro) AS fecha,
-            COUNT(*) AS trd,
-            SUM(CASE WHEN e.registro_correcto = 0
-                       OR EXISTS (SELECT 1 FROM errores_registro er WHERE er.id_envio = e.id_envio)
-                     THEN 1 ELSE 0 END) AS rce
-     FROM envios e
-     WHERE e.activo = 1 AND ${filtroEnvios.sql}
-     GROUP BY DATE(e.fecha_registro)`,
-    { type: QueryTypes.SELECT, replacements: filtroEnvios.replacements }
-  );
-
-  const diasPdeea = await sequelize.query(
-    `SELECT DATE(e.fecha_registro) AS fecha,
-            COUNT(*) AS ted,
-            SUM(CASE WHEN ult.id_estado IS NOT NULL AND ult.id_estado = e.id_estado_actual
-                     THEN 1 ELSE 0 END) AS eea
-     FROM envios e
-     ${SQL_ULTIMO_HISTORIAL}
-     WHERE e.activo = 1 AND ${filtroEnvios.sql}
-     GROUP BY DATE(e.fecha_registro)`,
-    { type: QueryTypes.SELECT, replacements: filtroEnvios.replacements }
-  );
-
-  const diasPdioic = await sequelize.query(
-    `SELECT DATE(i.fecha_reporte) AS fecha,
-            COUNT(*) AS tid,
-            SUM(CASE WHEN ${SQL_INCIDENCIA_COMPLETA} THEN 1 ELSE 0 END) AS nioc
-     FROM incidencias i
-     JOIN envios e ON e.id_envio = i.id_envio
-     WHERE e.activo = 1 AND ${filtroIncidencias.sql}
-     GROUP BY DATE(i.fecha_reporte)`,
-    { type: QueryTypes.SELECT, replacements: filtroIncidencias.replacements }
-  );
-
-  return indicadoresDesdeFilas(diasTpdre, diasPdre, diasPdeea, diasPdioic);
+  const { indicadores } = await obtenerEstudio();
+  return indicadores;
 };
 
 const getCoberturaVentana = async () => {
@@ -446,7 +439,7 @@ const getMedicionInvestigacion = async () => {
     { type: QueryTypes.SELECT }
   );
 
-  const disponibles = ventanaPos?.jornadasDisponibles || 0;
+  const disponibles = posprueba?.jornadasDisponibles ?? ventanaPos?.jornadasDisponibles ?? 0;
 
   return {
     posprueba,
@@ -472,12 +465,8 @@ const buildExportPayload = async (dimension) => {
   const config = DIMENSIONES[dimension];
   if (!config) throw Object.assign(new Error('Dimensión no válida'), { statusCode: 400 });
 
-  const [filas, totalBd, indicadores] = await Promise.all([
-    getDatosDimension(dimension),
-    countDatosDimension(dimension),
-    calcularIndicadores(),
-  ]);
-
+  const { jornadas, filas, indicadores } = await obtenerEstudio();
+  const filasDim = filas[dimension] || [];
   const headers = config.columnas.map((key, i) => ({ key, label: config.labels[i] }));
   return {
     dimension,
@@ -487,11 +476,11 @@ const buildExportPayload = async (dimension) => {
     grupo: GRUPO_MUESTRA.POSPRUEBA,
     incluyeDatosSinteticos: false,
     headers,
-    filas,
-    total: totalBd,
-    exportados: filas.length,
+    filas: filasDim,
+    total: jornadas.length,
+    exportados: filasDim.length,
     jornadasEsperadas: JORNADAS_FICHA,
-    jornadasDisponibles: filas.length,
+    jornadasDisponibles: jornadas.length,
     limite: JORNADAS_FICHA,
     indicadores: {
       tpdre: indicadores.tpdre,
