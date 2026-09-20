@@ -1,6 +1,7 @@
 /**
  * Verifica que los indicadores de investigación se calculen sobre la muestra
  * real (preprueba/posprueba) y nunca sobre los datos sintéticos del DataMart.
+ * Unidad de análisis: jornada operativa (promedio diario, n = 20).
  */
 jest.mock('../src/models', () => ({
   sequelize: { query: jest.fn() },
@@ -9,13 +10,13 @@ jest.mock('../src/models', () => ({
 const { sequelize } = require('../src/models');
 const observacionService = require('../src/services/observacion.service');
 
-/** Devuelve, en orden, las filas simuladas para TPRE, PER, PEEA y PIOIC. */
+/** Devuelve, en orden, las filas diarias simuladas para TPDRE, PDRE, PDEEA y PDIOIC. */
 const mockIndicadores = ({ tpre, per, peea, pioic }) => {
   sequelize.query
-    .mockResolvedValueOnce([tpre])
-    .mockResolvedValueOnce([per])
-    .mockResolvedValueOnce([peea])
-    .mockResolvedValueOnce([pioic]);
+    .mockResolvedValueOnce(Array.isArray(tpre) ? tpre : [tpre])
+    .mockResolvedValueOnce(Array.isArray(per) ? per : [per])
+    .mockResolvedValueOnce(Array.isArray(peea) ? peea : [peea])
+    .mockResolvedValueOnce(Array.isArray(pioic) ? pioic : [pioic]);
 };
 
 const sqlDeLlamada = (i) => sequelize.query.mock.calls[i][0].replace(/\s+/g, ' ');
@@ -28,10 +29,10 @@ beforeEach(() => {
 describe('calcularIndicadores — exclusión de datos sintéticos', () => {
   it('filtra por origen REAL y grupos de muestra en las cuatro consultas', async () => {
     mockIndicadores({
-      tpre: { ner: 50, suma_tre: 250 },
-      per: { treg: 50, rce: 5 },
-      peea: { tee: 50, eea: 40 },
-      pioic: { ntir: 12, nioc: 9 },
+      tpre: [{ nerd: 5, suma_tre: 25 }],
+      per: [{ trevd: 5, rce: 1 }],
+      peea: [{ teed: 5, eea: 4 }],
+      pioic: [{ tioed: 2, nioc: 2 }],
     });
 
     await observacionService.calcularIndicadores();
@@ -40,6 +41,7 @@ describe('calcularIndicadores — exclusión de datos sintéticos', () => {
     for (let i = 0; i < 4; i += 1) {
       expect(sqlDeLlamada(i)).toContain('origen_dato = :origenReal');
       expect(sqlDeLlamada(i)).toContain('grupo_muestra IN (:gruposMuestra)');
+      expect(sqlDeLlamada(i)).toContain('GROUP BY DATE(e.fecha_registro)');
       expect(replacementsDeLlamada(i)).toEqual({
         origenReal: 'REAL',
         gruposMuestra: ['PREPRUEBA', 'POSPRUEBA'],
@@ -49,25 +51,27 @@ describe('calcularIndicadores — exclusión de datos sintéticos', () => {
 
   it('restringe el cálculo a un solo grupo cuando se indica', async () => {
     mockIndicadores({
-      tpre: { ner: 50, suma_tre: 300 },
-      per: { treg: 50, rce: 10 },
-      peea: { tee: 50, eea: 35 },
-      pioic: { ntir: 20, nioc: 12 },
+      tpre: [{ nerd: 5, suma_tre: 30 }],
+      per: [{ trevd: 5, rce: 1 }],
+      peea: [{ teed: 5, eea: 4 }],
+      pioic: [{ tioed: 2, nioc: 1 }],
     });
 
     const resultado = await observacionService.calcularIndicadores({ grupo: 'PREPRUEBA' });
 
     expect(replacementsDeLlamada(0).gruposMuestra).toEqual(['PREPRUEBA']);
+    expect(replacementsDeLlamada(0).ventanaDesde).toBe('2026-08-01');
+    expect(replacementsDeLlamada(0).ventanaHasta).toBe('2026-08-20');
     expect(resultado.grupo).toBe('PREPRUEBA');
     expect(resultado.incluyeDatosSinteticos).toBe(false);
   });
 
   it('solo incluye datos sintéticos con alcance TODOS, marcándolo explícitamente', async () => {
     mockIndicadores({
-      tpre: { ner: 5500, suma_tre: 27500 },
-      per: { treg: 5500, rce: 440 },
-      peea: { tee: 5500, eea: 3300 },
-      pioic: { ntir: 990, nioc: 871 },
+      tpre: [{ nerd: 100, suma_tre: 500 }],
+      per: [{ trevd: 100, rce: 8 }],
+      peea: [{ teed: 100, eea: 60 }],
+      pioic: [{ tioed: 20, nioc: 18 }],
     });
 
     const resultado = await observacionService.calcularIndicadores({ alcance: 'TODOS' });
@@ -79,10 +83,10 @@ describe('calcularIndicadores — exclusión de datos sintéticos', () => {
 
   it('ignora un alcance desconocido y vuelve al alcance de muestra', async () => {
     mockIndicadores({
-      tpre: { ner: 1, suma_tre: 1 },
-      per: { treg: 1, rce: 0 },
-      peea: { tee: 1, eea: 1 },
-      pioic: { ntir: 1, nioc: 1 },
+      tpre: [{ nerd: 1, suma_tre: 1 }],
+      per: [{ trevd: 1, rce: 0 }],
+      peea: [{ teed: 1, eea: 1 }],
+      pioic: [{ tioed: 1, nioc: 1 }],
     });
 
     const resultado = await observacionService.calcularIndicadores({ alcance: 'DATAMART' });
@@ -90,50 +94,72 @@ describe('calcularIndicadores — exclusión de datos sintéticos', () => {
   });
 });
 
-describe('calcularIndicadores — fórmulas', () => {
-  it('devuelve los cuatro indicadores con sus numeradores y denominadores', async () => {
+describe('calcularIndicadores — media de promedios diarios', () => {
+  it('devuelve TPDRE/PDRE/PDEEA/PDIOIC como promedio de las jornadas', async () => {
     mockIndicadores({
-      tpre: { ner: 50, suma_tre: 250 },   // 5 min
-      per: { treg: 50, rce: 6 },          // 12 %
-      peea: { tee: 50, eea: 41 },         // 82 %
-      pioic: { ntir: 12, nioc: 9 },       // 75 %
+      tpre: [
+        { nerd: 2, suma_tre: 10 }, // 5
+        { nerd: 2, suma_tre: 6 },  // 3  → media 4
+      ],
+      per: [
+        { trevd: 4, rce: 1 }, // 25%
+        { trevd: 4, rce: 0 }, // 0%   → media 12.5
+      ],
+      peea: [
+        { teed: 4, eea: 4 }, // 100%
+        { teed: 4, eea: 2 }, // 50%   → media 75
+      ],
+      pioic: [
+        { tioed: 2, nioc: 2 }, // 100%
+        { tioed: 2, nioc: 1 }, // 50%   → media 75
+      ],
     });
 
     const r = await observacionService.calcularIndicadores();
 
-    expect(r.tpre).toBe(5);
-    expect(r.per).toBe(12);
-    expect(r.peea).toBe(82);
+    expect(r.tpdre).toBe(4);
+    expect(r.tpre).toBe(4);
+    expect(r.pdre).toBe(12.5);
+    expect(r.per).toBe(12.5);
+    expect(r.pdeea).toBe(75);
+    expect(r.peea).toBe(75);
+    expect(r.pdioic).toBe(75);
     expect(r.pioic).toBe(75);
-    expect(r.detalle.pioic).toEqual({ nioc: 9, ntir: 12 });
-    expect(r.totalEnvios).toBe(50);
-    expect(r.totalIncidencias).toBe(12);
+    expect(r.unidadObservacion).toBe('jornada');
+    expect(r.detalle.pdioic).toEqual({
+      nioc: 3, tioed: 4, n_jornadas: 2, media_diaria: true,
+    });
+    expect(r.totalEnvios).toBe(8);
+    expect(r.totalIncidencias).toBe(4);
   });
 
-  it('PIOIC divide entre las incidencias registradas, no entre los envíos', async () => {
+  it('PDIOIC omite del promedio los días sin incidencias (N/A)', async () => {
     mockIndicadores({
-      tpre: { ner: 50, suma_tre: 250 },
-      per: { treg: 50, rce: 0 },
-      peea: { tee: 50, eea: 50 },
-      pioic: { ntir: 20, nioc: 15 },
+      tpre: [{ nerd: 3, suma_tre: 9 }],
+      per: [{ trevd: 3, rce: 0 }],
+      peea: [{ teed: 3, eea: 3 }],
+      pioic: [
+        { tioed: 0, nioc: 0 },
+        { tioed: 4, nioc: 3 },
+      ],
     });
 
     const r = await observacionService.calcularIndicadores();
-    expect(r.pioic).toBe(75);      // 15/20, no 15/50
-    expect(r.detalle.pioic.ntir).toBe(20);
+    expect(r.pdioic).toBe(75);
+    expect(r.detalle.pdioic.n_jornadas).toBe(1);
     expect(sqlDeLlamada(3)).toContain('FROM incidencias i');
   });
 
-  it('no divide entre cero cuando la muestra está vacía', async () => {
+  it('no divide entre cero cuando no hay jornadas con datos', async () => {
     mockIndicadores({
-      tpre: { ner: 0, suma_tre: 0 },
-      per: { treg: 0, rce: 0 },
-      peea: { tee: 0, eea: 0 },
-      pioic: { ntir: 0, nioc: 0 },
+      tpre: [],
+      per: [],
+      peea: [],
+      pioic: [],
     });
 
     const r = await observacionService.calcularIndicadores();
-    expect([r.tpre, r.per, r.peea, r.pioic]).toEqual([0, 0, 0, 0]);
+    expect([r.tpdre, r.pdre, r.pdeea, r.pdioic]).toEqual([0, 0, 0, 0]);
   });
 });
 
@@ -147,102 +173,82 @@ describe('criterio PIOIC en SQL', () => {
   });
 });
 
-describe('fichas de observación', () => {
-  it('la ficha de posprueba se limita a 50 registros y orden aleatorio (1–20 set 2026)', async () => {
+describe('fichas de observación diarias', () => {
+  it('la ficha de posprueba agrupa 20 jornadas (1–20 set 2026) sin sorteo por envío', async () => {
     sequelize.query.mockResolvedValueOnce([]);
-    await observacionService.getDatosDimension(1, { limit: 50, grupo: 'POSPRUEBA' });
+    const filas = await observacionService.getDatosDimension(1, { limit: 50, grupo: 'POSPRUEBA' });
     const sql = sqlDeLlamada(0);
     expect(sql).toContain('origen_dato = :origenReal');
-    expect(sql).toContain('grupo_muestra IN (:gruposMuestra)');
+    expect(sql).toContain('grupo_muestra <> :grupoPre');
     expect(sql).toContain('fecha_registro BETWEEN :ventanaDesde AND :ventanaHasta');
-    expect(sql).toContain('ORDER BY RAND()');
-    expect(sql).toContain('LIMIT 50');
+    expect(sql).toContain('GROUP BY DATE(e.fecha_registro)');
+    expect(sql).not.toContain('ORDER BY RAND()');
+    expect(sql).not.toContain('LIMIT 50');
     expect(replacementsDeLlamada(0)).toEqual({
       origenReal: 'REAL',
-      gruposMuestra: ['POSPRUEBA'],
+      grupoPre: 'PREPRUEBA',
       ventanaDesde: '2026-09-01',
       ventanaHasta: '2026-09-20',
     });
+    expect(filas).toHaveLength(20);
+    expect(filas[0].fecha).toBe('01/09/2026');
+    expect(filas[19].fecha).toBe('20/09/2026');
+    expect(filas[0].tpdre).toBe('N/A');
   });
 
-  it('la ficha de la dimensión 4 se construye sobre incidencias de la muestra', async () => {
+  it('la ficha de la dimensión 4 se construye sobre incidencias agrupadas por día', async () => {
     sequelize.query.mockResolvedValueOnce([]);
-    await observacionService.getDatosDimension(4, { limit: 50 });
+    await observacionService.getDatosDimension(4, { grupo: 'POSPRUEBA' });
     const sql = sqlDeLlamada(0);
     expect(sql).toContain('FROM incidencias i');
     expect(sql).toContain('origen_dato = :origenReal');
-    expect(sql).toContain('LIMIT 50');
+    expect(sql).toContain('GROUP BY DATE(e.fecha_registro)');
+    expect(sql).not.toContain('LIMIT 50');
   });
 
-  it('la ficha 4 expone titulo, descripcion y observacion como columnas independientes', async () => {
+  it('la ficha 4 expone TIOED, NIOC, incompletas y PDIOIC', () => {
     const dim4 = observacionService.DIMENSIONES[4];
-    expect(dim4.columnas).toEqual([
-      'fecha',
-      'codigo_incidencia',
-      'tipo_incidencia',
-      'area',
-      'codigo_envio',
-      'estado_incidencia',
-      'titulo',
-      'descripcion',
-      'informacion_completa',
-      'fuente_principal',
-      'observacion',
-    ]);
+    expect(dim4.indicador).toBe('PDIOIC');
+    expect(dim4.columnas).toEqual(['fecha', 'tioed', 'nioc', 'incompletas', 'pdioic']);
     expect(dim4.labels).toEqual([
       'Fecha',
-      'Código incidencia',
-      'Tipo incidencia',
-      'Área',
-      'Código envío',
-      'Estado incidencia',
-      'Título',
-      'Descripción',
-      'Información completa (Sí/No)',
-      'Fuente principal de información',
-      'Observación',
+      'Total de incidencias evaluadas (TIOED)',
+      'Incidencias con información completa (NIOC)',
+      'Incidencias con información incompleta',
+      'Porcentaje diario de incidencias con información completa (%) (PDIOIC)',
     ]);
-
-    sequelize.query.mockResolvedValueOnce([]);
-    await observacionService.getDatosDimension(4);
-    const sql = sqlDeLlamada(0);
-    expect(sql).toContain('i.titulo');
-    expect(sql).toContain('i.descripcion');
-    expect(sql).toContain('i.observacion');
-    expect(sql).not.toMatch(/i\.descripcion\s+AS\s+observacion/i);
   });
 
-  it('la exportación de la ficha 4 usa las mismas columnas y no nombra descripción como observación', async () => {
+  it('la exportación de la ficha 4 usa las columnas diarias y marca N/A si no hay incidencias', async () => {
     sequelize.query
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([{ total: 0 }])
-      .mockResolvedValueOnce([{ ner: 0, suma_tre: 0 }])
-      .mockResolvedValueOnce([{ treg: 0, rce: 0 }])
-      .mockResolvedValueOnce([{ tee: 0, eea: 0 }])
-      .mockResolvedValueOnce([{ ntir: 0, nioc: 0 }]);
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
 
-    const payload = await observacionService.buildExportPayload(4);
+    const payload = await observacionService.buildExportPayload(4, { grupo: 'POSPRUEBA' });
     expect(payload.headers.map((h) => h.key)).toEqual(observacionService.DIMENSIONES[4].columnas);
     expect(payload.headers.map((h) => h.label)).toEqual(observacionService.DIMENSIONES[4].labels);
-    expect(payload.headers.find((h) => h.key === 'descripcion').label).toBe('Descripción');
-    expect(payload.headers.find((h) => h.key === 'observacion').label).toBe('Observación');
+    expect(payload.filas).toHaveLength(20);
+    expect(payload.filas[0].pdioic).toBe('N/A');
+    expect(payload.exportados).toBe(20);
   });
 
-  it('las dimensiones 1, 2 y 3 siguen consultando envíos y no cambian de columnas', async () => {
-    expect(observacionService.DIMENSIONES[1].indicador).toBe('TPRE');
-    expect(observacionService.DIMENSIONES[2].indicador).toBe('PER');
-    expect(observacionService.DIMENSIONES[3].indicador).toBe('PEEA');
-    expect(observacionService.DIMENSIONES[1].columnas).toContain('tiempo_registro_min');
-    expect(observacionService.DIMENSIONES[2].columnas).toContain('error_en_registro');
-    expect(observacionService.DIMENSIONES[3].columnas).toContain('estado_actualizado');
-    expect(observacionService.DIMENSIONES[1].columnas).not.toContain('codigo_incidencia');
-    expect(observacionService.DIMENSIONES[2].columnas).not.toContain('codigo_incidencia');
-    expect(observacionService.DIMENSIONES[3].columnas).not.toContain('codigo_incidencia');
+  it('las dimensiones 1, 2 y 3 consultan envíos agregados por jornada', async () => {
+    expect(observacionService.DIMENSIONES[1].indicador).toBe('TPDRE');
+    expect(observacionService.DIMENSIONES[2].indicador).toBe('PDRE');
+    expect(observacionService.DIMENSIONES[3].indicador).toBe('PDEEA');
+    expect(observacionService.DIMENSIONES[1].columnas).toEqual(['fecha', 'nerd', 'suma_tre', 'tpdre']);
+    expect(observacionService.DIMENSIONES[2].columnas).toContain('pdre');
+    expect(observacionService.DIMENSIONES[3].columnas).toContain('pdeea');
+    expect(observacionService.DIMENSIONES[1].columnas).not.toContain('codigo_envio');
+    expect(observacionService.limiteFichaGrupo()).toBe(20);
 
     sequelize.query.mockResolvedValue([]);
-    await observacionService.getDatosDimension(1);
-    await observacionService.getDatosDimension(2);
-    await observacionService.getDatosDimension(3);
+    await observacionService.getDatosDimension(1, { grupo: 'POSPRUEBA' });
+    await observacionService.getDatosDimension(2, { grupo: 'POSPRUEBA' });
+    await observacionService.getDatosDimension(3, { grupo: 'POSPRUEBA' });
     expect(sqlDeLlamada(0)).toContain('FROM envios e');
     expect(sqlDeLlamada(1)).toContain('FROM envios e');
     expect(sqlDeLlamada(2)).toContain('FROM envios e');

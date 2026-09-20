@@ -28,7 +28,6 @@ const {
   GRUPOS_MUESTRA_VALIDOS,
   TAMANIO_GRUPO_MUESTRA,
   POSPRUEBA_POOL,
-  limiteFichaGrupo,
   ventanaFichaGrupo,
   capturaHastaPosprueba,
   listarDiasLaborablesPosprueba,
@@ -36,18 +35,17 @@ const {
   CAMPOS_INCIDENCIA_COMPLETA,
   VENTANAS_MEDICION,
   aFechaISO,
-  calcularTPRE,
-  calcularPER,
-  calcularPEEA,
-  calcularPIOIC,
   redondear,
 } = require('../utils/reglasIndicadores');
 
 const fichasDir = path.join(__dirname, '../../uploads/fichas');
 if (!fs.existsSync(fichasDir)) fs.mkdirSync(fichasDir, { recursive: true });
 
-/** Tamaño de cada grupo de la muestra (50 preprueba + 50 posprueba). */
-const FICHA_MUESTRA = TAMANIO_GRUPO_MUESTRA;
+/** Unidad de análisis del instrumento: una fila = una jornada operativa. */
+const JORNADAS_FICHA = 20;
+const VALOR_NA = 'N/A';
+const FICHA_MUESTRA = JORNADAS_FICHA;
+const limiteFichaGrupo = () => JORNADAS_FICHA;
 
 const ALCANCE = Object.freeze({
   MUESTRA: 'MUESTRA', // solo registros REALES marcados como preprueba/posprueba
@@ -57,80 +55,57 @@ const ALCANCE = Object.freeze({
 const DIMENSIONES = {
   1: {
     id: 'eficiencia',
-    titulo: 'Dimensión 1 - Eficiencia operativa (TPRE)',
-    indicador: 'TPRE',
+    titulo: 'Dimensión 1 - Eficiencia operativa (TPDRE)',
+    indicador: 'TPDRE',
     vista: 'vw_ficha_eficiencia',
-    columnas: [
-      'codigo_envio', 'fecha', 'tipo_mercaderia', 'peso_kg', 'numero_paquetes',
-      'origen', 'destino', 'hora_inicio', 'hora_fin', 'tiempo_registro_min',
-      'usuario_responsable', 'observaciones',
-    ],
+    columnas: ['fecha', 'nerd', 'suma_tre', 'tpdre'],
     labels: [
-      'Código envío', 'Fecha', 'Tipo mercadería', 'Peso (kg)', 'Nº paquetes',
-      'Origen', 'Destino', 'Hora inicio', 'Hora fin', 'Tiempo registro (min)',
-      'Usuario responsable', 'Observaciones',
+      'Fecha',
+      'Número de envíos registrados (NERD)',
+      'Sumatoria de tiempos de registro (min) (ΣTRE)',
+      'Tiempo promedio diario de registro de envíos (min) (TPDRE)',
     ],
   },
   2: {
     id: 'calidad',
-    titulo: 'Dimensión 2 - Calidad información (PER)',
-    indicador: 'PER',
+    titulo: 'Dimensión 2 - Calidad información (PDRE)',
+    indicador: 'PDRE',
     vista: 'vw_ficha_calidad',
-    columnas: [
-      'codigo_envio', 'fecha', 'tipo_mercaderia', 'destino', 'numero_paquetes',
-      'error_en_registro', 'tipo_error', 'campo_afectado', 'observaciones',
-    ],
+    columnas: ['fecha', 'trevd', 'rce', 'sin_error', 'pdre'],
     labels: [
-      'Código envío', 'Fecha', 'Tipo mercadería', 'Destino', 'Nº paquetes',
-      'Error registro (Sí/No)', 'Tipo error', 'Campo afectado', 'Observaciones',
+      'Fecha',
+      'Total de registros evaluados (TREvD)',
+      'Registros con error (RCE)',
+      'Registros sin error',
+      'Porcentaje diario de registros con error (%) (PDRE)',
     ],
   },
   3: {
     id: 'control',
-    titulo: 'Dimensión 3 - Control y seguimiento (PEEA)',
-    indicador: 'PEEA',
+    titulo: 'Dimensión 3 - Control y seguimiento (PDEEA)',
+    indicador: 'PDEEA',
     vista: 'vw_ficha_control',
-    columnas: [
-      'codigo_envio', 'fecha', 'tipo_mercaderia', 'origen', 'destino',
-      'estado_actual', 'estado_actualizado', 'fecha_actualizacion',
-      'hora_actualizacion', 'responsable_actualizacion', 'observaciones',
-    ],
+    columnas: ['fecha', 'teed', 'eea', 'no_actualizado', 'pdeea'],
     labels: [
-      'Código envío', 'Fecha', 'Tipo mercadería', 'Origen', 'Destino',
-      'Estado actual', 'Estado actualizado (Sí/No)', 'Fecha actualización',
-      'Hora actualización', 'Responsable', 'Observaciones',
+      'Fecha',
+      'Total de envíos evaluados (TEED)',
+      'Envíos con estado actualizado (EEA)',
+      'Envíos con estado no actualizado',
+      'Porcentaje diario de envíos con estado actualizado (%) (PDEEA)',
     ],
   },
   4: {
     id: 'informacion_operativa',
-    titulo: 'Dimensión 4 - Gestión de la información operativa (PIOIC)',
-    indicador: 'PIOIC',
+    titulo: 'Dimensión 4 - Gestión de la información operativa (PDIOIC)',
+    indicador: 'PDIOIC',
     vista: 'vw_ficha_informacion_operativa',
-    columnas: [
-      'fecha',
-      'codigo_incidencia',
-      'tipo_incidencia',
-      'area',
-      'codigo_envio',
-      'estado_incidencia',
-      'titulo',
-      'descripcion',
-      'informacion_completa',
-      'fuente_principal',
-      'observacion',
-    ],
+    columnas: ['fecha', 'tioed', 'nioc', 'incompletas', 'pdioic'],
     labels: [
       'Fecha',
-      'Código incidencia',
-      'Tipo incidencia',
-      'Área',
-      'Código envío',
-      'Estado incidencia',
-      'Título',
-      'Descripción',
-      'Información completa (Sí/No)',
-      'Fuente principal de información',
-      'Observación',
+      'Total de incidencias evaluadas (TIOED)',
+      'Incidencias con información completa (NIOC)',
+      'Incidencias con información incompleta',
+      'Porcentaje diario de incidencias con información completa (%) (PDIOIC)',
     ],
   },
 };
@@ -151,6 +126,71 @@ const normalizarGrupo = (grupo) => {
   return GRUPOS_MUESTRA_VALIDOS.includes(valor) ? valor : null;
 };
 
+const listarDiasISO = (desde, hasta) => {
+  const dias = [];
+  const cursor = new Date(`${desde}T12:00:00`);
+  const fin = new Date(`${hasta}T12:00:00`);
+  while (cursor <= fin) {
+    dias.push(aFechaISO(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dias;
+};
+
+/** 20 jornadas del instrumento (posprueba: 1–20 set; preprueba: primeros 20 días de su ventana). */
+const jornadasFichaGrupo = (grupo) => {
+  const ventana = ventanaFichaGrupo(grupo) || VENTANAS_MEDICION[GRUPO_MUESTRA.POSPRUEBA];
+  return listarDiasISO(ventana.desde, ventana.hasta).slice(0, JORNADAS_FICHA);
+};
+
+const ventanaJornadasFicha = (grupo) => {
+  const base = ventanaFichaGrupo(grupo);
+  if (!base) return null;
+  const dias = jornadasFichaGrupo(grupo);
+  if (!dias.length) return base;
+  return { ...base, desde: dias[0], hasta: dias[dias.length - 1] };
+};
+
+const formatoFechaFicha = (iso) => {
+  const valor = aFechaISO(iso);
+  if (!valor) return '—';
+  const [y, m, d] = valor.split('-');
+  return `${d}/${m}/${y}`;
+};
+
+const valorONa = (numerador, denominador, { porcentaje = false } = {}) => {
+  const d = Number(denominador) || 0;
+  if (d <= 0) return VALOR_NA;
+  const n = Number(numerador) || 0;
+  return redondear(porcentaje ? (n / d) * 100 : n / d);
+};
+
+/**
+ * Media de los promedios diarios (n = jornadas con denominador > 0).
+ * Un día sin registros no entra al promedio y en la ficha se muestra N/A.
+ */
+const mediaDeRatiosDiarios = (filas, numeradorKey, denominadorKey, { porcentaje = false } = {}) => {
+  const valores = [];
+  let numerador = 0;
+  let denominador = 0;
+  for (const fila of filas || []) {
+    const n = Number(fila[numeradorKey]) || 0;
+    const d = Number(fila[denominadorKey]) || 0;
+    numerador += n;
+    denominador += d;
+    if (d > 0) {
+      const ratio = n / d;
+      valores.push(porcentaje ? ratio * 100 : ratio);
+    }
+  }
+  return {
+    valor: valores.length ? redondear(valores.reduce((acc, v) => acc + v, 0) / valores.length) : 0,
+    numerador: porcentaje ? numerador : redondear(numerador),
+    denominador,
+    nDias: valores.length,
+  };
+};
+
 /**
  * Construye el filtro que separa la muestra de investigación de los datos
  * sintéticos cargados para las pruebas técnicas del DataMart.
@@ -160,11 +200,21 @@ const filtroMuestra = (alias, { alcance, grupo, enVentana = false } = {}) => {
   const modo = normalizarAlcance(alcance);
   if (modo === ALCANCE.TODOS) return { sql: '1 = 1', replacements: {} };
   const grupoNormalizado = normalizarGrupo(grupo);
-  const grupos = grupoNormalizado ? [grupoNormalizado] : GRUPOS_MUESTRA_VALIDOS;
-  const replacements = { origenReal: ORIGEN_DATO.REAL, gruposMuestra: grupos };
-  let sql = `${alias}.origen_dato = :origenReal AND ${alias}.grupo_muestra IN (:gruposMuestra)`;
+  const replacements = { origenReal: ORIGEN_DATO.REAL };
+
+  let sql;
+  if (grupoNormalizado === GRUPO_MUESTRA.POSPRUEBA) {
+    // Postest: toda la operación REAL de la ventana, no solo 50 envíos etiquetados.
+    replacements.grupoPre = GRUPO_MUESTRA.PREPRUEBA;
+    sql = `${alias}.origen_dato = :origenReal AND ${alias}.grupo_muestra <> :grupoPre`;
+  } else {
+    const grupos = grupoNormalizado ? [grupoNormalizado] : GRUPOS_MUESTRA_VALIDOS;
+    replacements.gruposMuestra = grupos;
+    sql = `${alias}.origen_dato = :origenReal AND ${alias}.grupo_muestra IN (:gruposMuestra)`;
+  }
+
   if (enVentana && grupoNormalizado) {
-    const ventana = ventanaFichaGrupo(grupoNormalizado);
+    const ventana = ventanaJornadasFicha(grupoNormalizado);
     if (ventana) {
       sql += ` AND e.fecha_registro BETWEEN :ventanaDesde AND :ventanaHasta`;
       replacements.ventanaDesde = ventana.desde;
@@ -193,96 +243,112 @@ const SQL_ULTIMO_HISTORIAL = `
     WHERE x.rn = 1
   ) ult ON ult.id_envio = e.id_envio`;
 
-const ordenFicha = (grupo) =>
-  normalizarGrupo(grupo) === GRUPO_MUESTRA.POSPRUEBA
-    ? 'ORDER BY RAND()'
-    : 'ORDER BY e.fecha_registro ASC, e.id_envio ASC';
-
-const sqlFicha = (dimension, filtro, grupo) => {
-  const orden = ordenFicha(grupo);
+const sqlFicha = (dimension, filtro) => {
   if (dimension === 1) {
-    return `SELECT e.codigo_envio, e.fecha_registro AS fecha, e.tipo_carga AS tipo_mercaderia,
-                   e.peso_kg, e.numero_paquetes, e.origen, e.destino,
-                   TIME(e.hora_inicio_registro) AS hora_inicio,
-                   TIME(e.hora_fin_registro) AS hora_fin,
-                   e.tiempo_registro_min,
-                   CONCAT(u.nombres, ' ', u.apellidos) AS usuario_responsable,
-                   e.observaciones
+    return `SELECT DATE(e.fecha_registro) AS fecha,
+                   COUNT(*) AS nerd,
+                   COALESCE(SUM(e.tiempo_registro_min), 0) AS suma_tre
             FROM envios e
-            LEFT JOIN usuarios u ON e.id_responsable = u.id_usuario
             WHERE e.activo = 1 AND ${filtro.sql}
-            ${orden}`;
+            GROUP BY DATE(e.fecha_registro)
+            ORDER BY DATE(e.fecha_registro) ASC`;
   }
   if (dimension === 2) {
-    return `SELECT e.codigo_envio, e.fecha_registro AS fecha, e.tipo_carga AS tipo_mercaderia,
-                   e.destino, e.numero_paquetes,
-                   IF(e.registro_correcto = 0 OR er.total > 0, 'Sí', 'No') AS error_en_registro,
-                   COALESCE(er.tipo_error, IF(e.registro_correcto = 0, 'validacion', NULL)) AS tipo_error,
-                   er.campo_afectado,
-                   e.observaciones
+    return `SELECT DATE(e.fecha_registro) AS fecha,
+                   COUNT(*) AS trevd,
+                   SUM(CASE WHEN e.registro_correcto = 0
+                              OR EXISTS (SELECT 1 FROM errores_registro er WHERE er.id_envio = e.id_envio)
+                            THEN 1 ELSE 0 END) AS rce
             FROM envios e
-            LEFT JOIN (
-              SELECT id_envio, COUNT(*) AS total,
-                     SUBSTRING_INDEX(GROUP_CONCAT(tipo_error ORDER BY created_at DESC), ',', 1) AS tipo_error,
-                     SUBSTRING_INDEX(GROUP_CONCAT(campo_afectado ORDER BY created_at DESC), ',', 1) AS campo_afectado
-              FROM errores_registro WHERE id_envio IS NOT NULL GROUP BY id_envio
-            ) er ON er.id_envio = e.id_envio
             WHERE e.activo = 1 AND ${filtro.sql}
-            ${orden}`;
+            GROUP BY DATE(e.fecha_registro)
+            ORDER BY DATE(e.fecha_registro) ASC`;
   }
   if (dimension === 3) {
-    return `SELECT e.codigo_envio, DATE(e.fecha_registro) AS fecha, e.tipo_carga AS tipo_mercaderia,
-                   e.origen, e.destino, s.nombre AS estado_actual,
-                   IF(ult.id_estado IS NOT NULL AND ult.id_estado = e.id_estado_actual, 'Sí', 'No') AS estado_actualizado,
-                   DATE(COALESCE(ult.fecha_hora, e.hora_fin_registro, e.hora_inicio_registro)) AS fecha_actualizacion,
-                   TIME(COALESCE(ult.fecha_hora, e.hora_fin_registro, e.hora_inicio_registro)) AS hora_actualizacion,
-                   CONCAT(u.nombres, ' ', u.apellidos) AS responsable_actualizacion,
-                   e.observaciones
+    return `SELECT DATE(e.fecha_registro) AS fecha,
+                   COUNT(*) AS teed,
+                   SUM(CASE WHEN ult.id_estado IS NOT NULL AND ult.id_estado = e.id_estado_actual
+                            THEN 1 ELSE 0 END) AS eea
             FROM envios e
-            JOIN estados_envio s ON e.id_estado_actual = s.id_estado
             ${SQL_ULTIMO_HISTORIAL}
-            LEFT JOIN usuarios u ON ult.id_usuario = u.id_usuario
             WHERE e.activo = 1 AND ${filtro.sql}
-            ${orden}`;
+            GROUP BY DATE(e.fecha_registro)
+            ORDER BY DATE(e.fecha_registro) ASC`;
   }
-  const ordenInc = normalizarGrupo(grupo) === GRUPO_MUESTRA.POSPRUEBA
-    ? 'ORDER BY RAND()'
-    : 'ORDER BY e.fecha_registro ASC, i.id_incidencia ASC';
-  return `SELECT DATE(i.fecha_reporte) AS fecha, i.codigo_incidencia,
-                 i.tipo AS tipo_incidencia, i.area, e.codigo_envio,
-                 i.estado_incidencia, i.titulo, i.descripcion,
-                 IF(${SQL_INCIDENCIA_COMPLETA}, 'Sí', 'No') AS informacion_completa,
-                 i.fuente_principal, i.observacion
+  return `SELECT DATE(e.fecha_registro) AS fecha,
+                 COUNT(*) AS tioed,
+                 SUM(CASE WHEN ${SQL_INCIDENCIA_COMPLETA} THEN 1 ELSE 0 END) AS nioc
           FROM incidencias i
           JOIN envios e ON e.id_envio = i.id_envio
           WHERE e.activo = 1 AND ${filtro.sql}
-          ${ordenInc}`;
+          GROUP BY DATE(e.fecha_registro)
+          ORDER BY DATE(e.fecha_registro) ASC`;
 };
 
-const getDatosDimension = async (dimension, { limit = null, alcance, grupo } = {}) => {
+const armarFilaDiaria = (dimension, fechaISO, raw) => {
+  const fecha = formatoFechaFicha(fechaISO);
+  if (dimension === 1) {
+    const nerd = Number(raw?.nerd) || 0;
+    const sumaTre = redondear(Number(raw?.suma_tre) || 0);
+    return { fecha, nerd, suma_tre: sumaTre, tpdre: valorONa(sumaTre, nerd) };
+  }
+  if (dimension === 2) {
+    const trevd = Number(raw?.trevd) || 0;
+    const rce = Number(raw?.rce) || 0;
+    return {
+      fecha,
+      trevd,
+      rce,
+      sin_error: Math.max(0, trevd - rce),
+      pdre: valorONa(rce, trevd, { porcentaje: true }),
+    };
+  }
+  if (dimension === 3) {
+    const teed = Number(raw?.teed) || 0;
+    const eea = Number(raw?.eea) || 0;
+    return {
+      fecha,
+      teed,
+      eea,
+      no_actualizado: Math.max(0, teed - eea),
+      pdeea: valorONa(eea, teed, { porcentaje: true }),
+    };
+  }
+  const tioed = Number(raw?.tioed) || 0;
+  const nioc = Number(raw?.nioc) || 0;
+  return {
+    fecha,
+    tioed,
+    nioc,
+    incompletas: Math.max(0, tioed - nioc),
+    pdioic: valorONa(nioc, tioed, { porcentaje: true }),
+  };
+};
+
+const getDatosDimension = async (dimension, { alcance, grupo } = {}) => {
   const config = DIMENSIONES[dimension];
   if (!config) throw Object.assign(new Error('Dimensión no válida'), { statusCode: 400 });
   const grupoNormalizado = normalizarGrupo(grupo);
   const filtro = filtroMuestra('e', { alcance, grupo, enVentana: true });
-  let sql = sqlFicha(dimension, filtro, grupoNormalizado);
-  const limiteGrupo = limiteFichaGrupo(grupoNormalizado);
-  const cap = limit ? Math.max(1, Math.min(Number(limit) || limiteGrupo, 500)) : null;
-  if (cap) sql += ` LIMIT ${cap}`;
-  return sequelize.query(sql, { type: QueryTypes.SELECT, replacements: filtro.replacements });
-};
-
-const countDatosDimension = async (dimension, { alcance, grupo } = {}) => {
-  const config = DIMENSIONES[dimension];
-  if (!config) return 0;
-  const filtro = filtroMuestra('e', { alcance, grupo, enVentana: true });
-  const tabla = dimension === 4
-    ? `FROM incidencias i JOIN envios e ON e.id_envio = i.id_envio WHERE e.activo = 1 AND ${filtro.sql}`
-    : `FROM envios e WHERE e.activo = 1 AND ${filtro.sql}`;
-  const [row] = await sequelize.query(`SELECT COUNT(*) AS total ${tabla}`, {
+  const sql = sqlFicha(dimension, filtro);
+  const filas = await sequelize.query(sql, {
     type: QueryTypes.SELECT,
     replacements: filtro.replacements,
   });
-  return Number(row?.total) || 0;
+  const porFecha = new Map();
+  for (const fila of filas) {
+    const iso = aFechaISO(fila.fecha);
+    if (iso) porFecha.set(iso, fila);
+  }
+  return jornadasFichaGrupo(grupoNormalizado).map((iso) =>
+    armarFilaDiaria(dimension, iso, porFecha.get(iso))
+  );
+};
+
+const countDatosDimension = async (dimension, { grupo } = {}) => {
+  const config = DIMENSIONES[dimension];
+  if (!config) return 0;
+  return jornadasFichaGrupo(normalizarGrupo(grupo)).length;
 };
 
 // -----------------------------------------------------------------------------
@@ -290,128 +356,163 @@ const countDatosDimension = async (dimension, { alcance, grupo } = {}) => {
 // -----------------------------------------------------------------------------
 
 /**
- * Calcula TPRE, PER, PEEA y PIOIC sobre un alcance controlado.
- * Por defecto solo considera la muestra de investigación (datos REALES
- * marcados como PREPRUEBA o POSPRUEBA). Los registros sintéticos generados
- * por `db:seed-bulk` quedan excluidos salvo que se pida alcance = TODOS,
- * que existe únicamente para inspección operativa, no para la tesis.
+ * Calcula TPDRE, PDRE, PDEEA y PDIOIC como media de los promedios diarios
+ * (una observación = una jornada). Por defecto solo considera la muestra
+ * de investigación (datos REALES marcados como PREPRUEBA o POSPRUEBA).
  */
 const calcularIndicadores = async ({ alcance, grupo } = {}) => {
   const modo = normalizarAlcance(alcance);
   const grupoNormalizado = normalizarGrupo(grupo);
-  const filtroEnvios = filtroMuestra('e', { alcance: modo, grupo: grupoNormalizado });
+  const filtroEnvios = filtroMuestra('e', {
+    alcance: modo,
+    grupo: grupoNormalizado,
+    enVentana: Boolean(grupoNormalizado),
+  });
 
-  // D1 — TPRE = ΣTRE / NER
-  const [tpreRow] = await sequelize.query(
-    `SELECT COUNT(*) AS ner, COALESCE(SUM(e.tiempo_registro_min), 0) AS suma_tre
+  const diasTpdre = await sequelize.query(
+    `SELECT DATE(e.fecha_registro) AS fecha,
+            COUNT(*) AS nerd,
+            COALESCE(SUM(e.tiempo_registro_min), 0) AS suma_tre
      FROM envios e
-     WHERE e.activo = 1 AND e.tiempo_registro_min IS NOT NULL AND ${filtroEnvios.sql}`,
+     WHERE e.activo = 1 AND ${filtroEnvios.sql}
+     GROUP BY DATE(e.fecha_registro)`,
     { type: QueryTypes.SELECT, replacements: filtroEnvios.replacements }
   );
-  const ner = Number(tpreRow?.ner) || 0;
-  const sumaTre = Number(tpreRow?.suma_tre) || 0;
-  const tpre = ner
-    ? { valor: redondear(sumaTre / ner), numerador: redondear(sumaTre), denominador: ner }
-    : calcularTPRE([]);
+  const tpdre = mediaDeRatiosDiarios(diasTpdre, 'suma_tre', 'nerd');
 
-  // D2 — PER = (RCE / TREg) × 100
-  const [perRow] = await sequelize.query(
-    `SELECT COUNT(*) AS treg,
+  const diasPdre = await sequelize.query(
+    `SELECT DATE(e.fecha_registro) AS fecha,
+            COUNT(*) AS trevd,
             SUM(CASE WHEN e.registro_correcto = 0
                        OR EXISTS (SELECT 1 FROM errores_registro er WHERE er.id_envio = e.id_envio)
                      THEN 1 ELSE 0 END) AS rce
      FROM envios e
-     WHERE e.activo = 1 AND ${filtroEnvios.sql}`,
+     WHERE e.activo = 1 AND ${filtroEnvios.sql}
+     GROUP BY DATE(e.fecha_registro)`,
     { type: QueryTypes.SELECT, replacements: filtroEnvios.replacements }
   );
-  const per = calcularPER(Number(perRow?.rce) || 0, Number(perRow?.treg) || 0);
+  const pdre = mediaDeRatiosDiarios(diasPdre, 'rce', 'trevd', { porcentaje: true });
 
-  // D3 — PEEA = (EEA / TEE) × 100
-  const [peeaRow] = await sequelize.query(
-    `SELECT COUNT(*) AS tee,
+  const diasPdeea = await sequelize.query(
+    `SELECT DATE(e.fecha_registro) AS fecha,
+            COUNT(*) AS teed,
             SUM(CASE WHEN ult.id_estado IS NOT NULL AND ult.id_estado = e.id_estado_actual
                      THEN 1 ELSE 0 END) AS eea
      FROM envios e
      ${SQL_ULTIMO_HISTORIAL}
-     WHERE e.activo = 1 AND ${filtroEnvios.sql}`,
+     WHERE e.activo = 1 AND ${filtroEnvios.sql}
+     GROUP BY DATE(e.fecha_registro)`,
     { type: QueryTypes.SELECT, replacements: filtroEnvios.replacements }
   );
-  const peea = calcularPEEA(Number(peeaRow?.eea) || 0, Number(peeaRow?.tee) || 0);
+  const pdeea = mediaDeRatiosDiarios(diasPdeea, 'eea', 'teed', { porcentaje: true });
 
-  // D4 — PIOIC = (NIOC / NTIR) × 100
-  // Denominador: incidencias registradas de los envíos del alcance (NO los envíos).
-  const [pioicRow] = await sequelize.query(
-    `SELECT COUNT(*) AS ntir,
+  const diasPdioic = await sequelize.query(
+    `SELECT DATE(e.fecha_registro) AS fecha,
+            COUNT(*) AS tioed,
             SUM(CASE WHEN ${SQL_INCIDENCIA_COMPLETA} THEN 1 ELSE 0 END) AS nioc
      FROM incidencias i
      JOIN envios e ON e.id_envio = i.id_envio
-     WHERE e.activo = 1 AND ${filtroEnvios.sql}`,
+     WHERE e.activo = 1 AND ${filtroEnvios.sql}
+     GROUP BY DATE(e.fecha_registro)`,
     { type: QueryTypes.SELECT, replacements: filtroEnvios.replacements }
   );
-  const pioic = calcularPIOIC(Number(pioicRow?.nioc) || 0, Number(pioicRow?.ntir) || 0);
+  const pdioic = mediaDeRatiosDiarios(diasPdioic, 'nioc', 'tioed', { porcentaje: true });
 
-  const totalEnvios = per.denominador;
+  const detalleDiario = (clave, extra) => ({
+    ...extra,
+    n_jornadas: extra.n_jornadas,
+    media_diaria: true,
+  });
 
   return {
     alcance: modo,
     grupo: grupoNormalizado || (modo === ALCANCE.TODOS ? 'TODOS' : 'PREPRUEBA+POSPRUEBA'),
     incluyeDatosSinteticos: modo === ALCANCE.TODOS,
-    tpre: tpre.valor,
-    per: per.valor,
-    peea: peea.valor,
-    pioic: pioic.valor,
-    totalEnvios,
-    totalIncidencias: pioic.denominador,
+    unidadObservacion: 'jornada',
+    nJornadas: grupoNormalizado ? jornadasFichaGrupo(grupoNormalizado).length : JORNADAS_FICHA,
+    nJornadasConDatos: tpdre.nDias,
+    tpre: tpdre.valor,
+    tpdre: tpdre.valor,
+    per: pdre.valor,
+    pdre: pdre.valor,
+    peea: pdeea.valor,
+    pdeea: pdeea.valor,
+    pioic: pdioic.valor,
+    pdioic: pdioic.valor,
+    totalEnvios: pdre.denominador,
+    totalIncidencias: pdioic.denominador,
     detalle: {
-      tpre: { suma_tre: tpre.numerador, ner: tpre.denominador, unidad: 'minutos' },
-      per: { rce: per.numerador, treg: per.denominador },
-      peea: { eea: peea.numerador, tee: peea.denominador },
-      pioic: { nioc: pioic.numerador, ntir: pioic.denominador },
+      tpre: detalleDiario('tpre', { suma_tre: tpdre.numerador, ner: tpdre.denominador, n_jornadas: tpdre.nDias, unidad: 'minutos' }),
+      tpdre: detalleDiario('tpdre', { suma_tre: tpdre.numerador, nerd: tpdre.denominador, n_jornadas: tpdre.nDias, unidad: 'minutos' }),
+      per: detalleDiario('per', { rce: pdre.numerador, treg: pdre.denominador, n_jornadas: pdre.nDias }),
+      pdre: detalleDiario('pdre', { rce: pdre.numerador, trevd: pdre.denominador, n_jornadas: pdre.nDias }),
+      peea: detalleDiario('peea', { eea: pdeea.numerador, tee: pdeea.denominador, n_jornadas: pdeea.nDias }),
+      pdeea: detalleDiario('pdeea', { eea: pdeea.numerador, teed: pdeea.denominador, n_jornadas: pdeea.nDias }),
+      pioic: detalleDiario('pioic', { nioc: pdioic.numerador, ntir: pdioic.denominador, n_jornadas: pdioic.nDias }),
+      pdioic: detalleDiario('pdioic', { nioc: pdioic.numerador, tioed: pdioic.denominador, n_jornadas: pdioic.nDias }),
     },
   };
 };
 
 /**
- * Cobertura de un grupo respecto al periodo declarado en su ficha: cuántos
- * registros hay, cuántos caen fuera de la ventana y cuántos días quedan.
+ * Cobertura de un grupo: jornadas observadas (n = 20) respecto al instrumento.
  */
 const getCoberturaVentana = async (grupo) => {
   const ventana = VENTANAS_MEDICION[grupo];
   if (!ventana) return null;
+  const jornadas = jornadasFichaGrupo(grupo);
+  const desde = jornadas[0];
+  const hasta = jornadas[jornadas.length - 1];
 
   const [row] = await sequelize.query(
-    `SELECT COUNT(*) AS total,
-            SUM(CASE WHEN e.fecha_registro BETWEEN :desde AND :hasta THEN 1 ELSE 0 END) AS dentro
-     FROM envios e
-     WHERE e.activo = 1 AND e.origen_dato = :real AND e.grupo_muestra = :grupo`,
+    grupo === GRUPO_MUESTRA.POSPRUEBA
+      ? `SELECT COUNT(*) AS total,
+                SUM(CASE WHEN e.fecha_registro BETWEEN :desde AND :hasta THEN 1 ELSE 0 END) AS dentro,
+                COUNT(DISTINCT CASE WHEN e.fecha_registro BETWEEN :desde AND :hasta
+                                    THEN DATE(e.fecha_registro) END) AS dias
+         FROM envios e
+         WHERE e.activo = 1 AND e.origen_dato = :real AND e.grupo_muestra <> :pre`
+      : `SELECT COUNT(*) AS total,
+                SUM(CASE WHEN e.fecha_registro BETWEEN :desde AND :hasta THEN 1 ELSE 0 END) AS dentro,
+                COUNT(DISTINCT CASE WHEN e.fecha_registro BETWEEN :desde AND :hasta
+                                    THEN DATE(e.fecha_registro) END) AS dias
+         FROM envios e
+         WHERE e.activo = 1 AND e.origen_dato = :real AND e.grupo_muestra = :grupo`,
     {
       type: QueryTypes.SELECT,
-      replacements: { desde: ventana.desde, hasta: ventana.hasta, real: ORIGEN_DATO.REAL, grupo },
+      replacements: grupo === GRUPO_MUESTRA.POSPRUEBA
+        ? { desde, hasta, real: ORIGEN_DATO.REAL, pre: GRUPO_MUESTRA.PREPRUEBA }
+        : { desde, hasta, real: ORIGEN_DATO.REAL, grupo },
     }
   );
 
   const total = Number(row?.total) || 0;
   const dentro = Number(row?.dentro) || 0;
+  const dias = Number(row?.dias) || 0;
   const hoy = aFechaISO(new Date());
   const msPorDia = 86400000;
-  const diasRestantes = hoy > ventana.hasta
+  const diasRestantes = hoy > hasta
     ? 0
-    : Math.round((new Date(`${ventana.hasta}T12:00:00`) - new Date(`${(hoy < ventana.desde ? ventana.desde : hoy)}T12:00:00`)) / msPorDia);
+    : Math.round((new Date(`${hasta}T12:00:00`) - new Date(`${(hoy < desde ? desde : hoy)}T12:00:00`)) / msPorDia);
 
   return {
     ...ventana,
+    desde,
+    hasta,
     registrados: total,
-    dentroDeVentana: dentro,
+    enviosDentro: dentro,
+    jornadasObservadas: dias,
+    esperadoJornadas: JORNADAS_FICHA,
+    dentroDeVentana: dias,
     fueraDeVentana: total - dentro,
-    faltantes: Math.max(0, TAMANIO_GRUPO_MUESTRA - dentro),
-    abierta: hoy <= ventana.hasta,
+    faltantes: Math.max(0, JORNADAS_FICHA - dias),
+    abierta: hoy <= hasta,
     diasRestantes,
   };
 };
 
 /**
- * Resultado consolidado de la medición de investigación:
- * preprueba (50) y posprueba (50) por separado, nunca mezcladas.
+ * Resultado consolidado de la medición: 20 jornadas de preprueba y 20 de posprueba.
  */
 const getMedicionInvestigacion = async () => {
   const [preprueba, posprueba, ventanaPre, ventanaPos] = await Promise.all([
@@ -431,9 +532,8 @@ const getMedicionInvestigacion = async () => {
     { type: QueryTypes.SELECT }
   );
 
-  const enPreprueba = Number(cobertura?.preprueba) || 0;
-  const enPosprueba = Number(cobertura?.posprueba) || 0;
-
+  const jornadasPre = ventanaPre?.jornadasObservadas || 0;
+  const jornadasPos = ventanaPos?.jornadasObservadas || 0;
   const fueraDeVentana = (ventanaPre?.fueraDeVentana || 0) + (ventanaPos?.fueraDeVentana || 0);
 
   return {
@@ -441,17 +541,20 @@ const getMedicionInvestigacion = async () => {
     posprueba,
     ventanas: { preprueba: ventanaPre, posprueba: ventanaPos },
     muestra: {
-      esperadoPorGrupo: TAMANIO_GRUPO_MUESTRA,
-      esperadoTotal: TAMANIO_GRUPO_MUESTRA * 2,
-      registradoPreprueba: enPreprueba,
-      registradoPosprueba: enPosprueba,
-      registradoTotal: enPreprueba + enPosprueba,
+      esperadoPorGrupo: JORNADAS_FICHA,
+      esperadoTotal: JORNADAS_FICHA * 2,
+      registradoPreprueba: jornadasPre,
+      registradoPosprueba: jornadasPos,
+      registradoTotal: jornadasPre + jornadasPos,
+      enviosPreprueba: Number(cobertura?.preprueba) || 0,
+      enviosPosprueba: Number(cobertura?.posprueba) || 0,
       fueraDeVentana,
       completa:
-        enPreprueba === TAMANIO_GRUPO_MUESTRA
-        && enPosprueba === TAMANIO_GRUPO_MUESTRA
+        jornadasPre === JORNADAS_FICHA
+        && jornadasPos === JORNADAS_FICHA
         && fueraDeVentana === 0,
       pareada: false,
+      unidadObservacion: 'jornada',
     },
     datosSinteticos: {
       envios: Number(cobertura?.sinteticos) || 0,
@@ -474,7 +577,7 @@ const buildExportPayload = async (dimension, { alcance, grupo } = {}) => {
 
   const limite = limiteFichaGrupo(grupoNormalizado);
   const [filas, totalBd, indicadores] = await Promise.all([
-    getDatosDimension(dimension, { ...opciones, limit: limite }),
+    getDatosDimension(dimension, opciones),
     countDatosDimension(dimension, opciones),
     calcularIndicadores(opciones),
   ]);
@@ -494,9 +597,13 @@ const buildExportPayload = async (dimension, { alcance, grupo } = {}) => {
     limite,
     indicadores: {
       tpre: indicadores.tpre,
+      tpdre: indicadores.tpdre,
       per: indicadores.per,
+      pdre: indicadores.pdre,
       peea: indicadores.peea,
+      pdeea: indicadores.pdeea,
       pioic: indicadores.pioic,
+      pdioic: indicadores.pdioic,
     },
   };
 };
@@ -966,6 +1073,7 @@ module.exports = {
   aleatorizarPosprueba,
   filtroMuestra,
   SQL_INCIDENCIA_COMPLETA,
+  JORNADAS_FICHA,
   FICHA_MUESTRA,
   limiteFichaGrupo,
   POSPRUEBA_POOL,

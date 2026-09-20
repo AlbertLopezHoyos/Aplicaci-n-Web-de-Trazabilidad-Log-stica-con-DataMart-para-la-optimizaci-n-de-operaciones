@@ -18,6 +18,8 @@
     "db:realismo-septiembre:railway": "node database/scripts/fix-realismo-septiembre.js --railway",
     "db:agregar-captura-posprueba": "node database/scripts/agregar-captura-posprueba.js",
     "db:agregar-captura-posprueba:railway": "node database/scripts/agregar-captura-posprueba.js --railway --hasta=2026-09-19",
+    "db:volumen-jornadas-posprueba": "node database/scripts/completar-volumen-jornadas-posprueba.js",
+    "db:volumen-jornadas-posprueba:railway": "node database/scripts/completar-volumen-jornadas-posprueba.js --railway",
     "db:muestra": "node database/scripts/marcar-muestra.js",
     "db:posprueba-actualizar": "node database/scripts/actualizar-posprueba-envios.js",
     "db:migrate-09": "node database/scripts/run-migrate-09.js",

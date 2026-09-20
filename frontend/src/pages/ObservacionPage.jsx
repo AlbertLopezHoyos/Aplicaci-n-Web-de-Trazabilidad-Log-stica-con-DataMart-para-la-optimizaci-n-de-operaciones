@@ -22,7 +22,7 @@ const DIMENSIONES = [
   {
     id: 1,
     titulo: 'Eficiencia operativa',
-    indicador: 'TPRE',
+    indicador: 'TPDRE',
     unidad: 'min',
     icon: Timer,
     color: 'border-blue-200 bg-blue-50 text-blue-800',
@@ -31,7 +31,7 @@ const DIMENSIONES = [
   {
     id: 2,
     titulo: 'Calidad de la información',
-    indicador: 'PER',
+    indicador: 'PDRE',
     unidad: '%',
     icon: AlertTriangle,
     color: 'border-red-200 bg-red-50 text-red-800',
@@ -40,7 +40,7 @@ const DIMENSIONES = [
   {
     id: 3,
     titulo: 'Control y seguimiento',
-    indicador: 'PEEA',
+    indicador: 'PDEEA',
     unidad: '%',
     icon: MapPin,
     color: 'border-green-200 bg-green-50 text-green-800',
@@ -49,7 +49,7 @@ const DIMENSIONES = [
   {
     id: 4,
     titulo: 'Gestión info. operativa',
-    indicador: 'PIOIC',
+    indicador: 'PDIOIC',
     unidad: '%',
     icon: ClipboardCheck,
     color: 'border-amber-200 bg-amber-50 text-amber-800',
@@ -57,11 +57,15 @@ const DIMENSIONES = [
   },
 ];
 
-const CLAVE_INDICADOR = { 1: 'tpre', 2: 'per', 3: 'peea', 4: 'pioic' };
+const CLAVE_INDICADOR = { 1: 'tpdre', 2: 'pdre', 3: 'pdeea', 4: 'pdioic' };
+const CLAVE_INDICADOR_LEGACY = { 1: 'tpre', 2: 'per', 3: 'peea', 4: 'pioic' };
 const ALCANCE_FICHA = 'MUESTRA';
 const GRUPO_FICHA = 'POSPRUEBA';
-const POSPRUEBA_MUESTRA = 50;
+const JORNADAS_POSPRUEBA = 20;
 const VENTANA_POSPRUEBA = { desde: '2026-09-01', hasta: '2026-09-20' };
+
+const valorIndicadorDe = (indicadores, dimId) =>
+  indicadores?.[CLAVE_INDICADOR[dimId]] ?? indicadores?.[CLAVE_INDICADOR_LEGACY[dimId]];
 
 const ObservacionPage = () => {
   const [indicadores, setIndicadores] = useState(null);
@@ -113,8 +117,8 @@ const ObservacionPage = () => {
     try {
       await api.post(resolveAleatorizarUrl());
       toastSuccess(
-        'Registros aleatorizados',
-        'mostrando registros aleatorios posprueba (01-09-2026 al 19-09-2026, sin domingos)'
+        'Muestra actualizada',
+        'fichas de 20 jornadas (01-09-2026 al 20-09-2026, promedio por día)'
       );
       loadIndicadores();
       loadDimension(dimensionActiva);
@@ -146,7 +150,7 @@ const ObservacionPage = () => {
       });
       toastSuccess(
         'Ficha exportada',
-        `Dimensión ${dim} (${payload.indicador}) · ${payload.filas?.length ?? 0} registros`
+        `Dimensión ${dim} (${payload.indicador}) · ${payload.filas?.length ?? 0} jornadas`
       );
     } catch {
       toastError('Error', 'No se pudo exportar la ficha');
@@ -156,8 +160,7 @@ const ObservacionPage = () => {
   };
 
   const dimActual = DIMENSIONES.find((d) => d.id === dimensionActiva);
-  const claveInd = CLAVE_INDICADOR[dimensionActiva];
-  const valorIndicador = indicadores?.[claveInd];
+  const valorIndicador = valorIndicadorDe(indicadores, dimensionActiva);
   const labelCol = (key, idx) => labels[idx] || key.replace(/_/g, ' ');
 
   return (
@@ -171,7 +174,7 @@ const ObservacionPage = () => {
       </Link>
       <PageHeader
         title="Fichas de observación"
-        subtitle={`Postest — ${POSPRUEBA_MUESTRA} envíos de posprueba (aleatorios) · origen Lima · tipos frágil, general o vulnerable`}
+        subtitle={`Postest — ${JORNADAS_POSPRUEBA} jornadas (promedio por día) · 1 al 20 set 2026`}
         compact
         action={
           <div className="flex flex-wrap gap-2">
@@ -209,17 +212,17 @@ const ObservacionPage = () => {
         <p className="flex items-start gap-2">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-salazar-700" />
           <span>
-            Estas fichas muestran {POSPRUEBA_MUESTRA} registros al azar del <strong>postest</strong>{' '}
-            (posprueba, {VENTANA_POSPRUEBA.desde} a {VENTANA_POSPRUEBA.hasta}). No forman parte del
-            funcionamiento operativo: no crean envíos ni cambian estados. Envíos, seguimiento e
-            incidencias siguen siendo la operación diaria.
+            Cada fila es <strong>un día operativo</strong> ({JORNADAS_POSPRUEBA} jornadas del{' '}
+            {VENTANA_POSPRUEBA.desde} al {VENTANA_POSPRUEBA.hasta}). Los indicadores son el promedio
+            diario (TPDRE, PDRE, PDEEA, PDIOIC). Si un día no tiene incidencias, PDIOIC se muestra
+            como N/A. No crean envíos ni cambian la operación diaria.
           </span>
         </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="rounded-full bg-salazar-50 px-3 py-1.5 text-xs font-medium text-salazar-800 ring-1 ring-salazar-200">
-          Posprueba · {VENTANA_POSPRUEBA.desde} a {VENTANA_POSPRUEBA.hasta} · {POSPRUEBA_MUESTRA} registros por ficha
+          Posprueba · {VENTANA_POSPRUEBA.desde} a {VENTANA_POSPRUEBA.hasta} · {JORNADAS_POSPRUEBA} jornadas
         </span>
       </div>
 
@@ -227,7 +230,7 @@ const ObservacionPage = () => {
         {DIMENSIONES.map((d) => {
           const Icon = d.icon;
           const activa = dimensionActiva === d.id;
-          const valor = indicadores?.[CLAVE_INDICADOR[d.id]];
+          const valor = valorIndicadorDe(indicadores, d.id);
           return (
             <button
               key={d.id}
@@ -260,13 +263,13 @@ const ObservacionPage = () => {
               {tituloDim || dimActual?.titulo}
             </h3>
             <p className="text-xs text-slate-500">
-              Vista previa · {datos.length} de {totalRegistros} en posprueba ({VENTANA_POSPRUEBA.desde} a {VENTANA_POSPRUEBA.hasta}) · Indicador {dimActual?.indicador}:{' '}
+              {datos.length} jornadas · {VENTANA_POSPRUEBA.desde} a {VENTANA_POSPRUEBA.hasta} · media diaria {dimActual?.indicador}:{' '}
               <strong>{valorIndicador ?? '—'}{dimActual?.unidad === '%' ? '%' : ' min'}</strong>
             </p>
           </div>
           <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200">
             <ClipboardList className="mr-1 inline h-3 w-3" />
-            {POSPRUEBA_MUESTRA} envíos · {VENTANA_POSPRUEBA.desde} a {VENTANA_POSPRUEBA.hasta}
+            {JORNADAS_POSPRUEBA} días · {VENTANA_POSPRUEBA.desde} a {VENTANA_POSPRUEBA.hasta}
           </span>
         </div>
         {loading ? (
@@ -290,7 +293,7 @@ const ObservacionPage = () => {
                 {datos.length === 0 && (
                   <tr>
                     <td colSpan={columnas.length + 1} className="px-4 py-10 text-center text-slate-500">
-                      Sin registros de posprueba en la ventana {VENTANA_POSPRUEBA.desde} a {VENTANA_POSPRUEBA.hasta}.
+                      Sin jornadas de posprueba en la ventana {VENTANA_POSPRUEBA.desde} a {VENTANA_POSPRUEBA.hasta}.
                     </td>
                   </tr>
                 )}

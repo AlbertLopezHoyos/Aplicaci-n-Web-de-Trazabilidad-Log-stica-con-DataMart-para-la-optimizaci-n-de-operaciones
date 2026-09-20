@@ -3,26 +3,21 @@ const { sequelize } = require('../../src/models');
 const { QueryTypes } = require('sequelize');
 
 (async () => {
-  const rows = await sequelize.query(
+  const [c] = await sequelize.query(
     `SELECT
-       SUM(CASE WHEN origen_dato='REAL' AND grupo_muestra='POSPRUEBA' THEN 1 ELSE 0 END) AS posprueba,
-       SUM(CASE WHEN origen_dato='REAL' AND grupo_muestra='PREPRUEBA' THEN 1 ELSE 0 END) AS preprueba,
-       SUM(CASE WHEN origen_dato='REAL' AND fecha_registro BETWEEN '2026-09-01' AND '2026-09-19' THEN 1 ELSE 0 END) AS reales_ventana,
-       SUM(CASE WHEN origen_dato='REAL' AND grupo_muestra='POSPRUEBA' AND fecha_registro BETWEEN '2026-09-01' AND '2026-09-19' THEN 1 ELSE 0 END) AS pos_en_ventana
+       SUM(grupo_muestra='POSPRUEBA') AS pos,
+       SUM(grupo_muestra='PREPRUEBA') AS pre,
+       SUM(grupo_muestra='NO_MUESTRA') AS no,
+       SUM(origen_dato='REAL' AND fecha_registro BETWEEN '2026-09-01' AND '2026-09-20') AS reales_ventana
      FROM envios WHERE activo=1`,
     { type: QueryTypes.SELECT }
   );
-  const inc = await sequelize.query(
-    `SELECT COUNT(*) AS n FROM incidencias i
-     JOIN envios e ON e.id_envio=i.id_envio
-     WHERE e.activo=1 AND e.origen_dato='REAL' AND e.grupo_muestra='POSPRUEBA'`,
+  const posFechas = await sequelize.query(
+    `SELECT fecha_registro, origen_dato, COUNT(*) n
+     FROM envios WHERE activo=1 AND grupo_muestra='POSPRUEBA'
+     GROUP BY fecha_registro, origen_dato ORDER BY fecha_registro`,
     { type: QueryTypes.SELECT }
   );
-  const fechas = await sequelize.query(
-    `SELECT MIN(fecha_registro) AS minf, MAX(fecha_registro) AS maxf
-     FROM envios WHERE activo=1 AND origen_dato='REAL' AND grupo_muestra='POSPRUEBA'`,
-    { type: QueryTypes.SELECT }
-  );
-  console.log(JSON.stringify({ envios: rows[0], incidencias_pos: inc[0], fechas_pos: fechas[0] }, null, 2));
+  console.log(JSON.stringify({ c, posFechas }, null, 2));
   await sequelize.close();
 })();

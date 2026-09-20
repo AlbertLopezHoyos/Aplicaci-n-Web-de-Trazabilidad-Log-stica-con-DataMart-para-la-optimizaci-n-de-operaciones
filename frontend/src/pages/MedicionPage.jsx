@@ -19,48 +19,48 @@ import { exportFichaExcel } from '../utils/fichaExport';
 
 const INDICADORES = [
   {
-    clave: 'tpre',
-    nombre: 'TPRE',
+    clave: 'tpdre',
+    nombre: 'TPDRE',
     dimension: 'Eficiencia operativa',
-    descripcion: 'Tiempo promedio de registro de envíos',
-    formula: 'TPRE = ΣTRE / NER',
+    descripcion: 'Tiempo promedio diario de registro de envíos (media de 20 jornadas)',
+    formula: 'TPDRE = ΣTRE / NERD',
     unidad: 'min',
     icon: Timer,
     color: 'text-blue-600',
-    detalle: (d) => `ΣTRE ${d?.tpre?.suma_tre ?? 0} min / NER ${d?.tpre?.ner ?? 0}`,
+    detalle: (d) => `Media de ${d?.tpdre?.n_jornadas ?? d?.tpre?.n_jornadas ?? 0} días · ΣTRE ${d?.tpdre?.suma_tre ?? d?.tpre?.suma_tre ?? 0} min`,
   },
   {
-    clave: 'per',
-    nombre: 'PER',
+    clave: 'pdre',
+    nombre: 'PDRE',
     dimension: 'Calidad de la información logística',
-    descripcion: 'Porcentaje de errores en los registros',
-    formula: 'PER = (RCE / TREg) × 100',
+    descripcion: 'Porcentaje diario de registros con error (media de 20 jornadas)',
+    formula: 'PDRE = (RCE / TREvD) × 100',
     unidad: '%',
     icon: AlertTriangle,
     color: 'text-red-600',
-    detalle: (d) => `RCE ${d?.per?.rce ?? 0} / TREg ${d?.per?.treg ?? 0}`,
+    detalle: (d) => `Media de ${d?.pdre?.n_jornadas ?? d?.per?.n_jornadas ?? 0} días · RCE ${d?.pdre?.rce ?? d?.per?.rce ?? 0}`,
   },
   {
-    clave: 'peea',
-    nombre: 'PEEA',
+    clave: 'pdeea',
+    nombre: 'PDEEA',
     dimension: 'Control y seguimiento de envíos',
-    descripcion: 'Porcentaje de envíos con estado actualizado',
-    formula: 'PEEA = (EEA / TEE) × 100',
+    descripcion: 'Porcentaje diario de envíos con estado actualizado (media de 20 jornadas)',
+    formula: 'PDEEA = (EEA / TEED) × 100',
     unidad: '%',
     icon: MapPin,
     color: 'text-green-600',
-    detalle: (d) => `EEA ${d?.peea?.eea ?? 0} / TEE ${d?.peea?.tee ?? 0}`,
+    detalle: (d) => `Media de ${d?.pdeea?.n_jornadas ?? d?.peea?.n_jornadas ?? 0} días · EEA ${d?.pdeea?.eea ?? d?.peea?.eea ?? 0}`,
   },
   {
-    clave: 'pioic',
-    nombre: 'PIOIC',
+    clave: 'pdioic',
+    nombre: 'PDIOIC',
     dimension: 'Gestión de la información operativa',
-    descripcion: 'Porcentaje de incidencias operativas con información completa',
-    formula: 'PIOIC = (NIOC / NTIR) × 100',
+    descripcion: 'Porcentaje diario de incidencias con información completa (media de 20 jornadas)',
+    formula: 'PDIOIC = (NIOC / TIOED) × 100',
     unidad: '%',
     icon: ClipboardCheck,
     color: 'text-amber-600',
-    detalle: (d) => `NIOC ${d?.pioic?.nioc ?? 0} / NTIR ${d?.pioic?.ntir ?? 0}`,
+    detalle: (d) => `Media de ${d?.pdioic?.n_jornadas ?? d?.pioic?.n_jornadas ?? 0} días · NIOC ${d?.pdioic?.nioc ?? d?.pioic?.nioc ?? 0}`,
   },
 ];
 
@@ -94,7 +94,7 @@ const VentanaCard = ({ etiqueta, ventana }) => {
             completa ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
           }`}
         >
-          {ventana.dentroDeVentana} / 50
+          {ventana.dentroDeVentana} / {ventana.esperadoJornadas ?? 20}
         </span>
       </div>
       <p className="mt-2 text-xs text-slate-500">{ventana.fuente}</p>
@@ -102,13 +102,13 @@ const VentanaCard = ({ etiqueta, ventana }) => {
         {ventana.fueraDeVentana > 0 && (
           <p className="flex items-center gap-1.5 text-red-700">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-            {ventana.fueraDeVentana} registro(s) marcados fuera del periodo declarado
+            {ventana.fueraDeVentana} envío(s) marcados fuera del periodo declarado
           </p>
         )}
         {ventana.faltantes > 0 && (
           <p className="flex items-center gap-1.5 text-amber-700">
             <CalendarClock className="h-3.5 w-3.5 shrink-0" />
-            Faltan {ventana.faltantes} registro(s)
+            Faltan {ventana.faltantes} jornada(s)
             {ventana.abierta
               ? ` · quedan ${ventana.diasRestantes} día(s) de observación`
               : ' · el periodo de observación ya cerró'}
@@ -148,7 +148,7 @@ const MedicionPage = () => {
         filas: payload.filas || [],
         indicadores: payload.indicadores || {},
       });
-      toastSuccess('Ficha exportada', `Dimensión ${dimension} · ${grupo} · ${payload.filas?.length ?? 0} registros`);
+        toastSuccess('Ficha exportada', `Dimensión ${dimension} · ${grupo} · ${payload.filas?.length ?? 0} jornadas`);
     } catch {
       toastError('Error', 'No se pudo exportar la ficha');
     } finally {
@@ -179,7 +179,7 @@ const MedicionPage = () => {
       </Link>
       <PageHeader
         title="Medición de investigación"
-        subtitle="Postest — TPRE, PER, PEEA y PIOIC sobre 50 envíos reales (1–20 set 2026)"
+        subtitle="Postest — TPDRE, PDRE, PDEEA y PDIOIC sobre 20 jornadas (1–20 set 2026)"
         compact
       />
 
@@ -187,9 +187,9 @@ const MedicionPage = () => {
         <p className="flex items-start gap-2">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-salazar-700" />
           <span>
-            Este módulo solo extrae los datos del <strong>postest</strong>. No registra envíos, no
-            cambia estados y no forma parte del funcionamiento operativo (envíos, seguimiento, incidencias).
-            La operación sigue en esos módulos; aquí se miden los 50 registros de posprueba.
+            Este módulo solo extrae los datos del <strong>postest</strong>. Cada observación es un
+            día (20 jornadas, 1–20 set 2026). Los indicadores son el promedio diario. No registra
+            envíos ni cambia la operación.
           </span>
         </p>
       </div>
@@ -198,8 +198,8 @@ const MedicionPage = () => {
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
         <StatChip
-          label="Registros de postest"
-          value={`${muestra?.registradoPosprueba ?? 0} / ${muestra?.esperadoPorGrupo ?? 50}`}
+          label="Jornadas de postest"
+          value={`${muestra?.registradoPosprueba ?? 0} / ${muestra?.esperadoPorGrupo ?? 20}`}
           accent="salazar"
         />
         <StatChip
@@ -218,7 +218,7 @@ const MedicionPage = () => {
         <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
           <h3 className="font-semibold text-salazar-900">Indicadores del postest</h3>
           <p className="text-xs text-slate-500">
-            Calculados solo sobre envíos REALES de posprueba en la ventana 1–20 set 2026
+            Media de los promedios diarios (20 jornadas, 1–20 set 2026)
           </p>
         </div>
         <div className="table-panel-body">
@@ -233,7 +233,7 @@ const MedicionPage = () => {
             </thead>
             <tbody>
               {INDICADORES.map(({ clave, nombre, dimension, descripcion, formula, unidad, icon: Icon, color, detalle }) => {
-                const pos = posprueba?.[clave];
+                const pos = posprueba?.[clave] ?? posprueba?.[{ tpdre: 'tpre', pdre: 'per', pdeea: 'peea', pdioic: 'pioic' }[clave]];
                 return (
                   <tr key={clave} className="border-t border-slate-100 align-top">
                     <td className="px-3 py-3">
@@ -262,7 +262,7 @@ const MedicionPage = () => {
       <div className="card">
         <h3 className="panel-title">Exportar fichas del postest</h3>
         <p className="mb-3 text-xs text-slate-500">
-          Cada Excel incluye únicamente los 50 registros de posprueba. No exporta la operación completa ni datos sintéticos.
+          Cada Excel incluye las 20 jornadas de posprueba (una fila = un día). No exporta la operación completa.
         </p>
         <div className="grid gap-2 sm:grid-cols-2">
           {[1, 2, 3, 4].map((dim) => (

@@ -239,71 +239,77 @@ const normalizeMockPath = (url) =>
     .replace(/^\//, '')
     .split('?')[0];
 
-const fmtTime = (iso) => (iso ? new Date(iso).toTimeString().slice(0, 8) : null);
+const JORNADAS_FICHA = 20;
+const VALOR_NA = 'N/A';
+
+const diasPospruebaMock = () => {
+  const dias = [];
+  const cursor = new Date('2026-09-01T12:00:00');
+  for (let i = 0; i < JORNADAS_FICHA; i += 1) {
+    const y = cursor.getFullYear();
+    const m = String(cursor.getMonth() + 1).padStart(2, '0');
+    const d = String(cursor.getDate()).padStart(2, '0');
+    dias.push(`${y}-${m}-${d}`);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dias;
+};
+
+const fmtFechaFicha = (iso) => {
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+};
+
+const jornadasMock = () =>
+  diasPospruebaMock().map((iso, i) => {
+    const nerd = 2 + (i % 4);
+    const sumaTre = Math.round(nerd * (3.2 + (i % 5) * 0.15) * 100) / 100;
+    const rce = i % 5 === 0 ? 1 : 0;
+    const eea = Math.max(0, nerd - (i % 7 === 0 ? 1 : 0));
+    const tioed = i % 4 === 0 ? 0 : 1;
+    const nioc = tioed && i % 6 !== 0 ? 1 : 0;
+    return { iso, nerd, sumaTre, rce, eea, tioed, nioc };
+  });
+
+const ratioONa = (numerador, denominador, porcentaje = false) => {
+  if (!denominador) return VALOR_NA;
+  const valor = porcentaje ? (numerador / denominador) * 100 : numerador / denominador;
+  return Math.round(valor * 100) / 100;
+};
 
 const buildFichaEficiencia = () =>
-  envios.map((e) => ({
-    codigo_envio: e.codigo_envio,
-    fecha: e.fecha_registro,
-    tipo_mercaderia: e.tipo_carga,
-    peso_kg: e.peso_kg,
-    numero_paquetes: e.numero_paquetes,
-    origen: e.origen,
-    destino: e.destino,
-    hora_inicio: fmtTime(e.hora_inicio_registro),
-    hora_fin: fmtTime(e.hora_fin_registro),
-    tiempo_registro_min: e.tiempo_registro_min,
-    usuario_responsable: e.responsable ? `${e.responsable.nombres} ${e.responsable.apellidos}` : 'María Torres Vega',
-    observaciones: e.observaciones,
+  jornadasMock().map(({ iso, nerd, sumaTre }) => ({
+    fecha: fmtFechaFicha(iso),
+    nerd,
+    suma_tre: sumaTre,
+    tpdre: ratioONa(sumaTre, nerd),
   }));
 
 const buildFichaCalidad = () =>
-  envios.map((e) => {
-    const err = erroresRegistro.find((x) => x.id_envio === e.id_envio);
-    const tieneError = !e.registro_correcto || err;
-    return {
-      codigo_envio: e.codigo_envio,
-      fecha: e.fecha_registro,
-      tipo_mercaderia: e.tipo_carga,
-      destino: e.destino,
-      numero_paquetes: e.numero_paquetes,
-      error_en_registro: tieneError ? 'Sí' : 'No',
-      tipo_error: err?.tipo_error || null,
-      campo_afectado: err?.campo_afectado || null,
-      observaciones: e.observaciones,
-    };
-  });
+  jornadasMock().map(({ iso, nerd, rce }) => ({
+    fecha: fmtFechaFicha(iso),
+    trevd: nerd,
+    rce,
+    sin_error: nerd - rce,
+    pdre: ratioONa(rce, nerd, true),
+  }));
 
 const buildFichaControl = () =>
-  envios.map((e) => ({
-    codigo_envio: e.codigo_envio,
-    fecha: e.fecha_registro,
-    tipo_mercaderia: e.tipo_carga,
-    origen: e.origen,
-    destino: e.destino,
-    estado_actual: e.estadoActual?.nombre,
-    estado_actualizado: tieneEstadoActualizadoMock(e) ? 'Sí' : 'No',
-    fecha_actualizacion: e.historial?.[0]?.fecha_hora?.split('T')[0] || null,
-    hora_actualizacion: fmtTime(e.historial?.[0]?.fecha_hora),
-    responsable_actualizacion: e.historial?.[0]?.usuario
-      ? `${e.historial[0].usuario.nombres} ${e.historial[0].usuario.apellidos}`
-      : null,
-    observaciones: e.observaciones,
+  jornadasMock().map(({ iso, nerd, eea }) => ({
+    fecha: fmtFechaFicha(iso),
+    teed: nerd,
+    eea,
+    no_actualizado: nerd - eea,
+    pdeea: ratioONa(eea, nerd, true),
   }));
 
 const buildFichaInformacionOperativa = () =>
-  incidencias.map((i) => ({
-    fecha: i.fecha_reporte?.split('T')[0],
-    codigo_incidencia: i.codigo_incidencia,
-    tipo_incidencia: i.tipo,
-    area: i.area,
-    codigo_envio: i.envio?.codigo_envio || null,
-    estado_incidencia: i.estado_incidencia,
-    titulo: i.titulo,
-    descripcion: i.descripcion,
-    informacion_completa: i.informacion_completa ? 'Sí' : 'No',
-    fuente_principal: i.fuente_principal,
-    observacion: i.observacion || null,
+  jornadasMock().map(({ iso, tioed, nioc }) => ({
+    fecha: fmtFechaFicha(iso),
+    tioed,
+    nioc,
+    incompletas: Math.max(0, tioed - nioc),
+    pdioic: ratioONa(nioc, tioed, true),
   }));
 
 const buildMockReportData = (tipo) => {
@@ -398,70 +404,55 @@ const buildMockReportData = (tipo) => {
 
 const FICHA_CONFIG = {
   1: {
-    titulo: 'Dimensión 1 - Eficiencia operativa (TPRE)',
-    indicador: 'TPRE',
-    columnas: [
-      'codigo_envio', 'fecha', 'tipo_mercaderia', 'peso_kg', 'numero_paquetes',
-      'origen', 'destino', 'hora_inicio', 'hora_fin', 'tiempo_registro_min',
-      'usuario_responsable', 'observaciones',
-    ],
+    titulo: 'Dimensión 1 - Eficiencia operativa (TPDRE)',
+    indicador: 'TPDRE',
+    columnas: ['fecha', 'nerd', 'suma_tre', 'tpdre'],
     labels: [
-      'Código envío', 'Fecha', 'Tipo mercadería', 'Peso (kg)', 'Nº paquetes',
-      'Origen', 'Destino', 'Hora inicio', 'Hora fin', 'Tiempo registro (min)',
-      'Usuario responsable', 'Observaciones',
+      'Fecha',
+      'Número de envíos registrados (NERD)',
+      'Sumatoria de tiempos de registro (min) (ΣTRE)',
+      'Tiempo promedio diario de registro de envíos (min) (TPDRE)',
     ],
   },
   2: {
-    titulo: 'Dimensión 2 - Calidad información (PER)',
-    indicador: 'PER',
-    columnas: [
-      'codigo_envio', 'fecha', 'tipo_mercaderia', 'destino', 'numero_paquetes',
-      'error_en_registro', 'tipo_error', 'campo_afectado', 'observaciones',
-    ],
+    titulo: 'Dimensión 2 - Calidad información (PDRE)',
+    indicador: 'PDRE',
+    columnas: ['fecha', 'trevd', 'rce', 'sin_error', 'pdre'],
     labels: [
-      'Código envío', 'Fecha', 'Tipo mercadería', 'Destino', 'Nº paquetes',
-      'Error registro (Sí/No)', 'Tipo error', 'Campo afectado', 'Observaciones',
+      'Fecha',
+      'Total de registros evaluados (TREvD)',
+      'Registros con error (RCE)',
+      'Registros sin error',
+      'Porcentaje diario de registros con error (%) (PDRE)',
     ],
   },
   3: {
-    titulo: 'Dimensión 3 - Control y seguimiento (PEEA)',
-    indicador: 'PEEA',
-    columnas: [
-      'codigo_envio', 'fecha', 'tipo_mercaderia', 'origen', 'destino',
-      'estado_actual', 'estado_actualizado', 'fecha_actualizacion',
-      'hora_actualizacion', 'responsable_actualizacion', 'observaciones',
-    ],
+    titulo: 'Dimensión 3 - Control y seguimiento (PDEEA)',
+    indicador: 'PDEEA',
+    columnas: ['fecha', 'teed', 'eea', 'no_actualizado', 'pdeea'],
     labels: [
-      'Código envío', 'Fecha', 'Tipo mercadería', 'Origen', 'Destino',
-      'Estado actual', 'Estado actualizado (Sí/No)', 'Fecha actualización',
-      'Hora actualización', 'Responsable', 'Observaciones',
+      'Fecha',
+      'Total de envíos evaluados (TEED)',
+      'Envíos con estado actualizado (EEA)',
+      'Envíos con estado no actualizado',
+      'Porcentaje diario de envíos con estado actualizado (%) (PDEEA)',
     ],
   },
   4: {
-    titulo: 'Dimensión 4 - Gestión de la información operativa (PIOIC)',
-    indicador: 'PIOIC',
-    columnas: [
-      'fecha', 'codigo_incidencia', 'tipo_incidencia', 'area', 'codigo_envio',
-      'estado_incidencia', 'titulo', 'descripcion', 'informacion_completa',
-      'fuente_principal', 'observacion',
-    ],
+    titulo: 'Dimensión 4 - Gestión de la información operativa (PDIOIC)',
+    indicador: 'PDIOIC',
+    columnas: ['fecha', 'tioed', 'nioc', 'incompletas', 'pdioic'],
     labels: [
-      'Fecha', 'Código incidencia', 'Tipo incidencia', 'Área', 'Código envío',
-      'Estado incidencia', 'Título', 'Descripción', 'Información completa (Sí/No)',
-      'Fuente principal de información', 'Observación',
+      'Fecha',
+      'Total de incidencias evaluadas (TIOED)',
+      'Incidencias con información completa (NIOC)',
+      'Incidencias con información incompleta',
+      'Porcentaje diario de incidencias con información completa (%) (PDIOIC)',
     ],
   },
 };
 
-const FICHA_MUESTRA = 50;
-
-const takeUltimosFicha = (filas, limit = FICHA_MUESTRA) => {
-  if (!filas?.length) return [];
-  const sorted = [...filas].sort((a, b) =>
-    String(b.fecha || b.codigo_envio || '').localeCompare(String(a.fecha || a.codigo_envio || ''))
-  );
-  return sorted.slice(0, limit);
-};
+const FICHA_MUESTRA = JORNADAS_FICHA;
 
 const buildFichaExportPayload = (dim) => {
   const cfg = FICHA_CONFIG[dim];
@@ -471,86 +462,121 @@ const buildFichaExportPayload = (dim) => {
     3: buildFichaControl,
     4: buildFichaInformacionOperativa,
   };
-  const all = builders[dim]?.() || [];
-  const filas = takeUltimosFicha(all);
+  const filas = builders[dim]?.() || [];
   const headers = cfg.columnas.map((key, i) => ({ key, label: cfg.labels[i] }));
   const ind = calcIndicadores();
   return {
     dimension: dim,
     titulo: cfg.titulo,
     indicador: cfg.indicador,
+    columnas: cfg.columnas,
+    labels: cfg.labels,
     headers,
     filas,
-    total: all.length,
+    total: filas.length,
     exportados: filas.length,
     limite: FICHA_MUESTRA,
-    indicadores: { tpre: ind.tpre, per: ind.per, peea: ind.peea, pioic: ind.pioic },
+    indicadores: {
+      tpre: ind.tpre,
+      tpdre: ind.tpdre,
+      per: ind.per,
+      pdre: ind.pdre,
+      peea: ind.peea,
+      pdeea: ind.pdeea,
+      pioic: ind.pioic,
+      pdioic: ind.pdioic,
+    },
   };
 };
 
 const redondear = (v) => Math.round((Number(v) || 0) * 100) / 100;
 
-// Mismo criterio PIOIC que backend/src/utils/reglasIndicadores.js
-const esIncidenciaCompletaMock = (i) =>
-  Boolean(i?.tipo && i?.area?.trim() && i?.titulo?.trim() && i?.descripcion?.trim() && i?.fuente_principal?.trim());
-
-// PEEA: el estado actual coincide con el último movimiento del historial
-// (el historial mock está ordenado del más reciente al más antiguo).
-const tieneEstadoActualizadoMock = (e) => {
-  const ultimo = e?.historial?.[0];
-  if (!ultimo?.estado) return false;
-  return ultimo.estado.id_estado === e.estadoActual?.id_estado;
+const mediaDiariaMock = (filas, numeradorKey, denominadorKey, porcentaje = false) => {
+  const valores = filas
+    .map((f) => {
+      const d = Number(f[denominadorKey]) || 0;
+      if (!d) return null;
+      const n = Number(f[numeradorKey]) || 0;
+      return porcentaje ? (n / d) * 100 : n / d;
+    })
+    .filter((v) => v !== null);
+  return valores.length ? redondear(valores.reduce((a, b) => a + b, 0) / valores.length) : 0;
 };
 
 const calcIndicadores = () => {
-  const tiempos = envios.filter((e) => e.tiempo_registro_min != null).map((e) => e.tiempo_registro_min);
-  const sumaTre = tiempos.reduce((a, b) => a + b, 0);
-  const tpre = tiempos.length ? sumaTre / tiempos.length : 0;
-
-  const conError = envios.filter(
-    (e) => !e.registro_correcto || erroresRegistro.some((x) => x.id_envio === e.id_envio)
-  ).length;
-  const per = envios.length ? (conError / envios.length) * 100 : 0;
-
-  const actualizados = envios.filter(tieneEstadoActualizadoMock).length;
-  const peea = envios.length ? (actualizados / envios.length) * 100 : 0;
-
-  const completas = incidencias.filter(esIncidenciaCompletaMock).length;
-  const pioic = incidencias.length ? (completas / incidencias.length) * 100 : 0;
+  const dias = jornadasMock();
+  const tpdre = mediaDiariaMock(dias, 'sumaTre', 'nerd');
+  const pdre = mediaDiariaMock(dias, 'rce', 'nerd', true);
+  const pdeea = mediaDiariaMock(dias, 'eea', 'nerd', true);
+  const pdioic = mediaDiariaMock(dias, 'nioc', 'tioed', true);
+  const nerd = dias.reduce((a, d) => a + d.nerd, 0);
+  const sumaTre = redondear(dias.reduce((a, d) => a + d.sumaTre, 0));
+  const rce = dias.reduce((a, d) => a + d.rce, 0);
+  const eea = dias.reduce((a, d) => a + d.eea, 0);
+  const tioed = dias.reduce((a, d) => a + d.tioed, 0);
+  const nioc = dias.reduce((a, d) => a + d.nioc, 0);
+  const nDias = dias.filter((d) => d.nerd > 0).length;
+  const nDiasInc = dias.filter((d) => d.tioed > 0).length;
 
   return {
     alcance: 'MUESTRA',
-    grupo: 'PREPRUEBA+POSPRUEBA',
+    grupo: 'POSPRUEBA',
     incluyeDatosSinteticos: false,
-    tpre: redondear(tpre),
-    per: redondear(per),
-    peea: redondear(peea),
-    pioic: redondear(pioic),
-    totalEnvios: envios.length,
-    totalIncidencias: incidencias.length,
+    unidadObservacion: 'jornada',
+    nJornadas: JORNADAS_FICHA,
+    nJornadasConDatos: nDias,
+    tpre: tpdre,
+    tpdre,
+    per: pdre,
+    pdre,
+    peea: pdeea,
+    pdeea,
+    pioic: pdioic,
+    pdioic,
+    totalEnvios: nerd,
+    totalIncidencias: tioed,
     detalle: {
-      tpre: { suma_tre: redondear(sumaTre), ner: tiempos.length, unidad: 'minutos' },
-      per: { rce: conError, treg: envios.length },
-      peea: { eea: actualizados, tee: envios.length },
-      pioic: { nioc: completas, ntir: incidencias.length },
+      tpre: { suma_tre: sumaTre, ner: nerd, n_jornadas: nDias, unidad: 'minutos', media_diaria: true },
+      tpdre: { suma_tre: sumaTre, nerd, n_jornadas: nDias, unidad: 'minutos', media_diaria: true },
+      per: { rce, treg: nerd, n_jornadas: nDias, media_diaria: true },
+      pdre: { rce, trevd: nerd, n_jornadas: nDias, media_diaria: true },
+      peea: { eea, tee: nerd, n_jornadas: nDias, media_diaria: true },
+      pdeea: { eea, teed: nerd, n_jornadas: nDias, media_diaria: true },
+      pioic: { nioc, ntir: tioed, n_jornadas: nDiasInc, media_diaria: true },
+      pdioic: { nioc, tioed, n_jornadas: nDiasInc, media_diaria: true },
     },
   };
 };
 
 const buildMedicionMock = () => {
   const base = calcIndicadores();
-  const mitad = (v) => redondear(v);
   return {
     preprueba: { ...base, grupo: 'PREPRUEBA' },
-    posprueba: { ...base, grupo: 'POSPRUEBA', tpre: mitad(base.tpre * 0.6), per: mitad(base.per * 0.5) },
+    posprueba: { ...base, grupo: 'POSPRUEBA' },
+    ventanas: {
+      posprueba: {
+        anexo: 'Anexo 3',
+        desde: '2026-09-01',
+        hasta: '2026-09-20',
+        fuente: 'Registros capturados desde la aplicación web.',
+        registrados: base.totalEnvios,
+        dentroDeVentana: JORNADAS_FICHA,
+        esperadoJornadas: JORNADAS_FICHA,
+        fueraDeVentana: 0,
+        faltantes: 0,
+        abierta: false,
+        diasRestantes: 0,
+      },
+    },
     muestra: {
-      esperadoPorGrupo: 50,
-      esperadoTotal: 100,
+      esperadoPorGrupo: JORNADAS_FICHA,
+      esperadoTotal: JORNADAS_FICHA * 2,
       registradoPreprueba: 0,
-      registradoPosprueba: 0,
-      registradoTotal: 0,
+      registradoPosprueba: JORNADAS_FICHA,
+      registradoTotal: JORNADAS_FICHA,
       completa: false,
       pareada: false,
+      unidadObservacion: 'jornada',
     },
     datosSinteticos: {
       envios: 0,
@@ -784,6 +810,8 @@ export const handleMockRequest = async (config) => {
       dimension: dim,
       titulo: payload.titulo,
       indicador: payload.indicador,
+      columnas: payload.columnas,
+      labels: payload.labels,
       data: payload.filas,
       total: payload.total,
       limite: payload.limite,

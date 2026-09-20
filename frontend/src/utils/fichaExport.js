@@ -76,10 +76,12 @@ export async function exportFichaExcel({ titulo, indicador, dimension, headers, 
   ws.getCell('A3').alignment = { horizontal: 'center', vertical: 'middle' };
   ws.getRow(3).height = 22;
 
-  const valorIndicador = indicadores[indicador?.toLowerCase()];
+  const valorIndicador = indicadores[indicador?.toLowerCase()]
+    ?? indicadores[{ TPDRE: 'tpre', PDRE: 'per', PDEEA: 'peea', PDIOIC: 'pioic' }[indicador]];
+  const unidad = ['TPRE', 'TPDRE'].includes(indicador) ? ' min' : '%';
   ws.mergeCells(4, 1, 4, colCount);
   ws.getCell('A4').value =
-    `Ficha de observación · Indicador ${indicador}${valorIndicador != null ? `: ${valorIndicador}${indicador === 'TPRE' ? ' min' : '%'}` : ''} · Últimos ${filas.length} registros · Generado: ${formatDateTime(new Date())}`;
+    `Ficha de observación · Indicador ${indicador}${valorIndicador != null ? `: ${valorIndicador}${unidad}` : ''} · ${filas.length} jornadas (promedio por día) · Generado: ${formatDateTime(new Date())}`;
   ws.getCell('A4').font = { size: 9, color: { argb: 'FF64748B' } };
   ws.getCell('A4').alignment = { horizontal: 'center', wrapText: true };
 
@@ -110,7 +112,7 @@ export async function exportFichaExcel({ titulo, indicador, dimension, headers, 
   if (!filas.length) {
     ws.mergeCells(headerRowNum + 1, 1, headerRowNum + 1, colCount + 1);
     const emptyCell = ws.getCell(headerRowNum + 1, 1);
-    emptyCell.value = 'Sin registros en esta dimensión.';
+    emptyCell.value = 'Sin jornadas en esta dimensión.';
     emptyCell.font = { italic: true, color: { argb: 'FF64748B' } };
     emptyCell.alignment = { horizontal: 'center', vertical: 'middle' };
   } else {

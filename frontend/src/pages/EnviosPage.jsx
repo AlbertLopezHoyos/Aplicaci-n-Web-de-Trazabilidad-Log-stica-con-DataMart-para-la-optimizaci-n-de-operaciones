@@ -7,7 +7,7 @@ import { usePresentacion } from '../context/PresentacionContext';
 import PageHeader from '../components/PageHeader';
 import StatChip from '../components/StatChip';
 import StatusBadge from '../components/StatusBadge';
-import { labelCliente } from '../utils/cliente';
+import { nombreCliente } from '../utils/cliente';
 import Pagination from '../components/Pagination';
 import { formatDate } from '../utils/format';
 import RegistroScopeFilter from '../components/RegistroScopeFilter';
@@ -189,7 +189,7 @@ const EnviosPage = () => {
                   {envios.data?.map((e) => (
                     <tr key={e.id_envio} className="border-b border-slate-50 hover:bg-slate-50/50">
                       <td className="px-4 py-3 font-mono font-medium text-salazar-800">{e.codigo_envio}</td>
-                      <td className="px-4 py-3">{labelCliente(e.cliente)}</td>
+                      <td className="px-4 py-3">{nombreCliente(e.cliente)}</td>
                       <td className="px-4 py-3 text-xs">
                         {e.origen} → {e.destino}
                       </td>

@@ -8,8 +8,8 @@ const HERRAMIENTAS = [
     icon: ClipboardList,
     titulo: 'Fichas de observación',
     descripcion:
-      'Exporta las fichas por dimensión (TPRE, PER, PEEA, PIOIC) con los registros del postest en Excel.',
-    detalle: '50 envíos · 1 al 20 set 2026',
+      'Exporta las fichas por dimensión (TPDRE, PDRE, PDEEA, PDIOIC). Cada fila es un día operativo.',
+    detalle: '20 jornadas · 1 al 20 set 2026',
     color: 'border-slate-200 bg-white hover:border-salazar-300 hover:shadow-md',
     iconWrap: 'bg-salazar-100 text-salazar-800',
   },
@@ -18,8 +18,8 @@ const HERRAMIENTAS = [
     icon: FlaskConical,
     titulo: 'Medición de indicadores',
     descripcion:
-      'Consulta y exporta los cuatro indicadores del postest calculados sobre la muestra de posprueba.',
-    detalle: 'TPRE · PER · PEEA · PIOIC',
+      'Consulta los cuatro indicadores del postest como promedio diario de las 20 jornadas.',
+    detalle: 'TPDRE · PDRE · PDEEA · PDIOIC',
     color: 'border-slate-200 bg-white hover:border-salazar-300 hover:shadow-md',
     iconWrap: 'bg-slate-100 text-slate-700',
   },
@@ -38,7 +38,7 @@ const InvestigacionPage = () => (
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-salazar-700" />
         <span>
           Estas herramientas no forman parte de la operación diaria. Sirven para obtener las fichas
-          y los indicadores del postest desde la misma base de datos del sistema.
+          y los indicadores del postest (20 jornadas, promedio por día) desde la misma base de datos.
         </span>
       </p>
     </div>
